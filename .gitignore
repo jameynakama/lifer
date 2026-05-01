@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+
+# Go binaries
+backend/bin/
+backend/lifer
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.svelte-kit/
