@@ -1,12 +1,16 @@
 <script lang="ts">
     interface Stat {
       label: string
-      value: 11
+      value: number | string
     };
 
-    interface StatsBarProps {
-      stats: Stat[]
-    }
-
-    let { stats } = $props();
+    let { stats = [] }: { stats: Stat[] }= $props();
 </script>
+
+<div>
+    <ul>
+        {#each stats as stat}
+            <li><span>{stat.label}</span>: <span>{stat.value}</span></li>
+        {/each}
+    </ul>
+</div>

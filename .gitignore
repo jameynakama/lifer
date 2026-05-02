@@ -12,6 +12,9 @@ backend/lifer
 # Superpowers brainstorm sessions
 .superpowers/
 
+# jj workspaces
+.worktrees/
+
 # Frontend
 frontend/node_modules/
 frontend/dist/
