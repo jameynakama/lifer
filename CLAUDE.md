@@ -56,3 +56,29 @@ just migrate-up
 just run               # starts on :8080
 just                   # runs tests (default)
 ```
+
+## External APIs
+
+All three are **ingestion-only** -- hit them once to populate the DB, store assets locally or S3, never needed again at runtime.
+
+### eBird API
+- **Used for:** regional species checklists → preset groups (e.g. "Pacific Northwest")
+- **Auth:** free API key, request at ebird.org/api/keygen
+- **Key endpoint:** `GET /v2/product/spplist/{regionCode}` returns species codes for a region
+- **Region codes:** e.g. `US-WA` for Washington state, `US-OR` for Oregon
+- **Docs:** https://documenter.getpostman.com/view/664302/S1ENwy59
+
+### Xeno-canto
+- **Used for:** bird call/song recordings (the core quiz content)
+- **Auth:** free API key for registered members with verified email
+- **Approach:** search by species scientific name, filter to quality A or B, download MP3s, store file path in `recordings.file_path`
+- **Key endpoint:** `GET /api/2/recordings?query={scientific_name}+q:A` 
+- **License:** all recordings are Creative Commons -- safe to store and serve
+- **Docs:** https://xeno-canto.org/explore/api
+
+### Macaulay Library (Cornell Lab)
+- **Used for:** species photos shown on quiz reveal and for future image ID quizzes
+- **Auth:** same eBird API key
+- **Approach:** search by species code, download a few photos per species, store in `species_images`
+- **Key endpoint:** `GET /v2/ref/media/best?species={speciesCode}&mediaType=photo`
+- **Note:** same Cornell/eBird ecosystem -- one API key covers both eBird checklists and Macaulay media
