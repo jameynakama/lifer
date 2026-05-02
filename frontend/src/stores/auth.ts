@@ -1,9 +1,9 @@
 import { writable, type Writable } from "svelte/store";
 
 interface User {
-    id: number | null;
-    email: string | null;
-    name: string | null;
+    id: number;
+    email: string;
+    name: string;
 }
 
 type Auth = User | null;
