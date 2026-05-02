@@ -1,0 +1,50 @@
+# Lifer
+
+Spaced repetition practice for bird song and call identification.
+
+Play a recording, guess the species, reveal the answer, rate your confidence. Practice by region or build custom species groups. Scheduling powered by FSRS.
+
+## Stack
+
+- **Backend** -- Go, chi, sqlc, PostgreSQL
+- **Frontend** -- Svelte (Vite)
+- **Auth** -- Google OAuth
+
+## Local setup
+
+**Requirements:** Go 1.22+, Node 20+, PostgreSQL, [just](https://github.com/casey/just), [sqlc](https://sqlc.dev), [golang-migrate](https://github.com/golang-migrate/migrate)
+
+```bash
+brew install just sqlc golang-migrate
+```
+
+**First run:**
+
+```bash
+git clone https://github.com/jameynakama/lifer
+cd lifer
+cp .env.example .env   # fill in Google OAuth credentials and JWT secret
+createdb lifer_dev
+just migrate-up
+just run               # backend on http://localhost:8080
+```
+
+**Google OAuth credentials:** [console.cloud.google.com](https://console.cloud.google.com) -- create a project, enable the Google+ API, create OAuth 2.0 credentials. Set the redirect URI to `http://localhost:8080/api/v1/auth/google/callback`.
+
+## Commands
+
+```
+just            # run tests (default)
+just run        # start backend server
+just build      # build binary to backend/bin/lifer
+just migrate-up        # run pending migrations
+just migrate-down      # roll back one migration
+just generate          # regenerate sqlc types after schema changes
+just migration name=X  # create new migration files
+```
+
+## Data sources
+
+- **eBird API** -- regional species checklists (preset groups)
+- **Xeno-canto** -- bird call/song recordings (CC licensed, A/B quality)
+- **Macaulay Library** -- bird photos (Cornell Lab)
