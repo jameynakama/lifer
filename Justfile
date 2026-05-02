@@ -29,3 +29,8 @@ generate:
 # Create a new migration (usage: just migration name=add_something)
 migration name:
     migrate create -ext sql -dir backend/migrations -seq {{ name }}
+
+# Install all the required tools
+install-tools:
+    brew install sqlc
+    go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
