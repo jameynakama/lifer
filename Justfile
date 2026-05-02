@@ -30,6 +30,10 @@ generate:
 migration name:
     migrate create -ext sql -dir backend/migrations -seq {{ name }}
 
+# Start the frontend dev server
+frontend:
+    cd frontend && npm run dev
+
 # Install all the required tools
 install-tools:
     brew install sqlc
