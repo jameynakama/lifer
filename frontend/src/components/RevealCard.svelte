@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type { Card } from '../types'
+    import type { BirdCard } from '../types'
 
-    let { card, onRate }: { card: Card, onRate: (rating: number) => void } = $props()
+    let { card, onRate }: { card: BirdCard, onRate: (rating: number) => void } = $props()
 
     const ratings = [
       { label: "Again", value: 1 },

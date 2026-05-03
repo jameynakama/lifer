@@ -2,7 +2,13 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/svelte'
 import QuizCard from './QuizCard.svelte'
 
-const card = { recording_path: '/recordings/song-sparrow.mp3' }
+const card = {
+  id: '1',
+  recording_path: '/recordings/song-sparrow.mp3',
+  common_name: 'Song Sparrow',
+  scientific_name: 'Melospiza melodia',
+  photo_path: '/photos/song-sparrow.jpg',
+}
 
 describe('QuizCard', () => {
   it('renders an audio player with the recording path', () => {

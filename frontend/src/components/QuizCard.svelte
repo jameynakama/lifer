@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type { Card } from '../types'
+    import type { BirdCard } from '../types'
 
-    let { card, onReveal }: { card: Card, onReveal: () => void } = $props()
+    let { card, onReveal }: { card: BirdCard, onReveal: () => void } = $props()
 
     let guess: string = $state("");
 </script>
