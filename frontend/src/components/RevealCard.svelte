@@ -1,11 +1,7 @@
 <script lang="ts">
-    interface Card {
-      common_name: string
-      scientific_name: string
-      photo_path: string
-    };
+    import type { Card } from '../types'
 
-    let { card, onRate }: { card: Card, onRate: (v: number) => void} = $props();
+    let { card, onRate }: { card: Card, onRate: (rating: number) => void } = $props()
 
     const ratings = [
       { label: "Again", value: 1 },

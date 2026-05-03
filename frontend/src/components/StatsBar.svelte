@@ -1,10 +1,7 @@
 <script lang="ts">
-    interface Stat {
-      label: string
-      value: number | string
-    };
+    import type { Stat } from '../types'
 
-    let { stats = [] }: { stats: Stat[] }= $props();
+    let { stats = [] }: { stats: Stat[] } = $props()
 </script>
 
 <div>

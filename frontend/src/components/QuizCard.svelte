@@ -1,9 +1,7 @@
 <script lang="ts">
-    interface Card {
-      recording_path: string
-    }
+    import type { Card } from '../types'
 
-    let { card, onReveal }: { card: Card, onReveal: () => void } = $props();
+    let { card, onReveal }: { card: Card, onReveal: () => void } = $props()
 
     let guess: string = $state("");
 </script>
