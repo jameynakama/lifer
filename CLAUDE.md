@@ -51,7 +51,7 @@ Cards are user-scoped. Species/recordings/images are global shared catalog. is_a
 git clone https://github.com/jameynakama/lifer
 cd lifer
 cp .env.example .env   # fill in values
-createdb lifer_dev
+docker compose up -d   # starts postgres on port 5433
 just migrate-up
 just run               # starts on :8080
 just                   # runs tests (default)

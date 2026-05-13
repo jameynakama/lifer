@@ -1,12 +1,14 @@
 # Svelte Frontend Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Build a Svelte + Vite SPA in `frontend/` with login, dashboard, and quiz views for the Lifer bird song identification app.
 
 **Architecture:** State-based view switching via a `$view` Svelte store. `App.svelte` checks `/api/v1/me` on mount and renders the current view. Dashboard shows stats + group list with mock data; Quiz orchestrates QuizCard ↔ RevealCard with mock card data. API stubs are one-line swaps when real endpoints exist.
 
-**Tech Stack:** Svelte 4, Vite 5, Vitest 1, @testing-library/svelte 4, jsdom
+**Tech Stack:** Svelte 5, Vite 6, Vitest 4, @testing-library/svelte 5, jsdom
+
+> **Status: COMPLETE** (all 10 tasks done). Implemented with Svelte 5 runes (`$props()`, `$state()`, `$derived()`, `$effect()`, `onclick`) rather than Svelte 4 syntax (`export let`, `$:`, `on:click`, `onMount`). Files use `.ts` not `.js`. Required `resolve: { conditions: ['browser'] }` in vite.config.ts to prevent Svelte 5 SSR path in Vitest.
 
 ---
 
@@ -40,7 +42,7 @@
 - Modify: `frontend/src/main.js`
 - Modify: `Justfile`
 
-- [ ] **Step 1: Scaffold the project**
+- [x] **Step 1: Scaffold the project**
 
 ```bash
 cd /path/to/lifer
@@ -48,14 +50,14 @@ npm create vite@latest frontend -- --template svelte
 cd frontend && npm install
 ```
 
-- [ ] **Step 2: Install test dependencies**
+- [x] **Step 2: Install test dependencies**
 
 ```bash
 cd frontend
 npm install --save-dev vitest @testing-library/svelte @testing-library/jest-dom jsdom
 ```
 
-- [ ] **Step 3: Replace `frontend/vite.config.js`**
+- [x] **Step 3: Replace `frontend/vite.config.js`**
 
 ```js
 import { defineConfig } from 'vite'
@@ -76,13 +78,13 @@ export default defineConfig({
 })
 ```
 
-- [ ] **Step 4: Create `frontend/src/test-setup.js`**
+- [x] **Step 4: Create `frontend/src/test-setup.js`**
 
 ```js
 import '@testing-library/jest-dom'
 ```
 
-- [ ] **Step 5: Add test script to `frontend/package.json`**
+- [x] **Step 5: Add test script to `frontend/package.json`**
 
 In the `scripts` section, add:
 ```json
@@ -90,7 +92,7 @@ In the `scripts` section, add:
 "test:watch": "vitest"
 ```
 
-- [ ] **Step 6: Clear template boilerplate**
+- [x] **Step 6: Clear template boilerplate**
 
 Run from the repo root. Delete generated files that will be replaced:
 ```bash
@@ -123,7 +125,7 @@ Update `frontend/index.html` title to `Lifer`:
 </html>
 ```
 
-- [ ] **Step 7: Add frontend target to Justfile**
+- [x] **Step 7: Add frontend target to Justfile**
 
 Append to `Justfile`:
 ```
@@ -132,7 +134,7 @@ frontend:
     cd frontend && npm run dev
 ```
 
-- [ ] **Step 8: Verify Vitest is wired up**
+- [x] **Step 8: Verify Vitest is wired up**
 
 ```bash
 cd frontend && npx vitest run
@@ -140,7 +142,7 @@ cd frontend && npx vitest run
 
 Expected: "No test files found" (not an error about missing config or deps).
 
-- [ ] **Step 9: Commit**
+- [x] **Step 9: Commit**
 
 ```bash
 jj describe -m "scaffold Svelte frontend with Vite, Vitest, and /api proxy"
@@ -157,7 +159,7 @@ jj new
 - Create: `frontend/src/stores/session.js`
 - Create: `frontend/src/stores/stores.test.js`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `frontend/src/stores/stores.test.js`:
 ```js
@@ -186,7 +188,7 @@ describe('session store', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd frontend && npx vitest run src/stores/stores.test.js
@@ -194,7 +196,7 @@ cd frontend && npx vitest run src/stores/stores.test.js
 
 Expected: FAIL — "Cannot find module './auth.js'"
 
-- [ ] **Step 3: Create `frontend/src/stores/auth.js`**
+- [x] **Step 3: Create `frontend/src/stores/auth.js`**
 
 ```js
 import { writable } from 'svelte/store'
@@ -203,7 +205,7 @@ import { writable } from 'svelte/store'
 export const auth = writable(null)
 ```
 
-- [ ] **Step 4: Create `frontend/src/stores/view.js`**
+- [x] **Step 4: Create `frontend/src/stores/view.js`**
 
 ```js
 import { writable } from 'svelte/store'
@@ -212,7 +214,7 @@ import { writable } from 'svelte/store'
 export const view = writable('login')
 ```
 
-- [ ] **Step 5: Create `frontend/src/stores/session.js`**
+- [x] **Step 5: Create `frontend/src/stores/session.js`**
 
 ```js
 import { writable } from 'svelte/store'
@@ -221,7 +223,7 @@ import { writable } from 'svelte/store'
 export const session = writable({ groupId: null })
 ```
 
-- [ ] **Step 6: Run to verify pass**
+- [x] **Step 6: Run to verify pass**
 
 ```bash
 cd frontend && npx vitest run src/stores/stores.test.js
@@ -229,7 +231,7 @@ cd frontend && npx vitest run src/stores/stores.test.js
 
 Expected: 3 tests pass.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 jj describe -m "add auth, view, and session Svelte stores"
@@ -244,7 +246,7 @@ jj new
 - Create: `frontend/src/views/Login.svelte`
 - Create: `frontend/src/views/Login.test.js`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `frontend/src/views/Login.test.js`:
 ```js
@@ -261,7 +263,7 @@ describe('Login', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd frontend && npx vitest run src/views/Login.test.js
@@ -269,7 +271,7 @@ cd frontend && npx vitest run src/views/Login.test.js
 
 Expected: FAIL — "Cannot find module './Login.svelte'"
 
-- [ ] **Step 3: Create `frontend/src/views/Login.svelte`**
+- [x] **Step 3: Create `frontend/src/views/Login.svelte`**
 
 ```svelte
 <div class="login">
@@ -290,7 +292,7 @@ Expected: FAIL — "Cannot find module './Login.svelte'"
 </style>
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 cd frontend && npx vitest run src/views/Login.test.js
@@ -298,7 +300,7 @@ cd frontend && npx vitest run src/views/Login.test.js
 
 Expected: 1 test passes.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 jj describe -m "add Login view with Google auth link"
@@ -313,7 +315,7 @@ jj new
 - Create: `frontend/src/components/StatsBar.svelte`
 - Create: `frontend/src/components/StatsBar.test.js`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Create `frontend/src/components/StatsBar.test.js`:
 ```js
@@ -344,7 +346,7 @@ describe('StatsBar', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd frontend && npx vitest run src/components/StatsBar.test.js
@@ -352,7 +354,7 @@ cd frontend && npx vitest run src/components/StatsBar.test.js
 
 Expected: FAIL — "Cannot find module './StatsBar.svelte'"
 
-- [ ] **Step 3: Create `frontend/src/components/StatsBar.svelte`**
+- [x] **Step 3: Create `frontend/src/components/StatsBar.svelte`**
 
 ```svelte
 <script>
@@ -398,7 +400,7 @@ Expected: FAIL — "Cannot find module './StatsBar.svelte'"
 </style>
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 cd frontend && npx vitest run src/components/StatsBar.test.js
@@ -406,7 +408,7 @@ cd frontend && npx vitest run src/components/StatsBar.test.js
 
 Expected: 2 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 jj describe -m "add StatsBar component"
@@ -421,7 +423,7 @@ jj new
 - Create: `frontend/src/components/QuizCard.svelte`
 - Create: `frontend/src/components/QuizCard.test.js`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `frontend/src/components/QuizCard.test.js`:
 ```js
@@ -453,7 +455,7 @@ describe('QuizCard', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd frontend && npx vitest run src/components/QuizCard.test.js
@@ -461,7 +463,7 @@ cd frontend && npx vitest run src/components/QuizCard.test.js
 
 Expected: FAIL — "Cannot find module './QuizCard.svelte'"
 
-- [ ] **Step 3: Create `frontend/src/components/QuizCard.svelte`**
+- [x] **Step 3: Create `frontend/src/components/QuizCard.svelte`**
 
 ```svelte
 <script>
@@ -515,7 +517,7 @@ Expected: FAIL — "Cannot find module './QuizCard.svelte'"
 </style>
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 cd frontend && npx vitest run src/components/QuizCard.test.js
@@ -523,7 +525,7 @@ cd frontend && npx vitest run src/components/QuizCard.test.js
 
 Expected: 3 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 jj describe -m "add QuizCard component"
@@ -538,7 +540,7 @@ jj new
 - Create: `frontend/src/components/RevealCard.svelte`
 - Create: `frontend/src/components/RevealCard.test.js`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `frontend/src/components/RevealCard.test.js`:
 ```js
@@ -589,7 +591,7 @@ describe('RevealCard', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd frontend && npx vitest run src/components/RevealCard.test.js
@@ -597,7 +599,7 @@ cd frontend && npx vitest run src/components/RevealCard.test.js
 
 Expected: FAIL — "Cannot find module './RevealCard.svelte'"
 
-- [ ] **Step 3: Create `frontend/src/components/RevealCard.svelte`**
+- [x] **Step 3: Create `frontend/src/components/RevealCard.svelte`**
 
 ```svelte
 <script>
@@ -684,7 +686,7 @@ Expected: FAIL — "Cannot find module './RevealCard.svelte'"
 </style>
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 cd frontend && npx vitest run src/components/RevealCard.test.js
@@ -692,7 +694,7 @@ cd frontend && npx vitest run src/components/RevealCard.test.js
 
 Expected: 5 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 jj describe -m "add RevealCard component with confidence rating buttons"
@@ -707,7 +709,7 @@ jj new
 - Create: `frontend/src/components/GroupList.svelte`
 - Create: `frontend/src/components/GroupList.test.js`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `frontend/src/components/GroupList.test.js`:
 ```js
@@ -745,7 +747,7 @@ describe('GroupList', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd frontend && npx vitest run src/components/GroupList.test.js
@@ -753,7 +755,7 @@ cd frontend && npx vitest run src/components/GroupList.test.js
 
 Expected: FAIL — "Cannot find module './GroupList.svelte'"
 
-- [ ] **Step 3: Create `frontend/src/components/GroupList.svelte`**
+- [x] **Step 3: Create `frontend/src/components/GroupList.svelte`**
 
 ```svelte
 <script>
@@ -822,7 +824,7 @@ Expected: FAIL — "Cannot find module './GroupList.svelte'"
 </style>
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 cd frontend && npx vitest run src/components/GroupList.test.js
@@ -830,7 +832,7 @@ cd frontend && npx vitest run src/components/GroupList.test.js
 
 Expected: 3 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 jj describe -m "add GroupList component"
@@ -845,7 +847,7 @@ jj new
 - Create: `frontend/src/views/Dashboard.svelte`
 - Create: `frontend/src/views/Dashboard.test.js`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `frontend/src/views/Dashboard.test.js`:
 ```js
@@ -889,7 +891,7 @@ describe('Dashboard', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd frontend && npx vitest run src/views/Dashboard.test.js
@@ -897,7 +899,7 @@ cd frontend && npx vitest run src/views/Dashboard.test.js
 
 Expected: FAIL — "Cannot find module './Dashboard.svelte'"
 
-- [ ] **Step 3: Create `frontend/src/views/Dashboard.svelte`**
+- [x] **Step 3: Create `frontend/src/views/Dashboard.svelte`**
 
 ```svelte
 <script>
@@ -973,7 +975,7 @@ Expected: FAIL — "Cannot find module './Dashboard.svelte'"
 </style>
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 cd frontend && npx vitest run src/views/Dashboard.test.js
@@ -981,7 +983,7 @@ cd frontend && npx vitest run src/views/Dashboard.test.js
 
 Expected: 4 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 jj describe -m "add Dashboard view with mock group data"
@@ -996,7 +998,7 @@ jj new
 - Create: `frontend/src/views/Quiz.svelte`
 - Create: `frontend/src/views/Quiz.test.js`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `frontend/src/views/Quiz.test.js`:
 ```js
@@ -1043,7 +1045,7 @@ describe('Quiz', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd frontend && npx vitest run src/views/Quiz.test.js
@@ -1051,7 +1053,7 @@ cd frontend && npx vitest run src/views/Quiz.test.js
 
 Expected: FAIL — "Cannot find module './Quiz.svelte'"
 
-- [ ] **Step 3: Create `frontend/src/views/Quiz.svelte`**
+- [x] **Step 3: Create `frontend/src/views/Quiz.svelte`**
 
 ```svelte
 <script>
@@ -1128,7 +1130,7 @@ Expected: FAIL — "Cannot find module './Quiz.svelte'"
 </style>
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 cd frontend && npx vitest run src/views/Quiz.test.js
@@ -1136,7 +1138,7 @@ cd frontend && npx vitest run src/views/Quiz.test.js
 
 Expected: 4 tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 jj describe -m "add Quiz view with mock card queue"
@@ -1151,7 +1153,7 @@ jj new
 - Create: `frontend/src/App.svelte`
 - Create: `frontend/src/App.test.js`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Create `frontend/src/App.test.js`:
 ```js
@@ -1191,7 +1193,7 @@ describe('App', () => {
 })
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd frontend && npx vitest run src/App.test.js
@@ -1199,7 +1201,7 @@ cd frontend && npx vitest run src/App.test.js
 
 Expected: FAIL — "Cannot find module './App.svelte'"
 
-- [ ] **Step 3: Create `frontend/src/App.svelte`**
+- [x] **Step 3: Create `frontend/src/App.svelte`**
 
 ```svelte
 <script>
@@ -1230,7 +1232,7 @@ Expected: FAIL — "Cannot find module './App.svelte'"
 {/if}
 ```
 
-- [ ] **Step 4: Run to verify pass**
+- [x] **Step 4: Run to verify pass**
 
 ```bash
 cd frontend && npx vitest run src/App.test.js
@@ -1238,7 +1240,7 @@ cd frontend && npx vitest run src/App.test.js
 
 Expected: 2 tests pass.
 
-- [ ] **Step 5: Run the full test suite**
+- [x] **Step 5: Run the full test suite**
 
 ```bash
 cd frontend && npx vitest run
@@ -1246,7 +1248,7 @@ cd frontend && npx vitest run
 
 Expected: All tests pass across all files.
 
-- [ ] **Step 6: Verify the dev server starts**
+- [x] **Step 6: Verify the dev server starts**
 
 ```bash
 just frontend
@@ -1254,7 +1256,7 @@ just frontend
 
 Open http://localhost:5173 — should show the Login view (since there's no auth cookie in the browser). Clicking "Sign in with Google" should redirect to the backend OAuth flow.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 jj describe -m "add App root component with auth check and view routing"
