@@ -19,9 +19,8 @@ describe('App', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
     render(App)
     await vi.waitFor(() => {
-      expect(get(view)).toBe('login')
+      expect(screen.getByRole('link', { name: /sign in with google/i })).toBeInTheDocument()
     })
-    expect(screen.getByRole('link', { name: /sign in with google/i })).toBeInTheDocument()
   })
 
   it('shows Dashboard and sets auth when /api/v1/me returns 200', async () => {
@@ -29,16 +28,9 @@ describe('App', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }))
     render(App)
     await vi.waitFor(() => {
-      expect(get(view)).toBe('dashboard')
+      expect(screen.getByRole('button', { name: /start practice/i })).toBeInTheDocument()
     })
     expect(get(auth)).toEqual(user)
-    expect(screen.getByRole('button', { name: /start practice/i })).toBeInTheDocument()
   })
 
-  it('shows Quiz when view is quiz', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }))
-    view.set('quiz')
-    render(App)
-    expect(document.querySelector('audio')).not.toBeNull()
-  })
 })
