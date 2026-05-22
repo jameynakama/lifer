@@ -8,6 +8,7 @@
 # Go binaries
 backend/bin/
 backend/lifer
+backend/server
 
 # Superpowers brainstorm sessions
 .superpowers/
