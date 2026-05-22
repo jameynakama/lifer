@@ -29,15 +29,45 @@ Cards are user-scoped. Species/recordings/images are global shared catalog. is_a
 - [x] JWT sign/verify, RequireAuth middleware, user ID in context
 - [x] `GET /health`, `GET /api/v1/me` (auth-protected)
 - [x] Justfile with test/run/build/migrate-up/migrate-down/generate/migration
+- [x] Docker Compose for PostgreSQL (port 5435)
+- [x] Svelte 5 frontend: Login, Dashboard, Quiz views + StatsBar, GroupList, QuizCard, RevealCard components
+- [x] Google OAuth login button, auth check on load, state-based routing
+- [x] Full styling: dark/light themes (CSS custom properties), Inter font, atmospheric login, token-based components
+- [x] Theme toggle (sun/moon) with localStorage persistence + OS preference fallback
 
 ## What's next
-- [ ] Google Cloud Console: create OAuth credentials, fill `.env`
-- [ ] Svelte frontend scaffold in `frontend/`
-- [ ] "Login with Google" button → verify full auth flow end-to-end
-- [ ] Ingestion script: eBird API for species lists, xeno-canto for recordings (A/B quality only), Macaulay Library for images
-- [ ] FSRS implementation and quiz loop endpoints
-- [ ] Group management (admin: create presets; users: create custom groups)
-- [ ] Admin UI for catalog management
+
+### 1. Ingestion scripts (do this first -- needed for real data)
+- Get eBird API key at ebird.org/api/keygen (free, requires account)
+- `cmd/ingest/main.go` binary: region code arg → eBird species list → goroutine worker pool → xeno-canto (recordings, quality A/B) + Macaulay Library (photos) in parallel
+- Worker pool ~5-10 concurrent (respect xeno-canto rate limits); `errgroup` + semaphore pattern
+- Upserts idempotent on `xeno_canto_id` / `macaulay_id` -- safe to re-run
+- eBird regions are state-level codes (`US-WA`, `US-OR`); "Pacific Northwest" preset = union of multiple state runs
+- Store MP3s and photos locally (or S3 later); file paths in DB
+
+### 2. FSRS + quiz endpoints
+- `GET /api/v1/groups/:id/next` -- returns next due card for the group
+- `POST /api/v1/groups/:id/rate` -- takes rating 1-4, updates FSRS fields (stability, difficulty, due, state)
+- Swap `MOCK_CARDS` in `Quiz.svelte` for real fetch calls
+
+### 3. SvelteKit migration (before catalog view)
+- Current plain Vite + store-based routing will get unwieldy with more views
+- Migrate before adding the catalog/browse view
+
+### 4. Catalog / "Learn" view
+- Browse all species, filterable by region and alphabetically
+- Shows recordings, photos, and species info
+- Users can add species to custom groups from list or detail view
+- Requires SvelteKit routing + backend search/filter API (too many species to load all client-side)
+- Design group management UI alongside this (same "add to list" action)
+
+### 5. Group management
+- Admin: create/edit preset groups (region-based)
+- Users: create custom groups, add/remove species
+- Shared UI surface with catalog view
+
+### 6. Admin UI
+- Catalog management: add/edit species, recordings, images
 
 ## Key non-obvious choices
 - sqlc lives in `backend/` -- run `just generate` from repo root after any migration change
