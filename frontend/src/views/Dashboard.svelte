@@ -25,9 +25,41 @@
   }
 </script>
 
-<div>
+<div class="dashboard">
   <StatsBar {stats} />
-  <button onclick={() => startPractice(topGroup)}>Start Practice</button>
-  <p>{topGroup.name} · {topGroup.due_count} due</p>
+  <div class="quick-start">
+    <button class="btn-primary" onclick={() => startPractice(topGroup)}>Start Practice</button>
+    <p class="group-note">{topGroup.name} · {topGroup.due_count} due</p>
+  </div>
   <GroupList {groups} onPractice={startPractice} />
 </div>
+
+<style>
+  .dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+  .quick-start {
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0.8125rem;
+    width: 100%;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .group-note {
+    color: var(--text-secondary);
+    font-size: 0.6875rem;
+    text-align: center;
+  }
+</style>
