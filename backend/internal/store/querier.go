@@ -14,6 +14,9 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error)
 	UpsertCard(ctx context.Context, arg UpsertCardParams) (Card, error)
+	UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (Recording, error)
+	UpsertSpecies(ctx context.Context, arg UpsertSpeciesParams) (Species, error)
+	UpsertSpeciesImage(ctx context.Context, arg UpsertSpeciesImageParams) (SpeciesImage, error)
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)
 }
 
