@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
 type TaxonomyEntry struct {
@@ -52,8 +53,8 @@ func (c *Client) Taxonomy(ctx context.Context) ([]TaxonomyEntry, error) {
 }
 
 func (c *Client) SpeciesList(ctx context.Context, regionCode string) ([]string, error) {
-	url := fmt.Sprintf("%s/v2/product/spplist/%s", c.baseURL, regionCode)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	endpoint := fmt.Sprintf("%s/v2/product/spplist/%s", c.baseURL, url.PathEscape(regionCode))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}

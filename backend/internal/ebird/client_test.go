@@ -14,6 +14,7 @@ import (
 func TestTaxonomy(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v2/ref/taxonomy/ebird", r.URL.Path)
+		assert.Equal(t, "json", r.URL.Query().Get("fmt"))
 		assert.Equal(t, "testkey", r.Header.Get("X-eBirdApiToken"))
 		json.NewEncoder(w).Encode([]TaxonomyEntry{
 			{SpeciesCode: "soospa", CommonName: "Song Sparrow", SciName: "Melospiza melodia", Category: "species"},
@@ -44,6 +45,7 @@ func TestTaxonomyHTTPError(t *testing.T) {
 func TestSpeciesList(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v2/product/spplist/US-OR", r.URL.Path)
+		assert.Equal(t, "testkey", r.Header.Get("X-eBirdApiToken"))
 		json.NewEncoder(w).Encode([]string{"soospa", "norcaw", "mallar"})
 	}))
 	defer srv.Close()
@@ -52,4 +54,15 @@ func TestSpeciesList(t *testing.T) {
 	codes, err := c.SpeciesList(context.Background(), "US-OR")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"soospa", "norcaw", "mallar"}, codes)
+}
+
+func TestSpeciesListHTTPError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer srv.Close()
+
+	c := newWithBaseURL("bad", srv.URL)
+	_, err := c.SpeciesList(context.Background(), "US-OR")
+	assert.ErrorContains(t, err, "401")
 }
