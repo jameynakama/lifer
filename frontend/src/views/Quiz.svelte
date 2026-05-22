@@ -1,10 +1,11 @@
 <script lang="ts">
-  import type { Card } from '../types'
+  import type { BirdCard } from '../types'
   import { view } from '../stores/view'
   import QuizCard from '../components/QuizCard.svelte'
   import RevealCard from '../components/RevealCard.svelte'
+  import StatsBar from '../components/StatsBar.svelte'
 
-  const MOCK_CARDS: Card[] = [
+  const MOCK_CARDS: BirdCard[] = [
     {
       id: '1',
       recording_path: '/recordings/song-sparrow.mp3',
@@ -26,6 +27,12 @@
 
   const card = $derived(MOCK_CARDS[index])
 
+  const stats = $derived([
+    { label: 'Remaining', value: MOCK_CARDS.length - index },
+    { label: 'Reviewed', value: index },
+    { label: 'Streak', value: 5 },
+  ])
+
   function onReveal() {
     revealed = true
   }
@@ -40,10 +47,19 @@
   }
 </script>
 
-<div>
+<div class="quiz">
+  <StatsBar {stats} />
   {#if revealed}
     <RevealCard {card} {onRate} />
   {:else}
     <QuizCard {card} {onReveal} />
   {/if}
 </div>
+
+<style>
+  .quiz {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+</style>
