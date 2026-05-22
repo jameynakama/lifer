@@ -43,6 +43,7 @@ type Recording struct {
 	FilePath    string             `db:"file_path" json:"file_path"`
 	Quality     string             `db:"quality" json:"quality"`
 	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	Type        string             `db:"type" json:"type"`
 }
 
 type Species struct {

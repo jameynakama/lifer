@@ -202,7 +202,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTaxonomy(t *testing.T) -> void {
+func TestTaxonomy(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v2/ref/taxonomy/ebird", r.URL.Path)
 		assert.Equal(t, "testkey", r.Header.Get("X-eBirdApiToken"))
