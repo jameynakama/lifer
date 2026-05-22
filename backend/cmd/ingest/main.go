@@ -162,7 +162,7 @@ func ingestSpecies(
 	photos, err := mac.Photos(ctx, entry.SpeciesCode, maxImg)
 	if err != nil {
 		log.Printf("  warn: macaulay %s: %v", entry.SpeciesCode, err)
-		return nil
+		return nil // photos are optional; don't fail the species on image errors
 	}
 	for _, photo := range photos {
 		destPath := filepath.Join(assetsDir, "images", entry.SpeciesCode, photo.AssetID+".jpg")
@@ -194,13 +194,24 @@ func downloadFile(rawURL, destPath string) error {
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download %s: status %d", rawURL, resp.StatusCode)
 	}
-	f, err := os.Create(destPath)
+	tmp, err := os.CreateTemp(filepath.Dir(destPath), ".tmp-*")
 	if err != nil {
 		return err
 	}
-	defer f.Close()
-	_, err = io.Copy(f, resp.Body)
-	return err
+	tmpName := tmp.Name()
+	copyErr := func() error {
+		_, err := io.Copy(tmp, resp.Body)
+		return err
+	}()
+	closeErr := tmp.Close()
+	if copyErr != nil || closeErr != nil {
+		os.Remove(tmpName)
+		if copyErr != nil {
+			return copyErr
+		}
+		return closeErr
+	}
+	return os.Rename(tmpName, destPath)
 }
 
 func mustEnv(key string) string {
