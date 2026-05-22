@@ -6,11 +6,20 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 )
 
 type Photo struct {
 	AssetID         string `json:"assetId"`
 	UserDisplayName string `json:"userDisplayName"`
+}
+
+type apiResults struct {
+	Content []Photo `json:"content"`
+}
+
+type apiResponse struct {
+	Results apiResults `json:"results"`
 }
 
 type Client struct {
@@ -20,7 +29,7 @@ type Client struct {
 }
 
 func New(apiKey string) *Client {
-	return newWithBaseURL(apiKey, "https://api.ebird.org")
+	return newWithBaseURL(apiKey, "https://search.macaulaylibrary.org")
 }
 
 func newWithBaseURL(apiKey, baseURL string) *Client {
@@ -34,9 +43,11 @@ func newWithBaseURL(apiKey, baseURL string) *Client {
 // Photos returns up to max photos for the given eBird species code.
 func (c *Client) Photos(ctx context.Context, speciesCode string, max int) ([]Photo, error) {
 	params := url.Values{}
-	params.Set("species", speciesCode)
+	params.Set("taxonCode", speciesCode)
 	params.Set("mediaType", "photo")
-	endpoint := fmt.Sprintf("%s/v2/ref/media/best?%s", c.baseURL, params.Encode())
+	params.Set("sort", "rating_rank_desc")
+	params.Set("count", strconv.Itoa(max))
+	endpoint := fmt.Sprintf("%s/api/v1/search?%s", c.baseURL, params.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
@@ -50,10 +61,11 @@ func (c *Client) Photos(ctx context.Context, speciesCode string, max int) ([]Pho
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("macaulay photos %s: status %d", speciesCode, resp.StatusCode)
 	}
-	var photos []Photo
-	if err := json.NewDecoder(resp.Body).Decode(&photos); err != nil {
+	var r apiResponse
+	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
 		return nil, err
 	}
+	photos := r.Results.Content
 	if len(photos) > max {
 		photos = photos[:max]
 	}
