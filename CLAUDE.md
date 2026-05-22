@@ -12,7 +12,7 @@ A spaced repetition web app for bird song/call and image identification practice
 ## Data model
 - `users` -- google_id, email, name, picture, is_admin
 - `species` -- common_name, scientific_name, ebird_code
-- `recordings` -- species FK, xeno_canto_id, file_path, quality (A-E)
+- `recordings` -- species FK, xeno_canto_id, file_path, quality (A-E), type (raw string from xeno-canto, e.g. "song", "call")
 - `species_images` -- species FK, macaulay_id, file_path, credit
 - `groups` -- preset (eBird-sourced) or user-created; owner_id null for presets
 - `group_species` -- join table
@@ -34,35 +34,20 @@ Cards are user-scoped. Species/recordings/images are global shared catalog. is_a
 - [x] Google OAuth login button, auth check on load, state-based routing
 - [x] Full styling: dark/light themes (CSS custom properties), Inter font, atmospheric login, token-based components
 - [x] Theme toggle (sun/moon) with localStorage persistence + OS preference fallback
+- [x] `cmd/ingest` binary: eBird taxonomy + region species lists → xeno-canto (API v3, quality A/B) + Macaulay Library photos → local asset storage; buffered channel worker pool (default 5); idempotent upserts; post-run cleanup removes species missing recordings or images from DB and disk
+- [x] Migration 002: `type text` column on `recordings`
 
 ## What's next
 
-### 1. Ingestion scripts (do this first -- needed for real data)
-- Get eBird API key at ebird.org/api/keygen (free, requires account)
-- `cmd/ingest/main.go` binary: region code arg → eBird species list → goroutine worker pool → xeno-canto (recordings, quality A/B) + Macaulay Library (photos) in parallel
-- Worker pool ~5-10 concurrent (respect xeno-canto rate limits); `errgroup` + semaphore pattern
-- Upserts idempotent on `xeno_canto_id` / `macaulay_id` -- safe to re-run
-- eBird regions are state-level codes (`US-WA`, `US-OR`); "Pacific Northwest" preset = union of multiple state runs
-- Store MP3s and photos locally (or S3 later); file paths in DB
-
-**eBird → xeno-canto species lookup:**
-- eBird taxonomy gives `sciName: "Melospiza melodia"` -- split on space to get `gen` + `sp`
-- Query xeno-canto as `gen:Melospiza+sp:melodia` (case-insensitive, no encoding issues)
-- Do NOT use `en:` (common name) -- spacing/case makes it unreliable
-
-**Recording type strategy:**
-- xeno-canto `type` field contains values like `"song"`, `"call"`, `"call, song"`, `"alarm call, call, song, gurgle song, various calls"` (very free-form)
-- Query separately for `type:song` and `type:call`, grab 2-3 of each per species (~4-6 total)
-- Skip `type:alarm` for now -- multi-word type filtering is broken in xeno-canto API (can't query "alarm call" in any encoding)
-- Store the raw `type` string in `recordings.type` column -- useful for display and future filtering
-- **Why type variety matters:** species like Song Sparrow have a simple "chip" call all year but dozens of song variants in spring; quizzing on both is intentional
-
-**Schema addition needed:** `recordings` table needs a `type text` column (not in current migration)
-
-### 2. FSRS + quiz endpoints
+### 1. FSRS + quiz endpoints
 - `GET /api/v1/groups/:id/next` -- returns next due card for the group
 - `POST /api/v1/groups/:id/rate` -- takes rating 1-4, updates FSRS fields (stability, difficulty, due, state)
 - Swap `MOCK_CARDS` in `Quiz.svelte` for real fetch calls
+
+**Quiz lanes:** audio and image recognition are separate FSRS lanes per species, independently scheduled. A wigeon can be mature in image lane but new in audio lane. Lane preference is global per user×species (not per group) -- default both enabled. Data model implications:
+- Audio lane: `user × recording` -- existing `cards` table
+- Image lane: `user × species` (recognizing the species from any photo, not memorizing individual photos) -- needs new cards-like structure
+- Preference: new `user_species_preferences (user_id, species_id, audio_enabled, image_enabled)` table
 
 ### 3. SvelteKit migration (before catalog view)
 - Current plain Vite + store-based routing will get unwieldy with more views
@@ -114,15 +99,17 @@ All three are **ingestion-only** -- hit them once to populate the DB, store asse
 
 ### Xeno-canto
 - **Used for:** bird call/song recordings (the core quiz content)
-- **Auth:** free API key for registered members with verified email
-- **Approach:** search by species scientific name, filter to quality A or B, download MP3s, store file path in `recordings.file_path`
-- **Key endpoint:** `GET /api/2/recordings?query={scientific_name}+q:A` 
+- **Auth:** API key required (v3); free for registered members with verified email
+- **Approach:** query separately for `type:song` and `type:call` using `gen:{genus} sp:{species}`; filter to quality A or B (A-first); download MP3s; store raw `type` string and file path in `recordings`
+- **Key endpoint:** `GET https://xeno-canto.org/api/3/recordings?query=gen:Melospiza+sp:melodia+type:song&key={key}` -- **v3, not v2**
+- **Do NOT use** `en:` (common name) -- spacing/case unreliable. Do NOT use `q:A` in query -- filter client-side instead.
 - **License:** all recordings are Creative Commons -- safe to store and serve
 - **Docs:** https://xeno-canto.org/explore/api
 
 ### Macaulay Library (Cornell Lab)
 - **Used for:** species photos shown on quiz reveal and for future image ID quizzes
-- **Auth:** same eBird API key
-- **Approach:** search by species code, download a few photos per species, store in `species_images`
-- **Key endpoint:** `GET /v2/ref/media/best?species={speciesCode}&mediaType=photo`
-- **Note:** same Cornell/eBird ecosystem -- one API key covers both eBird checklists and Macaulay media
+- **Auth:** same eBird API key (`X-eBirdApiToken` header)
+- **Approach:** search by species code, download top-rated photos, store in `species_images`
+- **Key endpoint:** `GET https://search.macaulaylibrary.org/api/v1/search?taxonCode={speciesCode}&mediaType=photo&sort=rating_rank_desc&count={n}` -- **not api.ebird.org**
+- **Response shape:** `{ results: { content: [ { assetId, userDisplayName, ... } ] } }`
+- **Note:** same Cornell/eBird ecosystem -- one API key covers eBird checklists and Macaulay media
