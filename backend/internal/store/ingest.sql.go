@@ -36,6 +36,33 @@ func (q *Queries) DeleteSpeciesImagesBySpeciesID(ctx context.Context, speciesID 
 	return err
 }
 
+const listCompleteSpeciesEbirdCodes = `-- name: ListCompleteSpeciesEbirdCodes :many
+SELECT s.ebird_code
+FROM species s
+WHERE EXISTS (SELECT 1 FROM recordings r WHERE r.species_id = s.id)
+  AND EXISTS (SELECT 1 FROM species_images si WHERE si.species_id = s.id)
+`
+
+func (q *Queries) ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listCompleteSpeciesEbirdCodes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var ebird_code string
+		if err := rows.Scan(&ebird_code); err != nil {
+			return nil, err
+		}
+		items = append(items, ebird_code)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listIncompleteSpecies = `-- name: ListIncompleteSpecies :many
 SELECT id, ebird_code FROM species
 WHERE id NOT IN (SELECT DISTINCT species_id FROM recordings)

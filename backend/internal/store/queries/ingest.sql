@@ -28,6 +28,12 @@ SELECT id, ebird_code FROM species
 WHERE id NOT IN (SELECT DISTINCT species_id FROM recordings)
    OR id NOT IN (SELECT DISTINCT species_id FROM species_images);
 
+-- name: ListCompleteSpeciesEbirdCodes :many
+SELECT s.ebird_code
+FROM species s
+WHERE EXISTS (SELECT 1 FROM recordings r WHERE r.species_id = s.id)
+  AND EXISTS (SELECT 1 FROM species_images si WHERE si.species_id = s.id);
+
 -- name: DeleteRecordingsBySpeciesID :exec
 DELETE FROM recordings WHERE species_id = $1;
 

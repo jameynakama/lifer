@@ -15,6 +15,7 @@ type Querier interface {
 	GetDueCards(ctx context.Context, arg GetDueCardsParams) ([]GetDueCardsRow, error)
 	GetUserByGoogleID(ctx context.Context, googleID string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
+	ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, error)
 	ListIncompleteSpecies(ctx context.Context) ([]ListIncompleteSpeciesRow, error)
 	UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error)
 	UpsertCard(ctx context.Context, arg UpsertCardParams) (Card, error)

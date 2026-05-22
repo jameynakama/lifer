@@ -23,6 +23,7 @@ func main() {
 	maxRecordings := flag.Int("max-recordings", 4, "max recordings per species (split evenly between song and call)")
 	maxImages := flag.Int("max-images", 3, "max images per species")
 	workers := flag.Int("workers", 5, "concurrent worker count")
+	skipComplete := flag.Bool("skip-complete", false, "skip species that already have ≥1 recording and ≥1 image in the DB")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: ingest [flags] <region-code> [region-code...]\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
@@ -84,6 +85,20 @@ func main() {
 	}
 	log.Printf("total unique species: %d", len(codes))
 
+	if *skipComplete {
+		completeCodes, err := q.ListCompleteSpeciesEbirdCodes(ctx)
+		if err != nil {
+			log.Fatalf("skip-complete: query complete species: %v", err)
+		}
+		complete := make(map[string]struct{}, len(completeCodes))
+		for _, c := range completeCodes {
+			complete[c] = struct{}{}
+		}
+		before := len(codes)
+		codes = filterComplete(codes, complete)
+		log.Printf("--skip-complete: skipping %d already-complete species, processing %d remaining", before-len(codes), len(codes))
+	}
+
 	sem := make(chan struct{}, *workers)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -138,6 +153,16 @@ func main() {
 		}
 	}
 	log.Printf("cleanup: removed %d incomplete species", len(incomplete))
+}
+
+func filterComplete(codes []string, complete map[string]struct{}) []string {
+	out := make([]string, 0, len(codes))
+	for _, c := range codes {
+		if _, ok := complete[c]; !ok {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func ingestSpecies(
