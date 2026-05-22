@@ -9,6 +9,7 @@
 backend/bin/
 backend/lifer
 backend/server
+backend/ingest
 
 # Superpowers brainstorm sessions
 .superpowers/
