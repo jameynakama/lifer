@@ -23,6 +23,14 @@ func main() {
 	maxRecordings := flag.Int("max-recordings", 4, "max recordings per species (split evenly between song and call)")
 	maxImages := flag.Int("max-images", 3, "max images per species")
 	workers := flag.Int("workers", 5, "concurrent worker count")
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "Usage: ingest [flags] <region-code> [region-code...]\n\n")
+		fmt.Fprintf(os.Stderr, "Examples:\n")
+		fmt.Fprintf(os.Stderr, "  ingest US-OR\n")
+		fmt.Fprintf(os.Stderr, "  ingest US-OR US-WA US-ID\n\n")
+		fmt.Fprintf(os.Stderr, "Flags:\n")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
 	regions := flag.Args()
