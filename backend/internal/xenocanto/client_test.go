@@ -13,7 +13,7 @@ import (
 
 func TestSearch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/api/2/recordings", r.URL.Path)
+		assert.Equal(t, "/api/3/recordings", r.URL.Path)
 		q := r.URL.Query().Get("query")
 		assert.Contains(t, q, "gen:Melospiza")
 		assert.Contains(t, q, "sp:melodia")

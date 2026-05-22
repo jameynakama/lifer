@@ -44,7 +44,7 @@ func (c *Client) Search(ctx context.Context, genus, species, recType string) ([]
 	params := url.Values{}
 	params.Set("query", fmt.Sprintf("gen:%s sp:%s type:%s", genus, species, recType))
 	params.Set("key", c.apiKey)
-	endpoint := fmt.Sprintf("%s/api/2/recordings?%s", c.baseURL, params.Encode())
+	endpoint := fmt.Sprintf("%s/api/3/recordings?%s", c.baseURL, params.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
