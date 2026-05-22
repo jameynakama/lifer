@@ -31,7 +31,7 @@ func main() {
 	}
 
 	ebirdKey := mustEnv("EBIRD_API_KEY")
-	xcKey := os.Getenv("XENO_CANTO_API_KEY")
+	xcKey := mustEnv("XENO_CANTO_API_KEY")
 	assetsDir := mustEnv("ASSETS_DIR")
 	dbURL := mustEnv("DATABASE_URL")
 

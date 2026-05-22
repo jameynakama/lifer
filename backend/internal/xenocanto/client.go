@@ -43,9 +43,7 @@ func newWithBaseURL(apiKey, baseURL string) *Client {
 func (c *Client) Search(ctx context.Context, genus, species, recType string) ([]Recording, error) {
 	params := url.Values{}
 	params.Set("query", fmt.Sprintf("gen:%s sp:%s type:%s", genus, species, recType))
-	if c.apiKey != "" {
-		params.Set("key", c.apiKey)
-	}
+	params.Set("key", c.apiKey)
 	endpoint := fmt.Sprintf("%s/api/2/recordings?%s", c.baseURL, params.Encode())
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
