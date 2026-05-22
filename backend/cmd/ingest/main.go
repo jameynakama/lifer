@@ -118,6 +118,26 @@ func main() {
 	} else {
 		log.Printf("ingestion complete: %d/%d species", done, total)
 	}
+
+	log.Println("cleaning up species missing recordings or images...")
+	incomplete, err := q.ListIncompleteSpecies(ctx)
+	if err != nil {
+		log.Fatalf("cleanup: %v", err)
+	}
+	for _, sp := range incomplete {
+		os.RemoveAll(filepath.Join(assetsDir, "images", sp.EbirdCode))
+		os.RemoveAll(filepath.Join(assetsDir, "recordings", sp.EbirdCode))
+		if err := q.DeleteRecordingsBySpeciesID(ctx, sp.ID); err != nil {
+			log.Printf("  warn: cleanup recordings %s: %v", sp.EbirdCode, err)
+		}
+		if err := q.DeleteSpeciesImagesBySpeciesID(ctx, sp.ID); err != nil {
+			log.Printf("  warn: cleanup images %s: %v", sp.EbirdCode, err)
+		}
+		if err := q.DeleteSpeciesByID(ctx, sp.ID); err != nil {
+			log.Printf("  warn: cleanup species %s: %v", sp.EbirdCode, err)
+		}
+	}
+	log.Printf("cleanup: removed %d incomplete species", len(incomplete))
 }
 
 func ingestSpecies(

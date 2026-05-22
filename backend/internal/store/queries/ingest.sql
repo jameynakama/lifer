@@ -22,3 +22,17 @@ ON CONFLICT (macaulay_id) DO UPDATE
     SET file_path = EXCLUDED.file_path,
         credit    = EXCLUDED.credit
 RETURNING *;
+
+-- name: ListIncompleteSpecies :many
+SELECT id, ebird_code FROM species
+WHERE id NOT IN (SELECT DISTINCT species_id FROM recordings)
+   OR id NOT IN (SELECT DISTINCT species_id FROM species_images);
+
+-- name: DeleteRecordingsBySpeciesID :exec
+DELETE FROM recordings WHERE species_id = $1;
+
+-- name: DeleteSpeciesImagesBySpeciesID :exec
+DELETE FROM species_images WHERE species_id = $1;
+
+-- name: DeleteSpeciesByID :exec
+DELETE FROM species WHERE id = $1;

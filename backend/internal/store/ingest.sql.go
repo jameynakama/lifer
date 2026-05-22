@@ -9,6 +9,64 @@ import (
 	"context"
 )
 
+const deleteRecordingsBySpeciesID = `-- name: DeleteRecordingsBySpeciesID :exec
+DELETE FROM recordings WHERE species_id = $1
+`
+
+func (q *Queries) DeleteRecordingsBySpeciesID(ctx context.Context, speciesID int64) error {
+	_, err := q.db.Exec(ctx, deleteRecordingsBySpeciesID, speciesID)
+	return err
+}
+
+const deleteSpeciesByID = `-- name: DeleteSpeciesByID :exec
+DELETE FROM species WHERE id = $1
+`
+
+func (q *Queries) DeleteSpeciesByID(ctx context.Context, id int64) error {
+	_, err := q.db.Exec(ctx, deleteSpeciesByID, id)
+	return err
+}
+
+const deleteSpeciesImagesBySpeciesID = `-- name: DeleteSpeciesImagesBySpeciesID :exec
+DELETE FROM species_images WHERE species_id = $1
+`
+
+func (q *Queries) DeleteSpeciesImagesBySpeciesID(ctx context.Context, speciesID int64) error {
+	_, err := q.db.Exec(ctx, deleteSpeciesImagesBySpeciesID, speciesID)
+	return err
+}
+
+const listIncompleteSpecies = `-- name: ListIncompleteSpecies :many
+SELECT id, ebird_code FROM species
+WHERE id NOT IN (SELECT DISTINCT species_id FROM recordings)
+   OR id NOT IN (SELECT DISTINCT species_id FROM species_images)
+`
+
+type ListIncompleteSpeciesRow struct {
+	ID        int64  `db:"id" json:"id"`
+	EbirdCode string `db:"ebird_code" json:"ebird_code"`
+}
+
+func (q *Queries) ListIncompleteSpecies(ctx context.Context) ([]ListIncompleteSpeciesRow, error) {
+	rows, err := q.db.Query(ctx, listIncompleteSpecies)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListIncompleteSpeciesRow
+	for rows.Next() {
+		var i ListIncompleteSpeciesRow
+		if err := rows.Scan(&i.ID, &i.EbirdCode); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertRecording = `-- name: UpsertRecording :one
 INSERT INTO recordings (species_id, xeno_canto_id, file_path, quality, type)
 VALUES ($1, $2, $3, $4, $5)

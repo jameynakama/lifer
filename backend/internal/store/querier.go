@@ -9,9 +9,13 @@ import (
 )
 
 type Querier interface {
+	DeleteRecordingsBySpeciesID(ctx context.Context, speciesID int64) error
+	DeleteSpeciesByID(ctx context.Context, id int64) error
+	DeleteSpeciesImagesBySpeciesID(ctx context.Context, speciesID int64) error
 	GetDueCards(ctx context.Context, arg GetDueCardsParams) ([]GetDueCardsRow, error)
 	GetUserByGoogleID(ctx context.Context, googleID string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
+	ListIncompleteSpecies(ctx context.Context) ([]ListIncompleteSpeciesRow, error)
 	UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error)
 	UpsertCard(ctx context.Context, arg UpsertCardParams) (Card, error)
 	UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (Recording, error)
