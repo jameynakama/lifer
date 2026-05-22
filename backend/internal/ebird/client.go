@@ -34,7 +34,7 @@ func newWithBaseURL(apiKey, baseURL string) *Client {
 }
 
 func (c *Client) Taxonomy(ctx context.Context) ([]TaxonomyEntry, error) {
-	url := c.baseURL + "/v2/ref/taxonomy/ebird?fmt=json"
+	url := c.baseURL + "/v2/ref/taxonomy/ebird?fmt=json&cat=species"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err

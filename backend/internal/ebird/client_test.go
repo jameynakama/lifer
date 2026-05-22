@@ -15,6 +15,7 @@ func TestTaxonomy(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/v2/ref/taxonomy/ebird", r.URL.Path)
 		assert.Equal(t, "json", r.URL.Query().Get("fmt"))
+		assert.Equal(t, "species", r.URL.Query().Get("cat"))
 		assert.Equal(t, "testkey", r.Header.Get("X-eBirdApiToken"))
 		json.NewEncoder(w).Encode([]TaxonomyEntry{
 			{SpeciesCode: "soospa", CommonName: "Song Sparrow", SciName: "Melospiza melodia", Category: "species"},

@@ -34,6 +34,10 @@ migration name:
 frontend:
     cd frontend && npm run dev
 
+# Run the ingestion script (usage: just ingest US-OR)
+ingest *args:
+    cd backend && go run ./cmd/ingest {{ args }}
+
 # Install all the required tools
 install-tools:
     brew install sqlc

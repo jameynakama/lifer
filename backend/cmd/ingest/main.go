@@ -104,7 +104,12 @@ func main() {
 		}(code, entry)
 	}
 	wg.Wait()
-	log.Printf("ingestion complete: %d/%d species", done, total)
+	skipped := total - done
+	if skipped > 0 {
+		log.Printf("ingestion complete: %d/%d species (%d skipped -- no taxonomy entry)", done, total, skipped)
+	} else {
+		log.Printf("ingestion complete: %d/%d species", done, total)
+	}
 }
 
 func ingestSpecies(
@@ -131,7 +136,7 @@ func ingestSpecies(
 		return fmt.Errorf("upsert species: %w", err)
 	}
 
-	perType := maxRec / 2
+	perType := maxRec / 2 // integer division; --max-recordings 3 gives 1 per type
 	for _, recType := range []string{"song", "call"} {
 		recs, err := xc.Search(ctx, genus, species, recType)
 		if err != nil {
@@ -143,7 +148,7 @@ func ingestSpecies(
 		}
 		for _, rec := range recs {
 			destPath := filepath.Join(assetsDir, "recordings", entry.SpeciesCode, rec.ID+".mp3")
-			if err := downloadFile(rec.FileURL, destPath); err != nil {
+			if err := downloadFile(ctx, rec.FileURL, destPath); err != nil {
 				log.Printf("  warn: download recording %s: %v", rec.ID, err)
 				continue
 			}
@@ -166,7 +171,7 @@ func ingestSpecies(
 	}
 	for _, photo := range photos {
 		destPath := filepath.Join(assetsDir, "images", entry.SpeciesCode, photo.AssetID+".jpg")
-		if err := downloadFile(mac.PhotoURL(photo.AssetID), destPath); err != nil {
+		if err := downloadFile(ctx, mac.PhotoURL(photo.AssetID), destPath); err != nil {
 			log.Printf("  warn: download image %s: %v", photo.AssetID, err)
 			continue
 		}
@@ -182,11 +187,15 @@ func ingestSpecies(
 	return nil
 }
 
-func downloadFile(rawURL, destPath string) error {
+func downloadFile(ctx context.Context, rawURL, destPath string) error {
 	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
 		return err
 	}
-	resp, err := http.Get(rawURL) //nolint:noctx
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
 	}
