@@ -1,0 +1,62 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Dark theme tokens (default) */
+:root {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --border: #334155;
+  --text: #f1f5f9;
+  --text-muted: #64748b;
+  --text-secondary: #94a3b8;
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --shadow: none;
+}
+
+/* Light theme tokens (explicit override) */
+:root[data-theme="light"] {
+  --bg: #f8f7f4;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text: #1c1917;
+  --text-muted: #a8a29e;
+  --text-secondary: #78716c;
+  --accent: #4f7942;
+  --accent-hover: #3d6133;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Respect OS light preference unless user has overridden to dark */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f8f7f4;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --text: #1c1917;
+    --text-muted: #a8a29e;
+    --text-secondary: #78716c;
+    --accent: #4f7942;
+    --accent-hover: #3d6133;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+}
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 0 1.5rem 2rem;
+}
