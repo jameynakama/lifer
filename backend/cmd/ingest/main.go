@@ -22,7 +22,7 @@ import (
 func main() {
 	maxRecordings := flag.Int("max-recordings", 4, "max recordings per species (split evenly between song and call)")
 	maxImages := flag.Int("max-images", 3, "max images per species")
-	workers := flag.Int("workers", 5, "concurrent worker count")
+	workers := flag.Int("workers", 10, "concurrent worker count")
 	skipComplete := flag.Bool("skip-complete", false, "skip species that already have ≥1 recording and ≥1 image in the DB")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: ingest [flags] <region-code> [region-code...]\n\n")
@@ -190,53 +190,84 @@ func ingestSpecies(
 	}
 
 	perType := maxRec / 2 // integer division; --max-recordings 3 gives 1 per type
+
+	// Fan out song + call searches concurrently.
+	type searchResult struct {
+		recType string
+		recs    []xenocanto.Recording
+		err     error
+	}
+	searchCh := make(chan searchResult, 2)
 	for _, recType := range []string{"song", "call"} {
-		recs, err := xc.Search(ctx, genus, species, recType)
-		if err != nil {
-			log.Printf("  warn: xeno-canto %s %s: %v", entry.SpeciesCode, recType, err)
+		go func(rt string) {
+			recs, err := xc.Search(ctx, genus, species, rt)
+			searchCh <- searchResult{rt, recs, err}
+		}(recType)
+	}
+
+	// Collect search results and fan out downloads.
+	var recWg sync.WaitGroup
+	for range 2 {
+		result := <-searchCh
+		if result.err != nil {
+			log.Printf("  warn: xeno-canto %s %s: %v", entry.SpeciesCode, result.recType, result.err)
 			continue
 		}
+		recs := result.recs
 		if len(recs) > perType {
 			recs = recs[:perType]
 		}
 		for _, rec := range recs {
-			destPath := filepath.Join(assetsDir, "recordings", entry.SpeciesCode, rec.ID+".mp3")
-			if err := downloadFile(ctx, rec.FileURL, destPath); err != nil {
-				log.Printf("  warn: download recording %s: %v", rec.ID, err)
-				continue
-			}
-			if _, err := q.UpsertRecording(ctx, store.UpsertRecordingParams{
-				SpeciesID:   sp.ID,
-				XenoCantoID: rec.ID,
-				FilePath:    filepath.Join("recordings", entry.SpeciesCode, rec.ID+".mp3"),
-				Quality:     rec.Quality,
-				Type:        rec.Type,
-			}); err != nil {
-				log.Printf("  warn: upsert recording %s: %v", rec.ID, err)
-			}
+			recWg.Add(1)
+			go func(rec xenocanto.Recording) {
+				defer recWg.Done()
+				destPath := filepath.Join(assetsDir, "recordings", entry.SpeciesCode, rec.ID+".mp3")
+				if err := downloadFile(ctx, rec.FileURL, destPath); err != nil {
+					log.Printf("  warn: download recording %s: %v", rec.ID, err)
+					return
+				}
+				if _, err := q.UpsertRecording(ctx, store.UpsertRecordingParams{
+					SpeciesID:   sp.ID,
+					XenoCantoID: rec.ID,
+					FilePath:    filepath.Join("recordings", entry.SpeciesCode, rec.ID+".mp3"),
+					Quality:     rec.Quality,
+					Type:        rec.Type,
+				}); err != nil {
+					log.Printf("  warn: upsert recording %s: %v", rec.ID, err)
+				}
+			}(rec)
 		}
 	}
+	recWg.Wait()
 
 	photos, err := mac.Photos(ctx, entry.SpeciesCode, maxImg)
 	if err != nil {
 		log.Printf("  warn: macaulay %s: %v", entry.SpeciesCode, err)
 		return nil // photos are optional; don't fail the species on image errors
 	}
+
+	// Fan out image downloads concurrently.
+	var imgWg sync.WaitGroup
 	for _, photo := range photos {
-		destPath := filepath.Join(assetsDir, "images", entry.SpeciesCode, photo.AssetID+".jpg")
-		if err := downloadFile(ctx, mac.PhotoURL(photo.AssetID), destPath); err != nil {
-			log.Printf("  warn: download image %s: %v", photo.AssetID, err)
-			continue
-		}
-		if _, err := q.UpsertSpeciesImage(ctx, store.UpsertSpeciesImageParams{
-			SpeciesID:  sp.ID,
-			MacaulayID: photo.AssetID,
-			FilePath:   filepath.Join("images", entry.SpeciesCode, photo.AssetID+".jpg"),
-			Credit:     photo.UserDisplayName,
-		}); err != nil {
-			log.Printf("  warn: upsert image %s: %v", photo.AssetID, err)
-		}
+		imgWg.Add(1)
+		go func(photo macaulay.Photo) {
+			defer imgWg.Done()
+			destPath := filepath.Join(assetsDir, "images", entry.SpeciesCode, photo.AssetID+".jpg")
+			if err := downloadFile(ctx, mac.PhotoURL(photo.AssetID), destPath); err != nil {
+				log.Printf("  warn: download image %s: %v", photo.AssetID, err)
+				return
+			}
+			if _, err := q.UpsertSpeciesImage(ctx, store.UpsertSpeciesImageParams{
+				SpeciesID:  sp.ID,
+				MacaulayID: photo.AssetID,
+				FilePath:   filepath.Join("images", entry.SpeciesCode, photo.AssetID+".jpg"),
+				Credit:     photo.UserDisplayName,
+			}); err != nil {
+				log.Printf("  warn: upsert image %s: %v", photo.AssetID, err)
+			}
+		}(photo)
 	}
+	imgWg.Wait()
 	return nil
 }
 
