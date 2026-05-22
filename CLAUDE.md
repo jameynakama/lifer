@@ -45,6 +45,20 @@ Cards are user-scoped. Species/recordings/images are global shared catalog. is_a
 - eBird regions are state-level codes (`US-WA`, `US-OR`); "Pacific Northwest" preset = union of multiple state runs
 - Store MP3s and photos locally (or S3 later); file paths in DB
 
+**eBird → xeno-canto species lookup:**
+- eBird taxonomy gives `sciName: "Melospiza melodia"` -- split on space to get `gen` + `sp`
+- Query xeno-canto as `gen:Melospiza+sp:melodia` (case-insensitive, no encoding issues)
+- Do NOT use `en:` (common name) -- spacing/case makes it unreliable
+
+**Recording type strategy:**
+- xeno-canto `type` field contains values like `"song"`, `"call"`, `"call, song"`, `"alarm call, call, song, gurgle song, various calls"` (very free-form)
+- Query separately for `type:song` and `type:call`, grab 2-3 of each per species (~4-6 total)
+- Skip `type:alarm` for now -- multi-word type filtering is broken in xeno-canto API (can't query "alarm call" in any encoding)
+- Store the raw `type` string in `recordings.type` column -- useful for display and future filtering
+- **Why type variety matters:** species like Song Sparrow have a simple "chip" call all year but dozens of song variants in spring; quizzing on both is intentional
+
+**Schema addition needed:** `recordings` table needs a `type text` column (not in current migration)
+
 ### 2. FSRS + quiz endpoints
 - `GET /api/v1/groups/:id/next` -- returns next due card for the group
 - `POST /api/v1/groups/:id/rate` -- takes rating 1-4, updates FSRS fields (stability, difficulty, due, state)
