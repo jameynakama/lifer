@@ -67,6 +67,9 @@ func (c *Client) Search(ctx context.Context, genus, species, recType string) ([]
 func filterAndNormalize(recs []Recording) []Recording {
 	var as, bs []Recording
 	for _, r := range recs {
+		if r.FileURL == "" {
+			continue
+		}
 		// xeno-canto sometimes returns protocol-relative URLs
 		if strings.HasPrefix(r.FileURL, "//") {
 			r.FileURL = "https:" + r.FileURL

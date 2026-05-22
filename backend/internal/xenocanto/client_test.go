@@ -84,6 +84,16 @@ func TestFilterAndNormalize(t *testing.T) {
 			want: nil,
 		},
 		{
+			name: "empty file URL is skipped",
+			in: []Recording{
+				{ID: "1", Quality: "A", FileURL: ""},
+				{ID: "2", Quality: "A", FileURL: "https://example.com/2.mp3"},
+			},
+			want: []Recording{
+				{ID: "2", Quality: "A", FileURL: "https://example.com/2.mp3"},
+			},
+		},
+		{
 			name: "A before B",
 			in: []Recording{
 				{ID: "b", Quality: "B", FileURL: "https://example.com/b.mp3"},

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jameynakama/lifer/internal/ebird"
@@ -22,8 +23,9 @@ import (
 func main() {
 	maxRecordings := flag.Int("max-recordings", 4, "max recordings per species (split evenly between song and call)")
 	maxImages := flag.Int("max-images", 3, "max images per species")
-	workers := flag.Int("workers", 10, "concurrent worker count")
+	workers := flag.Int("workers", 5, "concurrent worker count")
 	skipComplete := flag.Bool("skip-complete", false, "skip species that already have ≥1 recording and ≥1 image in the DB")
+	speciesFilter := flag.String("species", "", "comma-separated ebird codes or common names to process (e.g. busti or \"Bushtit,American Robin\")")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: ingest [flags] <region-code> [region-code...]\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
@@ -84,6 +86,13 @@ func main() {
 		log.Printf("region %s: %d species", region, len(list))
 	}
 	log.Printf("total unique species: %d", len(codes))
+
+	if *speciesFilter != "" {
+		want := strings.Split(*speciesFilter, ",")
+		before := len(codes)
+		codes = filterBySpecies(codes, taxMap, want)
+		log.Printf("--species: filtered to %d/%d species", len(codes), before)
+	}
 
 	if *skipComplete {
 		completeCodes, err := q.ListCompleteSpeciesEbirdCodes(ctx)
@@ -153,6 +162,34 @@ func main() {
 		}
 	}
 	log.Printf("cleanup: removed %d incomplete species", len(incomplete))
+}
+
+func filterBySpecies(codes []string, taxMap map[string]ebird.TaxonomyEntry, want []string) []string {
+	if len(want) == 0 {
+		return []string{}
+	}
+	// Build a set of matching ebird codes from want, accepting either codes or common names.
+	match := make(map[string]struct{}, len(want))
+	for _, w := range want {
+		lower := strings.ToLower(w)
+		if _, ok := taxMap[lower]; ok {
+			match[lower] = struct{}{}
+			continue
+		}
+		for code, entry := range taxMap {
+			if strings.ToLower(entry.CommonName) == lower {
+				match[code] = struct{}{}
+				break
+			}
+		}
+	}
+	out := make([]string, 0, len(match))
+	for _, c := range codes {
+		if _, ok := match[c]; ok {
+			out = append(out, c)
+		}
+	}
+	return out
 }
 
 func filterComplete(codes []string, complete map[string]struct{}) []string {
@@ -271,40 +308,62 @@ func ingestSpecies(
 	return nil
 }
 
+// retryDelays controls the wait between attempts on a 429 response.
+// Overridable in tests.
+var retryDelays = []time.Duration{2 * time.Second, 4 * time.Second, 8 * time.Second}
+
 func downloadFile(ctx context.Context, rawURL, destPath string) error {
 	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
-	if err != nil {
-		return err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download %s: status %d", rawURL, resp.StatusCode)
-	}
-	tmp, err := os.CreateTemp(filepath.Dir(destPath), ".tmp-*")
-	if err != nil {
-		return err
-	}
-	tmpName := tmp.Name()
-	copyErr := func() error {
-		_, err := io.Copy(tmp, resp.Body)
-		return err
-	}()
-	closeErr := tmp.Close()
-	if copyErr != nil || closeErr != nil {
-		os.Remove(tmpName)
-		if copyErr != nil {
-			return copyErr
+	var lastErr error
+	for attempt := range len(retryDelays) + 1 {
+		if attempt > 0 {
+			select {
+			case <-time.After(retryDelays[attempt-1]):
+			case <-ctx.Done():
+				return ctx.Err()
+			}
 		}
-		return closeErr
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+		if err != nil {
+			return err
+		}
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			return err
+		}
+		if resp.StatusCode == http.StatusTooManyRequests {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("download %s: status 429", rawURL)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return fmt.Errorf("download %s: status %d", rawURL, resp.StatusCode)
+		}
+		tmp, err := os.CreateTemp(filepath.Dir(destPath), ".tmp-*")
+		if err != nil {
+			resp.Body.Close()
+			return err
+		}
+		tmpName := tmp.Name()
+		copyErr := func() error {
+			_, err := io.Copy(tmp, resp.Body)
+			return err
+		}()
+		resp.Body.Close()
+		closeErr := tmp.Close()
+		if copyErr != nil || closeErr != nil {
+			os.Remove(tmpName)
+			if copyErr != nil {
+				return copyErr
+			}
+			return closeErr
+		}
+		return os.Rename(tmpName, destPath)
 	}
-	return os.Rename(tmpName, destPath)
+	return lastErr
 }
 
 func mustEnv(key string) string {
