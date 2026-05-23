@@ -15,7 +15,7 @@ LIMIT 1;
 
 -- name: GetRandomRecording :one
 SELECT file_path FROM species_recordings
-WHERE species_id = $1
+WHERE species_id = $1 AND quality IN ('A', 'B')
 ORDER BY random()
 LIMIT 1;
 
