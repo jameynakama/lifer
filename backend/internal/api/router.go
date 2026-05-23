@@ -12,14 +12,14 @@ import (
 )
 
 type RouterConfig struct {
-	Queries     *store.Queries
+	Queries     store.Querier
 	OAuthConfig *oauth2.Config
 	JWTSecret   []byte
 	FrontendURL string
 }
 
 type Handler struct {
-	queries     *store.Queries
+	queries     store.Querier
 	oauthConfig *oauth2.Config
 	jwtSecret   []byte
 	frontendURL string
