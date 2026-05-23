@@ -16,12 +16,13 @@ CREATE TABLE species (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE recordings (
+CREATE TABLE species_recordings (
     id             BIGSERIAL PRIMARY KEY,
     species_id     BIGINT      NOT NULL REFERENCES species(id),
     xeno_canto_id  TEXT        NOT NULL UNIQUE,
     file_path      TEXT        NOT NULL,
     quality        CHAR(1)     NOT NULL CHECK (quality IN ('A','B','C','D','E')),
+    type           TEXT        NOT NULL DEFAULT '',
     created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -52,7 +53,8 @@ CREATE TABLE group_species (
 CREATE TABLE cards (
     id          BIGSERIAL PRIMARY KEY,
     user_id     BIGINT      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    recording_id BIGINT     NOT NULL REFERENCES recordings(id) ON DELETE CASCADE,
+    species_id  BIGINT      NOT NULL REFERENCES species(id) ON DELETE CASCADE,
+    lane        TEXT        NOT NULL CHECK (lane IN ('audio', 'image')),
     stability   FLOAT       NOT NULL DEFAULT 0,
     difficulty  FLOAT       NOT NULL DEFAULT 0,
     due         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -61,7 +63,15 @@ CREATE TABLE cards (
     lapses      INT         NOT NULL DEFAULT 0,
     state       SMALLINT    NOT NULL DEFAULT 0, -- 0=new 1=learning 2=review 3=relearning
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (user_id, recording_id)
+    UNIQUE (user_id, species_id, lane)
 );
+CREATE INDEX idx_cards_user_lane_due ON cards(user_id, lane, due);
 
-CREATE INDEX idx_cards_user_due ON cards(user_id, due);
+CREATE TABLE user_species_preferences (
+    user_id       BIGINT      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    species_id    BIGINT      NOT NULL REFERENCES species(id) ON DELETE CASCADE,
+    audio_enabled BOOLEAN     NOT NULL DEFAULT TRUE,
+    image_enabled BOOLEAN     NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (user_id, species_id)
+);
