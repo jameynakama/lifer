@@ -1,15 +1,19 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
 	"github.com/jameynakama/lifer/internal/auth"
 	"github.com/jameynakama/lifer/internal/store"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type nextCardResponse struct {
@@ -90,4 +94,85 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		PhotoURL:       photoURL,
 		Lane:           lane,
 	})
+}
+
+type rateCardRequest struct {
+	SpeciesID int64  `json:"species_id"`
+	Lane      string `json:"lane"`
+	Rating    int    `json:"rating"`
+}
+
+func (h *Handler) rateCard(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+
+	var req rateCardRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Rating < 1 || req.Rating > 4 {
+		http.Error(w, "rating must be 1-4", http.StatusBadRequest)
+		return
+	}
+	if req.Lane != "audio" && req.Lane != "image" {
+		http.Error(w, "lane must be audio or image", http.StatusBadRequest)
+		return
+	}
+
+	current, err := h.queries.GetCard(r.Context(), store.GetCardParams{
+		UserID:    userID,
+		SpeciesID: req.SpeciesID,
+		Lane:      req.Lane,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "card not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("GetCard error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	fsrsCard := fsrs.Card{
+		Stability:  current.Stability,
+		Difficulty: current.Difficulty,
+		Reps:       uint64(current.Reps),
+		Lapses:     uint64(current.Lapses),
+		State:      fsrs.State(current.State),
+	}
+	if current.LastReview.Valid {
+		fsrsCard.LastReview = current.LastReview.Time
+	}
+	if current.Due.Valid {
+		fsrsCard.Due = current.Due.Time
+	}
+
+	f := fsrs.NewFSRS(fsrs.DefaultParam())
+	result := f.Next(fsrsCard, time.Now(), fsrs.Rating(req.Rating)).Card
+
+	due := pgtype.Timestamptz{}
+	if err := due.Scan(result.Due); err != nil {
+		log.Printf("scan due error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	updated, err := h.queries.UpdateCardSchedule(r.Context(), store.UpdateCardScheduleParams{
+		UserID:     userID,
+		SpeciesID:  req.SpeciesID,
+		Lane:       req.Lane,
+		Stability:  result.Stability,
+		Difficulty: result.Difficulty,
+		Due:        due,
+		Lapses:     int32(result.Lapses),
+		State:      int16(result.State),
+	})
+	if err != nil {
+		log.Printf("UpdateCardSchedule error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, updated)
 }

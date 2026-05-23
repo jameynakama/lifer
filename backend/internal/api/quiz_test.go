@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -143,6 +144,72 @@ func TestGetNextCard_InvalidGroupID_Returns400(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	h.getNextCard(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestRateCard_UpdatesSchedule(t *testing.T) {
+	now := time.Now()
+	due := pgtype.Timestamptz{}
+	require.NoError(t, due.Scan(now.Add(24*time.Hour)))
+
+	updatedCard := store.Card{
+		UserID:    1,
+		SpeciesID: 99,
+		Lane:      "audio",
+		Stability: 2.5,
+		Due:       due,
+		State:     2,
+	}
+
+	q := &stubQuerier{
+		getCard: func(_ context.Context, arg store.GetCardParams) (store.Card, error) {
+			assert.Equal(t, int64(1), arg.UserID)
+			assert.Equal(t, int64(99), arg.SpeciesID)
+			assert.Equal(t, "audio", arg.Lane)
+			return store.Card{
+				UserID:    1,
+				SpeciesID: 99,
+				Lane:      "audio",
+				State:     0,
+			}, nil
+		},
+		updateCardSchedule: func(_ context.Context, arg store.UpdateCardScheduleParams) (store.Card, error) {
+			assert.Equal(t, int64(1), arg.UserID)
+			assert.Equal(t, int64(99), arg.SpeciesID)
+			assert.Equal(t, "audio", arg.Lane)
+			assert.Greater(t, arg.Stability, 0.0)
+			return updatedCard, nil
+		},
+	}
+
+	h := makeHandler(q)
+	body := `{"species_id":99,"lane":"audio","rating":3}`
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/groups/42/rate", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.rateCard(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var got store.Card
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.Equal(t, int64(99), got.SpeciesID)
+	assert.Equal(t, "audio", got.Lane)
+}
+
+func TestRateCard_InvalidRating_Returns400(t *testing.T) {
+	h := makeHandler(&stubQuerier{})
+	body := `{"species_id":99,"lane":"audio","rating":9}`
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/groups/42/rate", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.rateCard(w, r)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
