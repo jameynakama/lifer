@@ -45,7 +45,7 @@ Cards are user-scoped. Species/recordings/images are global shared catalog. is_a
 - Swap `MOCK_CARDS` in `Quiz.svelte` for real fetch calls
 
 **Quiz lanes:** audio and image recognition are separate FSRS lanes per species, independently scheduled. A wigeon can be mature in image lane but new in audio lane. Lane preference is global per user×species (not per group) -- default both enabled. Data model implications:
-- Audio lane: `user × recording` -- existing `cards` table
+- Audio lane: `user × (species, call_type)` -- one FSRS card per species per type ("song"/"call"), but each review shows a **random recording** from that pool so the user generalises rather than memorising one clip. Existing `cards` table needs updating (currently `user × recording`).
 - Image lane: `user × species` (recognizing the species from any photo, not memorizing individual photos) -- needs new cards-like structure
 - Preference: new `user_species_preferences (user_id, species_id, audio_enabled, image_enabled)` table
 
@@ -100,9 +100,11 @@ All three are **ingestion-only** -- hit them once to populate the DB, store asse
 ### Xeno-canto
 - **Used for:** bird call/song recordings (the core quiz content)
 - **Auth:** API key required (v3); free for registered members with verified email
-- **Approach:** query separately for `type:song` and `type:call` using `gen:{genus} sp:{species}`; filter to quality A or B (A-first); download MP3s; store raw `type` string and file path in `recordings`
-- **Key endpoint:** `GET https://xeno-canto.org/api/3/recordings?query=gen:Melospiza+sp:melodia+type:song&key={key}` -- **v3, not v2**
-- **Do NOT use** `en:` (common name) -- spacing/case unreliable. Do NOT use `q:A` in query -- filter client-side instead.
+- **Approach:** query separately for `type:song` and `type:call` using `en:"common name"` (lowercased, quoted); filter to quality A or B (A-first); download MP3s; store raw `type` string and file path in `recordings`
+- **Key endpoint:** `GET https://xeno-canto.org/api/3/recordings?key={key}&query=type:call%20en:%22cooper%27s%20hawk%22` -- **v3, not v2**
+- **Do NOT use** `gen:` + `sp:` -- eBird reclassifies genera faster than xeno-canto updates (e.g. Cooper's Hawk is `Astur` in eBird but `Accipiter` in xeno-canto), causing silent empty results. `en:` by common name is accurate and stable.
+- **Encoding gotcha:** `en:` with multi-word names requires `%20` for spaces inside the quotes, NOT `+`. Use `url.PathEscape` (not `url.Values.Encode`) to build the query parameter.
+- Do NOT use `q:A` in query -- filter client-side instead.
 - **License:** all recordings are Creative Commons -- safe to store and serve
 - **Docs:** https://xeno-canto.org/explore/api
 
