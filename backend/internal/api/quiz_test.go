@@ -122,3 +122,51 @@ func TestGetNextCard_NothingDue_Returns204(t *testing.T) {
 
 	assert.Equal(t, http.StatusNoContent, w.Code)
 }
+
+func TestGetNextCard_InvalidLane_Returns400(t *testing.T) {
+	h := makeHandler(&stubQuerier{})
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/next?lane=video", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getNextCard(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestGetNextCard_InvalidGroupID_Returns400(t *testing.T) {
+	h := makeHandler(&stubQuerier{})
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/notanumber/next?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "notanumber")
+	w := httptest.NewRecorder()
+
+	h.getNextCard(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestGetNextCard_NoMedia_Returns500(t *testing.T) {
+	due := pgtype.Timestamptz{}
+	require.NoError(t, due.Scan(time.Now().Add(-time.Hour)))
+
+	q := &stubQuerier{
+		getNextDueCard: func(_ context.Context, _ store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
+			return store.GetNextDueCardRow{SpeciesID: 99, Lane: "audio", Due: due}, nil
+		},
+		getRandomRecording: func(_ context.Context, _ int64) (string, error) {
+			return "", pgx.ErrNoRows
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/next?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getNextCard(w, r)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
