@@ -30,6 +30,11 @@ func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 	}
 }
 
+// UserIDKey returns the context key used by RequireAuth so tests can inject a user ID.
+func UserIDKey() any {
+	return userIDKey
+}
+
 func UserIDFromCtx(ctx context.Context) int64 {
 	id, _ := ctx.Value(userIDKey).(int64)
 	return id
