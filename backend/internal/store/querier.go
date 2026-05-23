@@ -19,7 +19,7 @@ type Querier interface {
 	ListIncompleteSpecies(ctx context.Context) ([]ListIncompleteSpeciesRow, error)
 	UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error)
 	UpsertCard(ctx context.Context, arg UpsertCardParams) (Card, error)
-	UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (Recording, error)
+	UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (SpeciesRecording, error)
 	UpsertSpecies(ctx context.Context, arg UpsertSpeciesParams) (Species, error)
 	UpsertSpeciesImage(ctx context.Context, arg UpsertSpeciesImageParams) (SpeciesImage, error)
 	UpsertUser(ctx context.Context, arg UpsertUserParams) (User, error)

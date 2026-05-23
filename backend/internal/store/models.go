@@ -36,16 +36,6 @@ type GroupSpecy struct {
 	SpeciesID int64 `db:"species_id" json:"species_id"`
 }
 
-type Recording struct {
-	ID          int64              `db:"id" json:"id"`
-	SpeciesID   int64              `db:"species_id" json:"species_id"`
-	XenoCantoID string             `db:"xeno_canto_id" json:"xeno_canto_id"`
-	FilePath    string             `db:"file_path" json:"file_path"`
-	Quality     string             `db:"quality" json:"quality"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	Type        string             `db:"type" json:"type"`
-}
-
 type Species struct {
 	ID             int64              `db:"id" json:"id"`
 	CommonName     string             `db:"common_name" json:"common_name"`
@@ -61,6 +51,16 @@ type SpeciesImage struct {
 	FilePath   string             `db:"file_path" json:"file_path"`
 	Credit     string             `db:"credit" json:"credit"`
 	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type SpeciesRecording struct {
+	ID          int64              `db:"id" json:"id"`
+	SpeciesID   int64              `db:"species_id" json:"species_id"`
+	XenoCantoID string             `db:"xeno_canto_id" json:"xeno_canto_id"`
+	FilePath    string             `db:"file_path" json:"file_path"`
+	Quality     string             `db:"quality" json:"quality"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	Type        string             `db:"type" json:"type"`
 }
 
 type User struct {

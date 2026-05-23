@@ -7,7 +7,7 @@ ON CONFLICT (ebird_code) DO UPDATE
 RETURNING *;
 
 -- name: UpsertRecording :one
-INSERT INTO recordings (species_id, xeno_canto_id, file_path, quality, type)
+INSERT INTO species_recordings (species_id, xeno_canto_id, file_path, quality, type)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (xeno_canto_id) DO UPDATE
     SET file_path = EXCLUDED.file_path,
@@ -25,17 +25,17 @@ RETURNING *;
 
 -- name: ListIncompleteSpecies :many
 SELECT id, ebird_code FROM species
-WHERE id NOT IN (SELECT DISTINCT species_id FROM recordings)
+WHERE id NOT IN (SELECT DISTINCT species_id FROM species_recordings)
    OR id NOT IN (SELECT DISTINCT species_id FROM species_images);
 
 -- name: ListCompleteSpeciesEbirdCodes :many
 SELECT s.ebird_code
 FROM species s
-WHERE EXISTS (SELECT 1 FROM recordings r WHERE r.species_id = s.id)
+WHERE EXISTS (SELECT 1 FROM species_recordings r WHERE r.species_id = s.id)
   AND EXISTS (SELECT 1 FROM species_images si WHERE si.species_id = s.id);
 
 -- name: DeleteRecordingsBySpeciesID :exec
-DELETE FROM recordings WHERE species_id = $1;
+DELETE FROM species_recordings WHERE species_id = $1;
 
 -- name: DeleteSpeciesImagesBySpeciesID :exec
 DELETE FROM species_images WHERE species_id = $1;

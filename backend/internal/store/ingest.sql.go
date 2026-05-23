@@ -10,7 +10,7 @@ import (
 )
 
 const deleteRecordingsBySpeciesID = `-- name: DeleteRecordingsBySpeciesID :exec
-DELETE FROM recordings WHERE species_id = $1
+DELETE FROM species_recordings WHERE species_id = $1
 `
 
 func (q *Queries) DeleteRecordingsBySpeciesID(ctx context.Context, speciesID int64) error {
@@ -39,7 +39,7 @@ func (q *Queries) DeleteSpeciesImagesBySpeciesID(ctx context.Context, speciesID 
 const listCompleteSpeciesEbirdCodes = `-- name: ListCompleteSpeciesEbirdCodes :many
 SELECT s.ebird_code
 FROM species s
-WHERE EXISTS (SELECT 1 FROM recordings r WHERE r.species_id = s.id)
+WHERE EXISTS (SELECT 1 FROM species_recordings r WHERE r.species_id = s.id)
   AND EXISTS (SELECT 1 FROM species_images si WHERE si.species_id = s.id)
 `
 
@@ -65,7 +65,7 @@ func (q *Queries) ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, 
 
 const listIncompleteSpecies = `-- name: ListIncompleteSpecies :many
 SELECT id, ebird_code FROM species
-WHERE id NOT IN (SELECT DISTINCT species_id FROM recordings)
+WHERE id NOT IN (SELECT DISTINCT species_id FROM species_recordings)
    OR id NOT IN (SELECT DISTINCT species_id FROM species_images)
 `
 
@@ -95,7 +95,7 @@ func (q *Queries) ListIncompleteSpecies(ctx context.Context) ([]ListIncompleteSp
 }
 
 const upsertRecording = `-- name: UpsertRecording :one
-INSERT INTO recordings (species_id, xeno_canto_id, file_path, quality, type)
+INSERT INTO species_recordings (species_id, xeno_canto_id, file_path, quality, type)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (xeno_canto_id) DO UPDATE
     SET file_path = EXCLUDED.file_path,
@@ -112,7 +112,7 @@ type UpsertRecordingParams struct {
 	Type        string `db:"type" json:"type"`
 }
 
-func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (Recording, error) {
+func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (SpeciesRecording, error) {
 	row := q.db.QueryRow(ctx, upsertRecording,
 		arg.SpeciesID,
 		arg.XenoCantoID,
@@ -120,7 +120,7 @@ func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams
 		arg.Quality,
 		arg.Type,
 	)
-	var i Recording
+	var i SpeciesRecording
 	err := row.Scan(
 		&i.ID,
 		&i.SpeciesID,

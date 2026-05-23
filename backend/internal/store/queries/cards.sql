@@ -1,7 +1,7 @@
 -- name: GetDueCards :many
 SELECT c.*, r.file_path AS recording_path, s.common_name, s.scientific_name
 FROM cards c
-JOIN recordings r ON r.id = c.recording_id
+JOIN species_recordings r ON r.id = c.recording_id
 JOIN species s ON s.id = r.species_id
 WHERE c.user_id = $1 AND c.due <= NOW()
 ORDER BY c.due

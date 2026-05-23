@@ -3,8 +3,8 @@ set dotenv-load
 default: test
 
 # Run all backend tests
-test:
-    cd backend && go test ./...
+test args='':
+    cd backend && go test {{ args }} ./...
 
 # Start the backend server
 run:

@@ -25,6 +25,7 @@ func main() {
 	maxImages := flag.Int("max-images", 3, "max images per species")
 	workers := flag.Int("workers", 5, "concurrent worker count")
 	skipComplete := flag.Bool("skip-complete", false, "skip species that already have ≥1 recording and ≥1 image in the DB")
+	skipMedia := flag.Bool("skip-media", false, "store external URLs instead of downloading files (ASSETS_DIR not required)")
 	speciesFilter := flag.String("species", "", "comma-separated ebird codes or common names to process (e.g. busti or \"Bushtit,American Robin\")")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: ingest [flags] <region-code> [region-code...]\n\n")
@@ -43,8 +44,11 @@ func main() {
 
 	ebirdKey := mustEnv("EBIRD_API_KEY")
 	xcKey := mustEnv("XENO_CANTO_API_KEY")
-	assetsDir := mustEnv("ASSETS_DIR")
 	dbURL := mustEnv("DATABASE_URL")
+	var assetsDir string
+	if !*skipMedia {
+		assetsDir = mustEnv("ASSETS_DIR")
+	}
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dbURL)
@@ -130,7 +134,7 @@ func main() {
 		go func(code string, entry ebird.TaxonomyEntry) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if err := ingestSpecies(ctx, q, xcClient, macaulayClient, entry, *maxRecordings, *maxImages, assetsDir); err != nil {
+			if err := ingestSpecies(ctx, q, xcClient, macaulayClient, entry, *maxRecordings, *maxImages, assetsDir, *skipMedia); err != nil {
 				log.Printf("error %s (%s): %v", entry.CommonName, code, err)
 			}
 			mu.Lock()
@@ -154,8 +158,10 @@ func main() {
 		log.Fatalf("cleanup: %v", err)
 	}
 	for _, sp := range incomplete {
-		os.RemoveAll(filepath.Join(assetsDir, "images", sp.EbirdCode))
-		os.RemoveAll(filepath.Join(assetsDir, "recordings", sp.EbirdCode))
+		if !*skipMedia {
+			os.RemoveAll(filepath.Join(assetsDir, "images", sp.EbirdCode))
+			os.RemoveAll(filepath.Join(assetsDir, "recordings", sp.EbirdCode))
+		}
 		if err := q.DeleteRecordingsBySpeciesID(ctx, sp.ID); err != nil {
 			log.Printf("  warn: cleanup recordings %s: %v", sp.EbirdCode, err)
 		}
@@ -215,6 +221,7 @@ func ingestSpecies(
 	entry ebird.TaxonomyEntry,
 	maxRec, maxImg int,
 	assetsDir string,
+	skipMedia bool,
 ) error {
 	sp, err := q.UpsertSpecies(ctx, store.UpsertSpeciesParams{
 		CommonName:     entry.CommonName,
@@ -257,15 +264,21 @@ func ingestSpecies(
 			recWg.Add(1)
 			go func(rec xenocanto.Recording) {
 				defer recWg.Done()
-				destPath := filepath.Join(assetsDir, "recordings", entry.SpeciesCode, rec.ID+".mp3")
-				if err := downloadFile(ctx, rec.FileURL, destPath); err != nil {
-					log.Printf("  warn: download recording %s: %v", rec.ID, err)
-					return
+				var filePath string
+				if skipMedia {
+					filePath = rec.FileURL
+				} else {
+					destPath := filepath.Join(assetsDir, "recordings", entry.SpeciesCode, rec.ID+".mp3")
+					if err := downloadFile(ctx, rec.FileURL, destPath); err != nil {
+						log.Printf("  warn: download recording %s: %v", rec.ID, err)
+						return
+					}
+					filePath = filepath.Join("recordings", entry.SpeciesCode, rec.ID+".mp3")
 				}
 				if _, err := q.UpsertRecording(ctx, store.UpsertRecordingParams{
 					SpeciesID:   sp.ID,
 					XenoCantoID: rec.ID,
-					FilePath:    filepath.Join("recordings", entry.SpeciesCode, rec.ID+".mp3"),
+					FilePath:    filePath,
 					Quality:     rec.Quality,
 					Type:        rec.Type,
 				}); err != nil {
@@ -288,15 +301,21 @@ func ingestSpecies(
 		imgWg.Add(1)
 		go func(photo macaulay.Photo) {
 			defer imgWg.Done()
-			destPath := filepath.Join(assetsDir, "images", entry.SpeciesCode, photo.AssetID+".jpg")
-			if err := downloadFile(ctx, mac.PhotoURL(photo.AssetID), destPath); err != nil {
-				log.Printf("  warn: download image %s: %v", photo.AssetID, err)
-				return
+			var filePath string
+			if skipMedia {
+				filePath = mac.PhotoURL(photo.AssetID)
+			} else {
+				destPath := filepath.Join(assetsDir, "images", entry.SpeciesCode, photo.AssetID+".jpg")
+				if err := downloadFile(ctx, mac.PhotoURL(photo.AssetID), destPath); err != nil {
+					log.Printf("  warn: download image %s: %v", photo.AssetID, err)
+					return
+				}
+				filePath = filepath.Join("images", entry.SpeciesCode, photo.AssetID+".jpg")
 			}
 			if _, err := q.UpsertSpeciesImage(ctx, store.UpsertSpeciesImageParams{
 				SpeciesID:  sp.ID,
 				MacaulayID: photo.AssetID,
-				FilePath:   filepath.Join("images", entry.SpeciesCode, photo.AssetID+".jpg"),
+				FilePath:   filePath,
 				Credit:     photo.UserDisplayName,
 			}); err != nil {
 				log.Printf("  warn: upsert image %s: %v", photo.AssetID, err)
