@@ -9,16 +9,22 @@ import (
 )
 
 type Querier interface {
+	DeleteCard(ctx context.Context, arg DeleteCardParams) error
 	DeleteRecordingsBySpeciesID(ctx context.Context, speciesID int64) error
 	DeleteSpeciesByID(ctx context.Context, id int64) error
 	DeleteSpeciesImagesBySpeciesID(ctx context.Context, speciesID int64) error
-	GetDueCards(ctx context.Context, arg GetDueCardsParams) ([]GetDueCardsRow, error)
+	GetCard(ctx context.Context, arg GetCardParams) (Card, error)
+	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
+	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)
+	GetRandomImage(ctx context.Context, speciesID int64) (string, error)
+	GetRandomRecording(ctx context.Context, speciesID int64) (string, error)
 	GetUserByGoogleID(ctx context.Context, googleID string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, error)
 	ListIncompleteSpecies(ctx context.Context) ([]ListIncompleteSpeciesRow, error)
 	UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error)
-	UpsertCard(ctx context.Context, arg UpsertCardParams) (Card, error)
+	UpsertCard(ctx context.Context, arg UpsertCardParams) error
+	UpsertPreferences(ctx context.Context, arg UpsertPreferencesParams) (UserSpeciesPreference, error)
 	UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (SpeciesRecording, error)
 	UpsertSpecies(ctx context.Context, arg UpsertSpeciesParams) (Species, error)
 	UpsertSpeciesImage(ctx context.Context, arg UpsertSpeciesImageParams) (SpeciesImage, error)

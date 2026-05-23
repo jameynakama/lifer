@@ -11,25 +11,82 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getDueCards = `-- name: GetDueCards :many
-SELECT c.id, c.user_id, c.recording_id, c.stability, c.difficulty, c.due, c.last_review, c.reps, c.lapses, c.state, c.created_at, r.file_path AS recording_path, s.common_name, s.scientific_name
-FROM cards c
-JOIN species_recordings r ON r.id = c.recording_id
-JOIN species s ON s.id = r.species_id
-WHERE c.user_id = $1 AND c.due <= NOW()
-ORDER BY c.due
-LIMIT $2
+const deleteCard = `-- name: DeleteCard :exec
+DELETE FROM cards
+WHERE user_id = $1 AND species_id = $2 AND lane = $3
 `
 
-type GetDueCardsParams struct {
-	UserID int64 `db:"user_id" json:"user_id"`
-	Limit  int32 `db:"limit" json:"limit"`
+type DeleteCardParams struct {
+	UserID    int64  `db:"user_id" json:"user_id"`
+	SpeciesID int64  `db:"species_id" json:"species_id"`
+	Lane      string `db:"lane" json:"lane"`
 }
 
-type GetDueCardsRow struct {
+func (q *Queries) DeleteCard(ctx context.Context, arg DeleteCardParams) error {
+	_, err := q.db.Exec(ctx, deleteCard, arg.UserID, arg.SpeciesID, arg.Lane)
+	return err
+}
+
+const getCard = `-- name: GetCard :one
+SELECT id, user_id, species_id, lane, stability, difficulty, due,
+       last_review, reps, lapses, state, created_at
+FROM cards
+WHERE user_id = $1 AND species_id = $2 AND lane = $3
+`
+
+type GetCardParams struct {
+	UserID    int64  `db:"user_id" json:"user_id"`
+	SpeciesID int64  `db:"species_id" json:"species_id"`
+	Lane      string `db:"lane" json:"lane"`
+}
+
+func (q *Queries) GetCard(ctx context.Context, arg GetCardParams) (Card, error) {
+	row := q.db.QueryRow(ctx, getCard, arg.UserID, arg.SpeciesID, arg.Lane)
+	var i Card
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.SpeciesID,
+		&i.Lane,
+		&i.Stability,
+		&i.Difficulty,
+		&i.Due,
+		&i.LastReview,
+		&i.Reps,
+		&i.Lapses,
+		&i.State,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getNextDueCard = `-- name: GetNextDueCard :one
+SELECT c.id, c.user_id, c.species_id, c.lane,
+       c.stability, c.difficulty, c.due, c.last_review,
+       c.reps, c.lapses, c.state, c.created_at,
+       s.common_name, s.scientific_name
+FROM cards c
+JOIN species s ON s.id = c.species_id
+JOIN group_species gs ON gs.species_id = c.species_id
+WHERE c.user_id = $1
+  AND gs.group_id = $2
+  AND c.lane = $3
+  AND c.due <= NOW()
+ORDER BY c.due
+LIMIT 1
+`
+
+type GetNextDueCardParams struct {
+	UserID  int64  `db:"user_id" json:"user_id"`
+	GroupID int64  `db:"group_id" json:"group_id"`
+	Lane    string `db:"lane" json:"lane"`
+}
+
+type GetNextDueCardRow struct {
 	ID             int64              `db:"id" json:"id"`
 	UserID         int64              `db:"user_id" json:"user_id"`
-	RecordingID    int64              `db:"recording_id" json:"recording_id"`
+	SpeciesID      int64              `db:"species_id" json:"species_id"`
+	Lane           string             `db:"lane" json:"lane"`
 	Stability      float64            `db:"stability" json:"stability"`
 	Difficulty     float64            `db:"difficulty" json:"difficulty"`
 	Due            pgtype.Timestamptz `db:"due" json:"due"`
@@ -38,73 +95,90 @@ type GetDueCardsRow struct {
 	Lapses         int32              `db:"lapses" json:"lapses"`
 	State          int16              `db:"state" json:"state"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
-	RecordingPath  string             `db:"recording_path" json:"recording_path"`
 	CommonName     string             `db:"common_name" json:"common_name"`
 	ScientificName string             `db:"scientific_name" json:"scientific_name"`
 }
 
-func (q *Queries) GetDueCards(ctx context.Context, arg GetDueCardsParams) ([]GetDueCardsRow, error) {
-	rows, err := q.db.Query(ctx, getDueCards, arg.UserID, arg.Limit)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetDueCardsRow
-	for rows.Next() {
-		var i GetDueCardsRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.RecordingID,
-			&i.Stability,
-			&i.Difficulty,
-			&i.Due,
-			&i.LastReview,
-			&i.Reps,
-			&i.Lapses,
-			&i.State,
-			&i.CreatedAt,
-			&i.RecordingPath,
-			&i.CommonName,
-			&i.ScientificName,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
+func (q *Queries) GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error) {
+	row := q.db.QueryRow(ctx, getNextDueCard, arg.UserID, arg.GroupID, arg.Lane)
+	var i GetNextDueCardRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.SpeciesID,
+		&i.Lane,
+		&i.Stability,
+		&i.Difficulty,
+		&i.Due,
+		&i.LastReview,
+		&i.Reps,
+		&i.Lapses,
+		&i.State,
+		&i.CreatedAt,
+		&i.CommonName,
+		&i.ScientificName,
+	)
+	return i, err
+}
+
+const getRandomImage = `-- name: GetRandomImage :one
+SELECT file_path FROM species_images
+WHERE species_id = $1
+ORDER BY random()
+LIMIT 1
+`
+
+func (q *Queries) GetRandomImage(ctx context.Context, speciesID int64) (string, error) {
+	row := q.db.QueryRow(ctx, getRandomImage, speciesID)
+	var file_path string
+	err := row.Scan(&file_path)
+	return file_path, err
+}
+
+const getRandomRecording = `-- name: GetRandomRecording :one
+SELECT file_path FROM species_recordings
+WHERE species_id = $1
+ORDER BY random()
+LIMIT 1
+`
+
+func (q *Queries) GetRandomRecording(ctx context.Context, speciesID int64) (string, error) {
+	row := q.db.QueryRow(ctx, getRandomRecording, speciesID)
+	var file_path string
+	err := row.Scan(&file_path)
+	return file_path, err
 }
 
 const updateCardSchedule = `-- name: UpdateCardSchedule :one
 UPDATE cards
-SET stability   = $3,
-    difficulty  = $4,
-    due         = $5,
+SET stability   = $4,
+    difficulty  = $5,
+    due         = $6,
     last_review = NOW(),
     reps        = reps + 1,
-    lapses      = $6,
-    state       = $7
-WHERE user_id = $1 AND recording_id = $2
-RETURNING id, user_id, recording_id, stability, difficulty, due, last_review, reps, lapses, state, created_at
+    lapses      = $7,
+    state       = $8
+WHERE user_id = $1 AND species_id = $2 AND lane = $3
+RETURNING id, user_id, species_id, lane, stability, difficulty, due,
+          last_review, reps, lapses, state, created_at
 `
 
 type UpdateCardScheduleParams struct {
-	UserID      int64              `db:"user_id" json:"user_id"`
-	RecordingID int64              `db:"recording_id" json:"recording_id"`
-	Stability   float64            `db:"stability" json:"stability"`
-	Difficulty  float64            `db:"difficulty" json:"difficulty"`
-	Due         pgtype.Timestamptz `db:"due" json:"due"`
-	Lapses      int32              `db:"lapses" json:"lapses"`
-	State       int16              `db:"state" json:"state"`
+	UserID     int64              `db:"user_id" json:"user_id"`
+	SpeciesID  int64              `db:"species_id" json:"species_id"`
+	Lane       string             `db:"lane" json:"lane"`
+	Stability  float64            `db:"stability" json:"stability"`
+	Difficulty float64            `db:"difficulty" json:"difficulty"`
+	Due        pgtype.Timestamptz `db:"due" json:"due"`
+	Lapses     int32              `db:"lapses" json:"lapses"`
+	State      int16              `db:"state" json:"state"`
 }
 
 func (q *Queries) UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error) {
 	row := q.db.QueryRow(ctx, updateCardSchedule,
 		arg.UserID,
-		arg.RecordingID,
+		arg.SpeciesID,
+		arg.Lane,
 		arg.Stability,
 		arg.Difficulty,
 		arg.Due,
@@ -115,7 +189,8 @@ func (q *Queries) UpdateCardSchedule(ctx context.Context, arg UpdateCardSchedule
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
-		&i.RecordingID,
+		&i.SpeciesID,
+		&i.Lane,
 		&i.Stability,
 		&i.Difficulty,
 		&i.Due,
@@ -128,33 +203,19 @@ func (q *Queries) UpdateCardSchedule(ctx context.Context, arg UpdateCardSchedule
 	return i, err
 }
 
-const upsertCard = `-- name: UpsertCard :one
-INSERT INTO cards (user_id, recording_id)
-VALUES ($1, $2)
-ON CONFLICT (user_id, recording_id) DO NOTHING
-RETURNING id, user_id, recording_id, stability, difficulty, due, last_review, reps, lapses, state, created_at
+const upsertCard = `-- name: UpsertCard :exec
+INSERT INTO cards (user_id, species_id, lane)
+VALUES ($1, $2, $3)
+ON CONFLICT (user_id, species_id, lane) DO NOTHING
 `
 
 type UpsertCardParams struct {
-	UserID      int64 `db:"user_id" json:"user_id"`
-	RecordingID int64 `db:"recording_id" json:"recording_id"`
+	UserID    int64  `db:"user_id" json:"user_id"`
+	SpeciesID int64  `db:"species_id" json:"species_id"`
+	Lane      string `db:"lane" json:"lane"`
 }
 
-func (q *Queries) UpsertCard(ctx context.Context, arg UpsertCardParams) (Card, error) {
-	row := q.db.QueryRow(ctx, upsertCard, arg.UserID, arg.RecordingID)
-	var i Card
-	err := row.Scan(
-		&i.ID,
-		&i.UserID,
-		&i.RecordingID,
-		&i.Stability,
-		&i.Difficulty,
-		&i.Due,
-		&i.LastReview,
-		&i.Reps,
-		&i.Lapses,
-		&i.State,
-		&i.CreatedAt,
-	)
-	return i, err
+func (q *Queries) UpsertCard(ctx context.Context, arg UpsertCardParams) error {
+	_, err := q.db.Exec(ctx, upsertCard, arg.UserID, arg.SpeciesID, arg.Lane)
+	return err
 }

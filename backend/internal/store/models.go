@@ -9,17 +9,18 @@ import (
 )
 
 type Card struct {
-	ID          int64              `db:"id" json:"id"`
-	UserID      int64              `db:"user_id" json:"user_id"`
-	RecordingID int64              `db:"recording_id" json:"recording_id"`
-	Stability   float64            `db:"stability" json:"stability"`
-	Difficulty  float64            `db:"difficulty" json:"difficulty"`
-	Due         pgtype.Timestamptz `db:"due" json:"due"`
-	LastReview  pgtype.Timestamptz `db:"last_review" json:"last_review"`
-	Reps        int32              `db:"reps" json:"reps"`
-	Lapses      int32              `db:"lapses" json:"lapses"`
-	State       int16              `db:"state" json:"state"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID         int64              `db:"id" json:"id"`
+	UserID     int64              `db:"user_id" json:"user_id"`
+	SpeciesID  int64              `db:"species_id" json:"species_id"`
+	Lane       string             `db:"lane" json:"lane"`
+	Stability  float64            `db:"stability" json:"stability"`
+	Difficulty float64            `db:"difficulty" json:"difficulty"`
+	Due        pgtype.Timestamptz `db:"due" json:"due"`
+	LastReview pgtype.Timestamptz `db:"last_review" json:"last_review"`
+	Reps       int32              `db:"reps" json:"reps"`
+	Lapses     int32              `db:"lapses" json:"lapses"`
+	State      int16              `db:"state" json:"state"`
+	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type Group struct {
@@ -59,8 +60,8 @@ type SpeciesRecording struct {
 	XenoCantoID string             `db:"xeno_canto_id" json:"xeno_canto_id"`
 	FilePath    string             `db:"file_path" json:"file_path"`
 	Quality     string             `db:"quality" json:"quality"`
-	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	Type        string             `db:"type" json:"type"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type User struct {
@@ -71,4 +72,12 @@ type User struct {
 	Picture   string             `db:"picture" json:"picture"`
 	IsAdmin   bool               `db:"is_admin" json:"is_admin"`
 	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+type UserSpeciesPreference struct {
+	UserID       int64              `db:"user_id" json:"user_id"`
+	SpeciesID    int64              `db:"species_id" json:"species_id"`
+	AudioEnabled bool               `db:"audio_enabled" json:"audio_enabled"`
+	ImageEnabled bool               `db:"image_enabled" json:"image_enabled"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
