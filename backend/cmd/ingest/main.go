@@ -111,7 +111,7 @@ func main() {
 	sem := make(chan struct{}, *workers)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	done := 0
+	started, done := 0, 0
 	total := len(codes)
 
 	for _, code := range codes {
@@ -122,6 +122,11 @@ func main() {
 		}
 		wg.Add(1)
 		sem <- struct{}{}
+		mu.Lock()
+		started++
+		n := started
+		mu.Unlock()
+		log.Printf("starting %d/%d: %s", n, total, entry.CommonName)
 		go func(code string, entry ebird.TaxonomyEntry) {
 			defer wg.Done()
 			defer func() { <-sem }()
@@ -211,12 +216,6 @@ func ingestSpecies(
 	maxRec, maxImg int,
 	assetsDir string,
 ) error {
-	parts := strings.SplitN(entry.SciName, " ", 2)
-	if len(parts) != 2 {
-		return fmt.Errorf("unexpected sciName %q", entry.SciName)
-	}
-	genus, species := parts[0], parts[1]
-
 	sp, err := q.UpsertSpecies(ctx, store.UpsertSpeciesParams{
 		CommonName:     entry.CommonName,
 		ScientificName: entry.SciName,
@@ -237,7 +236,7 @@ func ingestSpecies(
 	searchCh := make(chan searchResult, 2)
 	for _, recType := range []string{"song", "call"} {
 		go func(rt string) {
-			recs, err := xc.Search(ctx, genus, species, rt)
+			recs, err := xc.Search(ctx, entry.CommonName, rt)
 			searchCh <- searchResult{rt, recs, err}
 		}(recType)
 	}

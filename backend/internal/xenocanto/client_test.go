@@ -15,8 +15,7 @@ func TestSearch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/3/recordings", r.URL.Path)
 		q := r.URL.Query().Get("query")
-		assert.Contains(t, q, "gen:Melospiza")
-		assert.Contains(t, q, "sp:melodia")
+		assert.Contains(t, q, `en:"song sparrow"`)
 		assert.Contains(t, q, "type:song")
 		json.NewEncoder(w).Encode(apiResponse{
 			Recordings: []Recording{
@@ -29,7 +28,7 @@ func TestSearch(t *testing.T) {
 	defer srv.Close()
 
 	c := newWithBaseURL("", srv.URL)
-	recs, err := c.Search(context.Background(), "Melospiza", "melodia", "song")
+	recs, err := c.Search(context.Background(), "Song Sparrow", "song")
 	require.NoError(t, err)
 	// quality C is filtered out
 	assert.Len(t, recs, 2)
@@ -46,7 +45,7 @@ func TestSearchHTTPError(t *testing.T) {
 	defer srv.Close()
 
 	c := newWithBaseURL("", srv.URL)
-	_, err := c.Search(context.Background(), "Melospiza", "melodia", "song")
+	_, err := c.Search(context.Background(), "Song Sparrow", "song")
 	assert.ErrorContains(t, err, "429")
 }
 
@@ -58,7 +57,7 @@ func TestSearchIncludesAPIKey(t *testing.T) {
 	defer srv.Close()
 
 	c := newWithBaseURL("mykey", srv.URL)
-	recs, err := c.Search(context.Background(), "Melospiza", "melodia", "song")
+	recs, err := c.Search(context.Background(), "Song Sparrow", "song")
 	require.NoError(t, err)
 	assert.Empty(t, recs)
 }
