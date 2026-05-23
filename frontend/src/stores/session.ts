@@ -1,5 +1,10 @@
 import { writable, type Writable } from "svelte/store";
 
-type Session = { groupId: string | null };
+type Lane = 'audio' | 'image';
 
-export const session: Writable<Session> = writable({ groupId: null });
+type Session = {
+    groupId: string | null;
+    lane: Lane | null;
+};
+
+export const session: Writable<Session> = writable({ groupId: null, lane: null });

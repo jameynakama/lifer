@@ -4,16 +4,18 @@ export interface Stat {
 }
 
 export interface BirdCard {
-    id: string;
-    recording_path: string;
+    species_id: number;
     common_name: string;
     scientific_name: string;
-    photo_path: string;
+    media_url: string;
+    photo_url: string;
+    lane: 'audio' | 'image';
 }
 
 export interface Group {
     id: string;
     name: string;
     is_preset: boolean;
-    due_count: number;
+    audio_due: number;
+    image_due: number;
 }
