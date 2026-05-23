@@ -47,6 +47,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth(cfg.JWTSecret))
 			r.Get("/me", h.getMe)
+			r.Get("/groups/{id}/next", h.getNextCard)
+			r.Post("/groups/{id}/rate", h.rateCard)
+			r.Put("/species/{id}/preferences", h.updatePreferences)
 		})
 	})
 
