@@ -66,6 +66,8 @@ CREATE TABLE cards (
     UNIQUE (user_id, species_id, lane)
 );
 CREATE INDEX idx_cards_user_lane_due ON cards(user_id, lane, due);
+CREATE INDEX idx_species_recordings_species_id ON species_recordings(species_id);
+CREATE INDEX idx_species_images_species_id ON species_images(species_id);
 
 CREATE TABLE user_species_preferences (
     user_id       BIGINT      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
