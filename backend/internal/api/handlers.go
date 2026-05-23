@@ -91,7 +91,4 @@ func randomState() string {
 	return base64.URLEncoding.EncodeToString(b)
 }
 
-type contextKey string
-
-const userIDKey contextKey = "userID"
 
