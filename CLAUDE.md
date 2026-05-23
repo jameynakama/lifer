@@ -12,7 +12,7 @@ A spaced repetition web app for bird song/call and image identification practice
 ## Data model
 - `users` -- google_id, email, name, picture, is_admin
 - `species` -- common_name, scientific_name, ebird_code
-- `recordings` -- species FK, xeno_canto_id, file_path, quality (A-E), type (raw string from xeno-canto, e.g. "song", "call")
+- `species_recordings` -- species FK, xeno_canto_id, file_path (local relative path or external URL), quality (A-E), type (raw string from xeno-canto, e.g. "song", "call")
 - `species_images` -- species FK, macaulay_id, file_path, credit
 - `groups` -- preset (eBird-sourced) or user-created; owner_id null for presets
 - `group_species` -- join table
@@ -34,8 +34,9 @@ Cards are user-scoped. Species/recordings/images are global shared catalog. is_a
 - [x] Google OAuth login button, auth check on load, state-based routing
 - [x] Full styling: dark/light themes (CSS custom properties), Inter font, atmospheric login, token-based components
 - [x] Theme toggle (sun/moon) with localStorage persistence + OS preference fallback
-- [x] `cmd/ingest` binary: eBird taxonomy + region species lists → xeno-canto (API v3, quality A/B) + Macaulay Library photos → local asset storage; buffered channel worker pool (default 5); idempotent upserts; post-run cleanup removes species missing recordings or images from DB and disk
-- [x] Migration 002: `type text` column on `recordings`
+- [x] `cmd/ingest` binary: eBird taxonomy + region species lists → xeno-canto (API v3, quality A/B) + Macaulay Library photos; buffered channel worker pool (default 5); idempotent upserts; post-run cleanup removes species missing recordings or images from DB and disk; `--skip-media` flag stores external URLs instead of downloading files (no `ASSETS_DIR` required)
+- [x] Migration 002: `type text` column on `species_recordings`
+- [x] Migration 003: rename `recordings` → `species_recordings`
 
 ## What's next
 
@@ -88,7 +89,7 @@ just                   # runs tests (default)
 
 ## External APIs
 
-All three are **ingestion-only** -- hit them once to populate the DB, store assets locally or S3, never needed again at runtime.
+All three are **ingestion-only** -- hit them once to populate the DB, never needed again at runtime. By default, ingest stores external URLs directly in `file_path` (`--skip-media` flag); pass without the flag to download files locally instead.
 
 ### eBird API
 - **Used for:** regional species checklists → preset groups (e.g. "Pacific Northwest")
@@ -100,7 +101,8 @@ All three are **ingestion-only** -- hit them once to populate the DB, store asse
 ### Xeno-canto
 - **Used for:** bird call/song recordings (the core quiz content)
 - **Auth:** API key required (v3); free for registered members with verified email
-- **Approach:** query separately for `type:song` and `type:call` using `en:"common name"` (lowercased, quoted); filter to quality A or B (A-first); download MP3s; store raw `type` string and file path in `recordings`
+- **Approach:** query separately for `type:song` and `type:call` using `en:"common name"` (lowercased, quoted); filter to quality A or B (A-first); store raw `type` string and `file_path` in `species_recordings` -- either the xeno-canto download URL (`--skip-media`) or a local relative path
+- **Audio URL format:** `https://xeno-canto.org/{id}/download` -- confirmed works as `<audio src>` in browsers
 - **Key endpoint:** `GET https://xeno-canto.org/api/3/recordings?key={key}&query=type:call%20en:%22cooper%27s%20hawk%22` -- **v3, not v2**
 - **Do NOT use** `gen:` + `sp:` -- eBird reclassifies genera faster than xeno-canto updates (e.g. Cooper's Hawk is `Astur` in eBird but `Accipiter` in xeno-canto), causing silent empty results. `en:` by common name is accurate and stable.
 - **Encoding gotcha:** `en:` with multi-word names requires `%20` for spaces inside the quotes, NOT `+`. Use `url.PathEscape` (not `url.Values.Encode`) to build the query parameter.
@@ -111,7 +113,8 @@ All three are **ingestion-only** -- hit them once to populate the DB, store asse
 ### Macaulay Library (Cornell Lab)
 - **Used for:** species photos shown on quiz reveal and for future image ID quizzes
 - **Auth:** same eBird API key (`X-eBirdApiToken` header)
-- **Approach:** search by species code, download top-rated photos, store in `species_images`
+- **Approach:** search by species code, store top-rated photos in `species_images` -- either the Macaulay CDN URL (`--skip-media`) or a local relative path
+- **Image URL format:** `https://cdn.download.ams.birds.cornell.edu/api/v1/asset/{assetId}/large` -- works directly as `<img src>`
 - **Key endpoint:** `GET https://search.macaulaylibrary.org/api/v1/search?taxonCode={speciesCode}&mediaType=photo&sort=rating_rank_desc&count={n}` -- **not api.ebird.org**
 - **Response shape:** `{ results: { content: [ { assetId, userDisplayName, ... } ] } }`
 - **Note:** same Cornell/eBird ecosystem -- one API key covers eBird checklists and Macaulay media
