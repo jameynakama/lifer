@@ -57,20 +57,28 @@ Cards are user-scoped. Species/recordings/images are global shared catalog. is_a
 - For production: teach `cmd/ingest` to stream audio/images from xeno-canto/Macaulay directly into R2 via S3-compatible PUT (no temp files needed -- pipe `io.Reader` straight through)
 - Fixes CORS issues, URL rot, and unreliable scrubbing on streaming responses
 
-### 3. Catalog / "Learn" view
+### 3. Ad-hoc / browse mode
+- Study any card in a group at any time, not just due cards
+- Results don't count toward FSRS ratings (no POST to `/rate`)
+- Useful for learning new species before they've been scheduled, or just browsing
+
+### 4. Catalog / "Learn" view
 - Browse all species, filterable by region and alphabetically
 - Shows recordings, photos, and species info
 - Users can add species to custom groups from list or detail view
 - Requires backend search/filter API (too many species to load all client-side)
 - Design group management UI alongside this (same "add to list" action)
 
-### 4. Group management
+### 5. Group management
 - Admin: create/edit preset groups (region-based)
 - Users: create custom groups, add/remove species
 - Shared UI surface with catalog view
 
-### 5. Admin UI
+### 6. Admin UI
 - Catalog management: add/edit species, recordings, images
+
+## Bugs / fixes
+- **Enter to submit answer** -- pressing Enter in the SpeciesTypeahead should trigger "Reveal answer" (same as clicking the button) when a species is selected
 
 ## Key non-obvious choices
 - sqlc lives in `backend/` -- run `just generate` from repo root after any migration change
