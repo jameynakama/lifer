@@ -57,10 +57,10 @@ Cards are user-scoped. Species/recordings/images are global shared catalog. is_a
 - For production: teach `cmd/ingest` to stream audio/images from xeno-canto/Macaulay directly into R2 via S3-compatible PUT (no temp files needed -- pipe `io.Reader` straight through)
 - Fixes CORS issues, URL rot, and unreliable scrubbing on streaming responses
 
-### 3. Ad-hoc / browse mode
-- Study any card in a group at any time, not just due cards
+### 3. Ad-hoc / practice mode
+- Study all cards in a group at any time, not just due ones -- cycle through every species regardless of schedule
 - Results don't count toward FSRS ratings (no POST to `/rate`)
-- Useful for learning new species before they've been scheduled, or just browsing
+- Useful for drilling a group before a birdwatching trip, or learning new species before they've been scheduled
 
 ### 4. Catalog / "Learn" view
 - Browse all species, filterable by region and alphabetically
