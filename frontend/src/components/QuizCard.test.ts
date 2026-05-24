@@ -1,7 +1,21 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/svelte'
+import WaveSurfer from 'wavesurfer.js'
 import QuizCard from './QuizCard.svelte'
 import type { BirdCard, Species } from '../types'
+
+// WaveSurfer uses Web Audio API not available in jsdom -- mock the whole thing
+const mockWs = {
+  on: vi.fn((event: string, cb: () => void) => {
+    if (event === 'ready') cb()
+  }),
+  playPause: vi.fn(),
+  destroy: vi.fn(),
+}
+
+vi.mock('wavesurfer.js', () => ({
+  default: { create: vi.fn(() => mockWs) },
+}))
 
 const card: BirdCard = {
   species_id: 1,
@@ -18,11 +32,18 @@ const species: Species[] = [
 ]
 
 describe('QuizCard', () => {
-  it('renders an audio player with the media url', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockWs.on.mockImplementation((event: string, cb: () => void) => {
+      if (event === 'ready') cb()
+    })
+  })
+
+  it('initialises WaveSurfer with the media url', () => {
     render(QuizCard, { props: { card, species, onReveal: vi.fn() } })
-    const audio = document.querySelector('audio')
-    expect(audio).not.toBeNull()
-    expect(audio!.src).toContain('/recordings/song-sparrow.mp3')
+    expect(vi.mocked(WaveSurfer.create)).toHaveBeenCalledWith(
+      expect.objectContaining({ url: '/recordings/song-sparrow.mp3' })
+    )
   })
 
   it('Reveal button is disabled initially', () => {

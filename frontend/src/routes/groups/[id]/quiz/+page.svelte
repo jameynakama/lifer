@@ -104,7 +104,12 @@
     <p class="status error">{error}</p>
   {:else if done}
     <div class="done">
-      <p>All done for now!</p>
+      <p class="done-icon">🎉</p>
+      <p class="done-title">All caught up!</p>
+      {#if reviewed > 0}
+        <p class="done-sub">{reviewed} {reviewed === 1 ? 'card' : 'cards'} reviewed this session.</p>
+      {/if}
+      <p class="done-sub">Come back later when more cards are due.</p>
       <button onclick={() => goto(`/groups/${groupId}`)}>Back to group</button>
     </div>
   {:else if card}
@@ -145,10 +150,19 @@
     gap: 1rem;
     padding: 2rem 0;
   }
-  .done p {
+  .done-icon {
+    font-size: 2.5rem;
+    line-height: 1;
+  }
+  .done-title {
     color: var(--text);
-    font-size: 1rem;
-    font-weight: 600;
+    font-size: 1.125rem;
+    font-weight: 700;
+  }
+  .done-sub {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    text-align: center;
   }
   .done button {
     background: var(--accent);

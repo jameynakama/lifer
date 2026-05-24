@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { BirdCard, Species } from '../types'
   import SpeciesTypeahead from './SpeciesTypeahead.svelte'
+  import WavePlayer from './WavePlayer.svelte'
 
   let { card, species, onReveal }: {
     card: BirdCard
@@ -13,7 +14,7 @@
 
 <div class="quiz-card">
   <div class="audio-card">
-    <audio controls src={card.media_url}>Your browser does not support audio.</audio>
+    <WavePlayer url={card.media_url} />
   </div>
   <SpeciesTypeahead {species} onSelect={(s) => { selected = s }} />
   <div class="actions">
@@ -42,10 +43,6 @@
     border-radius: 12px;
     padding: 1rem;
     box-shadow: var(--shadow);
-  }
-  audio {
-    width: 100%;
-    display: block;
   }
   .actions {
     display: grid;

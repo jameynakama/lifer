@@ -4,6 +4,17 @@ import { goto } from '$app/navigation'
 import { page } from '$app/state'
 import QuizPage from './+page.svelte'
 
+// WaveSurfer uses Web Audio API not available in jsdom
+vi.mock('wavesurfer.js', () => ({
+  default: {
+    create: vi.fn(() => ({
+      on: vi.fn((event: string, cb: () => void) => { if (event === 'ready') cb() }),
+      playPause: vi.fn(),
+      destroy: vi.fn(),
+    })),
+  },
+}))
+
 const card = {
   species_id: 99,
   common_name: 'Song Sparrow',
@@ -62,19 +73,19 @@ describe('Quiz page', () => {
     })
   })
 
-  it('shows QuizCard (audio element) when a card is returned', async () => {
+  it('shows QuizCard with play button when a card is returned', async () => {
     vi.stubGlobal('fetch', makeFetch())
     render(QuizPage)
     await vi.waitFor(() => {
-      expect(document.querySelector('audio')).not.toBeNull()
+      expect(screen.getByRole('button', { name: /play/i })).toBeInTheDocument()
     })
   })
 
-  it('shows All done when 204 is returned for next card', async () => {
+  it('shows all caught up when 204 is returned for next card', async () => {
     vi.stubGlobal('fetch', makeFetch({ status: 204 }))
     render(QuizPage)
     await vi.waitFor(() => {
-      expect(screen.getByText(/all done/i)).toBeInTheDocument()
+      expect(screen.getByText(/all caught up/i)).toBeInTheDocument()
     })
   })
 
