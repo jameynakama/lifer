@@ -1,21 +1,12 @@
 <script lang="ts">
   import type { BirdCard, Species } from '../types'
 
-  let { card, correct, guessed, onRate }: {
+  let { card, correct, guessed, onNext }: {
     card: BirdCard
     correct: boolean
     guessed: Species | null
-    onRate: (rating: number) => void
+    onNext: () => void
   } = $props()
-
-  const suggestedRating = $derived(correct ? 3 : 1)
-
-  const ratings = [
-    { label: 'Again', value: 1 },
-    { label: 'Hard', value: 2 },
-    { label: 'Good', value: 3 },
-    { label: 'Easy', value: 4 },
-  ]
 </script>
 
 <div class="reveal-card">
@@ -34,18 +25,7 @@
     <p class="common-name">{card.common_name}</p>
     <p class="scientific-name">{card.scientific_name}</p>
   </div>
-  <p class="how-well">How well did you know it?</p>
-  <div class="ratings">
-    {#each ratings as rating}
-      <button
-        class="rating-{rating.label.toLowerCase()}"
-        class:suggested={rating.value === suggestedRating}
-        onclick={() => onRate(rating.value)}
-      >
-        {rating.label}
-      </button>
-    {/each}
-  </div>
+  <button class="btn-next" onclick={onNext}>Next</button>
 </div>
 
 <style>
@@ -96,33 +76,15 @@
     font-size: 0.8125rem;
     font-style: italic;
   }
-  .how-well {
-    color: var(--text-muted);
-    font-size: 0.6875rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-  }
-  .ratings {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.5rem;
-  }
-  .ratings button {
+  .btn-next {
+    background: var(--accent);
+    color: #fff;
     border: none;
-    border-radius: 8px;
-    padding: 0.625rem 0.25rem;
-    font-size: 0.75rem;
+    border-radius: 10px;
+    padding: 0.75rem;
+    font-size: 0.9375rem;
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
-    color: #fff;
-  }
-  .rating-again { background: #7f1d1d; }
-  .rating-hard  { background: #78350f; }
-  .rating-good  { background: #14532d; }
-  .rating-easy  { background: #1e3a8a; }
-  .ratings button.suggested {
-    outline: 3px solid rgba(255, 255, 255, 0.85);
-    outline-offset: 2px;
   }
 </style>

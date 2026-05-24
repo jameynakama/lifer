@@ -111,4 +111,28 @@ describe('Quiz page', () => {
       expect(screen.getByText(/✗/)).toBeInTheDocument()
     })
   })
+
+  it('clicking Next POSTs rating and advances to next card', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/species')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(species) })
+      }
+      if (opts?.method === 'POST') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(card) })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(QuizPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /i don't know/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /i don't know/i }))
+    await vi.waitFor(() => screen.getByRole('button', { name: /next/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    await vi.waitFor(() => {
+      const posts = fetchMock.mock.calls.filter(
+        (c: unknown[]) => (c[1] as RequestInit)?.method === 'POST'
+      )
+      expect(posts.length).toBe(1)
+    })
+  })
 })

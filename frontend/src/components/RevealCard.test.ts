@@ -21,41 +21,31 @@ const foxSparrow: Species = {
 
 describe('RevealCard', () => {
   it('renders the species common and scientific name', () => {
-    render(RevealCard, { props: { card, correct: true, guessed: songSparrow, onRate: vi.fn() } })
+    render(RevealCard, { props: { card, correct: true, guessed: songSparrow, onNext: vi.fn() } })
     expect(screen.getByText('Song Sparrow')).toBeInTheDocument()
     expect(screen.getByText('Melospiza melodia')).toBeInTheDocument()
   })
 
   it('renders a species photo', () => {
-    render(RevealCard, { props: { card, correct: true, guessed: songSparrow, onRate: vi.fn() } })
+    render(RevealCard, { props: { card, correct: true, guessed: songSparrow, onNext: vi.fn() } })
     const img = screen.getByRole('img', { name: /song sparrow/i })
     expect(img).toHaveAttribute('src', '/photos/song-sparrow.jpg')
   })
 
-  it('renders four confidence rating buttons', () => {
-    render(RevealCard, { props: { card, correct: true, guessed: songSparrow, onRate: vi.fn() } })
-    expect(screen.getByRole('button', { name: /again/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /hard/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /good/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /easy/i })).toBeInTheDocument()
+  it('renders a Next button', () => {
+    render(RevealCard, { props: { card, correct: true, guessed: songSparrow, onNext: vi.fn() } })
+    expect(screen.getByRole('button', { name: /next/i })).toBeInTheDocument()
   })
 
-  it('calls onRate with 1 when Again is clicked', async () => {
-    const onRate = vi.fn()
-    render(RevealCard, { props: { card, correct: false, guessed: null, onRate } })
-    await fireEvent.click(screen.getByRole('button', { name: /again/i }))
-    expect(onRate).toHaveBeenCalledWith(1)
-  })
-
-  it('calls onRate with 4 when Easy is clicked', async () => {
-    const onRate = vi.fn()
-    render(RevealCard, { props: { card, correct: true, guessed: songSparrow, onRate } })
-    await fireEvent.click(screen.getByRole('button', { name: /easy/i }))
-    expect(onRate).toHaveBeenCalledWith(4)
+  it('calls onNext when Next is clicked', async () => {
+    const onNext = vi.fn()
+    render(RevealCard, { props: { card, correct: true, guessed: songSparrow, onNext } })
+    await fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    expect(onNext).toHaveBeenCalled()
   })
 
   it('shows correct banner when answer is right', () => {
-    render(RevealCard, { props: { card, correct: true, guessed: songSparrow, onRate: vi.fn() } })
+    render(RevealCard, { props: { card, correct: true, guessed: songSparrow, onNext: vi.fn() } })
     const banner = screen.getByText(/✓/).closest('.result-banner')
     expect(banner).not.toBeNull()
     expect(banner).toHaveClass('correct')
@@ -64,7 +54,7 @@ describe('RevealCard', () => {
   })
 
   it('shows wrong banner with guessed name when answer is wrong', () => {
-    render(RevealCard, { props: { card, correct: false, guessed: foxSparrow, onRate: vi.fn() } })
+    render(RevealCard, { props: { card, correct: false, guessed: foxSparrow, onNext: vi.fn() } })
     const banner = screen.getByText(/✗/).closest('.result-banner')
     expect(banner).not.toBeNull()
     expect(banner).toHaveClass('incorrect')
@@ -73,19 +63,7 @@ describe('RevealCard', () => {
   })
 
   it("shows 'You didn't know' when I don't know was selected", () => {
-    render(RevealCard, { props: { card, correct: false, guessed: null, onRate: vi.fn() } })
+    render(RevealCard, { props: { card, correct: false, guessed: null, onNext: vi.fn() } })
     expect(screen.getByText(/you didn't know/i)).toBeInTheDocument()
-  })
-
-  it('Good button has suggested class when correct', () => {
-    render(RevealCard, { props: { card, correct: true, guessed: songSparrow, onRate: vi.fn() } })
-    expect(screen.getByRole('button', { name: /good/i })).toHaveClass('suggested')
-    expect(screen.getByRole('button', { name: /again/i })).not.toHaveClass('suggested')
-  })
-
-  it('Again button has suggested class when incorrect', () => {
-    render(RevealCard, { props: { card, correct: false, guessed: null, onRate: vi.fn() } })
-    expect(screen.getByRole('button', { name: /again/i })).toHaveClass('suggested')
-    expect(screen.getByRole('button', { name: /good/i })).not.toHaveClass('suggested')
   })
 })

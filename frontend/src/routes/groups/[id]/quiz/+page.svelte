@@ -56,8 +56,9 @@
     revealed = true
   }
 
-  async function onRate(rating: number) {
+  async function onNext() {
     if (!card) return
+    const rating = correct ? 3 : 1
     try {
       await fetch(`/api/v1/groups/${groupId}/rate`, {
         method: 'POST',
@@ -108,7 +109,7 @@
     </div>
   {:else if card}
     {#if revealed}
-      <RevealCard {card} {correct} {guessed} {onRate} />
+      <RevealCard {card} {correct} {guessed} {onNext} />
     {:else if lane === 'audio'}
       {#key card.species_id}
         <QuizCard {card} species={groupSpecies} {onReveal} />
