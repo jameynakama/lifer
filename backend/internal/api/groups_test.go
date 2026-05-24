@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/jameynakama/lifer/internal/store"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -119,4 +120,91 @@ func TestCreateGroup_EmptyName_Returns400(t *testing.T) {
 	h.createGroup(w, r)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestUpdateGroup_RenamesGroup(t *testing.T) {
+	q := &groupStubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{ID: id, Name: "Old Name", OwnerID: ownerID(1)}, nil
+		},
+		updateGroupName: func(_ context.Context, arg store.UpdateGroupNameParams) (store.Group, error) {
+			assert.Equal(t, int64(42), arg.ID)
+			assert.Equal(t, "New Name", arg.Name)
+			return store.Group{ID: 42, Name: "New Name", OwnerID: ownerID(1)}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":"New Name"}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/groups/42", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.updateGroup(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var got store.Group
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.Equal(t, "New Name", got.Name)
+}
+
+func TestUpdateGroup_WrongOwner_Returns403(t *testing.T) {
+	q := &groupStubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{ID: id, OwnerID: ownerID(999)}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":"New Name"}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/groups/42", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.updateGroup(w, r)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestDeleteGroup_DeletesGroup(t *testing.T) {
+	deleted := false
+	q := &groupStubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{ID: id, OwnerID: ownerID(1)}, nil
+		},
+		deleteGroup: func(_ context.Context, id int64) error {
+			assert.Equal(t, int64(42), id)
+			deleted = true
+			return nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodDelete, "/api/v1/groups/42", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.deleteGroup(w, r)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.True(t, deleted)
+}
+
+func TestDeleteGroup_NotFound_Returns404(t *testing.T) {
+	q := &groupStubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{}, pgx.ErrNoRows
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodDelete, "/api/v1/groups/99", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "99")
+	w := httptest.NewRecorder()
+
+	h.deleteGroup(w, r)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }

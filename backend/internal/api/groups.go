@@ -5,7 +5,9 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strconv"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jameynakama/lifer/internal/auth"
@@ -82,4 +84,62 @@ func (h *Handler) createGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusCreated, group)
+}
+
+func (h *Handler) updateGroup(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+
+	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	if !h.groupOwnerCheck(w, r, groupID, userID) {
+		return
+	}
+
+	var req updateGroupRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+
+	group, err := h.queries.UpdateGroupName(r.Context(), store.UpdateGroupNameParams{
+		ID:   groupID,
+		Name: req.Name,
+	})
+	if err != nil {
+		log.Printf("UpdateGroupName error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, group)
+}
+
+func (h *Handler) deleteGroup(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+
+	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	if !h.groupOwnerCheck(w, r, groupID, userID) {
+		return
+	}
+
+	if err := h.queries.DeleteGroup(r.Context(), groupID); err != nil {
+		log.Printf("DeleteGroup error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
