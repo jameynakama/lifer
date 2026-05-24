@@ -110,9 +110,13 @@
     {#if revealed}
       <RevealCard {card} {correct} {guessed} {onRate} />
     {:else if lane === 'audio'}
-      <QuizCard {card} species={groupSpecies} {onReveal} />
+      {#key card.species_id}
+        <QuizCard {card} species={groupSpecies} {onReveal} />
+      {/key}
     {:else}
-      <ImageQuizCard {card} species={groupSpecies} {onReveal} />
+      {#key card.species_id}
+        <ImageQuizCard {card} species={groupSpecies} {onReveal} />
+      {/key}
     {/if}
   {:else}
     <p class="status error">Something went wrong. <button onclick={fetchNext}>Retry</button></p>

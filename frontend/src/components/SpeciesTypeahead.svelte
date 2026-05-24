@@ -67,6 +67,7 @@
     role="combobox"
     aria-expanded={open}
     aria-controls="typeahead-dropdown"
+    aria-autocomplete="list"
     aria-activedescendant={open && filtered.length > 0 ? 'typeahead-option-' + highlighted : undefined}
   />
   {#if open && filtered.length > 0}
