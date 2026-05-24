@@ -143,3 +143,103 @@ func (h *Handler) deleteGroup(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *Handler) listGroupSpecies(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+
+	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	if !h.groupOwnerCheck(w, r, groupID, userID) {
+		return
+	}
+
+	species, err := h.queries.ListGroupSpecies(r.Context(), groupID)
+	if err != nil {
+		log.Printf("ListGroupSpecies error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	if species == nil {
+		species = []store.ListGroupSpeciesRow{}
+	}
+	writeJSON(w, http.StatusOK, species)
+}
+
+func (h *Handler) addSpeciesToGroup(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+
+	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	if !h.groupOwnerCheck(w, r, groupID, userID) {
+		return
+	}
+
+	var req addSpeciesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.queries.AddSpeciesToGroup(r.Context(), store.AddSpeciesToGroupParams{
+		GroupID:   groupID,
+		SpeciesID: req.SpeciesID,
+	}); err != nil {
+		log.Printf("AddSpeciesToGroup error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	for _, lane := range []string{"audio", "image"} {
+		if err := h.queries.UpsertCard(r.Context(), store.UpsertCardParams{
+			UserID:    userID,
+			SpeciesID: req.SpeciesID,
+			Lane:      lane,
+		}); err != nil {
+			log.Printf("UpsertCard error: %v", err)
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (h *Handler) removeSpeciesFromGroup(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+
+	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	speciesID, err := strconv.ParseInt(chi.URLParam(r, "species_id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid species id", http.StatusBadRequest)
+		return
+	}
+
+	if !h.groupOwnerCheck(w, r, groupID, userID) {
+		return
+	}
+
+	_ = userID // cards are not deleted (become dormant)
+	if err := h.queries.RemoveSpeciesFromGroup(r.Context(), store.RemoveSpeciesFromGroupParams{
+		GroupID:   groupID,
+		SpeciesID: speciesID,
+	}); err != nil {
+		log.Printf("RemoveSpeciesFromGroup error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}

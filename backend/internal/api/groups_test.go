@@ -259,3 +259,85 @@ func TestDeleteGroup_NotFound_Returns404(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
+
+func TestListGroupSpecies_ReturnsList(t *testing.T) {
+	q := &groupStubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{ID: id, OwnerID: ownerID(1)}, nil
+		},
+		listGroupSpecies: func(_ context.Context, groupID int64) ([]store.ListGroupSpeciesRow, error) {
+			assert.Equal(t, int64(42), groupID)
+			return []store.ListGroupSpeciesRow{
+				{ID: 7, CommonName: "Song Sparrow", ScientificName: "Melospiza melodia", EbirdCode: "sonspa"},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/species", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.listGroupSpecies(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []store.ListGroupSpeciesRow
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Len(t, body, 1)
+	assert.Equal(t, "Song Sparrow", body[0].CommonName)
+}
+
+func TestAddSpeciesToGroup_InsertsAndUpsertsBothCards(t *testing.T) {
+	upsertedLanes := []string{}
+	q := &groupStubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{ID: id, OwnerID: ownerID(1)}, nil
+		},
+		addSpeciesToGroup: func(_ context.Context, arg store.AddSpeciesToGroupParams) error {
+			assert.Equal(t, int64(42), arg.GroupID)
+			assert.Equal(t, int64(7), arg.SpeciesID)
+			return nil
+		},
+		upsertCard: func(_ context.Context, arg store.UpsertCardParams) error {
+			upsertedLanes = append(upsertedLanes, arg.Lane)
+			return nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"species_id":7}`
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/groups/42/species", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.addSpeciesToGroup(w, r)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.ElementsMatch(t, []string{"audio", "image"}, upsertedLanes)
+}
+
+func TestRemoveSpeciesFromGroup_RemovesEntry(t *testing.T) {
+	removed := false
+	q := &groupStubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{ID: id, OwnerID: ownerID(1)}, nil
+		},
+		removeSpeciesFromGroup: func(_ context.Context, arg store.RemoveSpeciesFromGroupParams) error {
+			assert.Equal(t, int64(42), arg.GroupID)
+			assert.Equal(t, int64(7), arg.SpeciesID)
+			removed = true
+			return nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodDelete, "/api/v1/groups/42/species/7", nil)
+	r = injectUserID(r, 1)
+	r = withChiParams(r, map[string]string{"id": "42", "species_id": "7"})
+	w := httptest.NewRecorder()
+
+	h.removeSpeciesFromGroup(w, r)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.True(t, removed)
+}
