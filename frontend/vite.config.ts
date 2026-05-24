@@ -1,19 +1,11 @@
 import { defineConfig } from 'vite'
-import { svelte } from '@sveltejs/vite-plugin-svelte'
+import { sveltekit } from '@sveltejs/kit/vite'
 
 export default defineConfig({
-  plugins: [svelte()],
-  resolve: {
-    conditions: ['browser'],
-  },
+  plugins: [sveltekit()],
   server: {
     proxy: {
       '/api': 'http://127.0.0.1:8080',
     },
-  },
-  test: {
-    environment: 'jsdom',
-    setupFiles: ['src/test-setup.ts'],
-    globals: true,
   },
 })
