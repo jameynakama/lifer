@@ -2,57 +2,86 @@
   import type { BirdCard } from '../types'
   import { view } from '../stores/view'
   import QuizCard from '../components/QuizCard.svelte'
+  import ImageQuizCard from '../components/ImageQuizCard.svelte'
   import RevealCard from '../components/RevealCard.svelte'
   import StatsBar from '../components/StatsBar.svelte'
 
-  const MOCK_CARDS: BirdCard[] = [
-    {
-      id: '1',
-      recording_path: '/recordings/song-sparrow.mp3',
-      common_name: 'Song Sparrow',
-      scientific_name: 'Melospiza melodia',
-      photo_path: '/photos/song-sparrow.jpg',
-    },
-    {
-      id: '2',
-      recording_path: '/recordings/spotted-towhee.mp3',
-      common_name: 'Spotted Towhee',
-      scientific_name: 'Pipilo maculatus',
-      photo_path: '/photos/spotted-towhee.jpg',
-    },
-  ]
+  let { groupId, lane }: { groupId: string; lane: 'audio' | 'image' } = $props()
 
-  let index = $state(0)
+  let card: BirdCard | null = $state(null)
   let revealed = $state(false)
+  let done = $state(false)
+  let reviewed = $state(0)
+  let loading = $state(true)
+  let error = $state('')
 
-  const card = $derived(MOCK_CARDS[index])
+  async function fetchNext() {
+    loading = true
+    error = ''
+    try {
+      const res = await fetch(`/api/v1/groups/${groupId}/next?lane=${lane}`)
+      if (res.status === 204) {
+        done = true
+        card = null
+        return
+      }
+      if (!res.ok) throw new Error(`Server error ${res.status}`)
+      card = await res.json()
+    } catch {
+      error = 'Failed to load next card.'
+    } finally {
+      loading = false
+    }
+  }
 
-  const stats = $derived([
-    { label: 'Remaining', value: MOCK_CARDS.length - index },
-    { label: 'Reviewed', value: index },
-    { label: 'Streak', value: 5 },
-  ])
+  async function onRate(rating: number) {
+    if (!card) return
+    try {
+      await fetch(`/api/v1/groups/${groupId}/rate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ species_id: card.species_id, lane: card.lane, rating }),
+      })
+    } catch {
+      // non-fatal: FSRS miss is recoverable on next session
+    }
+    reviewed += 1
+    revealed = false
+    await fetchNext()
+  }
 
   function onReveal() {
     revealed = true
   }
 
-  function onRate(_rating: number) {
-    if (index + 1 >= MOCK_CARDS.length) {
-      $view = 'dashboard'
-    } else {
-      index += 1
-      revealed = false
-    }
-  }
+  const stats = $derived([
+    { label: 'Reviewed', value: reviewed },
+    { label: 'Lane', value: lane === 'audio' ? '🔊 Audio' : '👁 Image' },
+  ])
+
+  fetchNext()
 </script>
 
 <div class="quiz">
   <StatsBar {stats} />
-  {#if revealed}
-    <RevealCard {card} {onRate} />
-  {:else}
-    <QuizCard {card} {onReveal} />
+
+  {#if loading}
+    <p class="status">Loading...</p>
+  {:else if error}
+    <p class="status error">{error}</p>
+  {:else if done}
+    <div class="done">
+      <p>All done for now!</p>
+      <button onclick={() => $view = 'dashboard'}>Back to dashboard</button>
+    </div>
+  {:else if card}
+    {#if revealed}
+      <RevealCard {card} {onRate} />
+    {:else if lane === 'audio'}
+      <QuizCard {card} {onReveal} />
+    {:else}
+      <ImageQuizCard {card} {onReveal} />
+    {/if}
   {/if}
 </div>
 
@@ -61,5 +90,36 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+  .status {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 2rem 0;
+  }
+  .error {
+    color: #b91c1c;
+  }
+  .done {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 2rem 0;
+  }
+  .done p {
+    color: var(--text);
+    font-size: 1rem;
+    font-weight: 600;
+  }
+  .done button {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 0.75rem 1.5rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
   }
 </style>

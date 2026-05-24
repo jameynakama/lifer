@@ -1,61 +1,94 @@
 <script lang="ts">
-  import { type Group } from '../types'
-  let { groups, onPractice }: { groups: Group[], onPractice: (g: Group) => void } = $props()
+  import type { Group } from '../types'
+
+  let {
+    groups,
+    onPractice,
+  }: {
+    groups: Group[];
+    onPractice: (group: Group, lane: 'audio' | 'image') => void;
+  } = $props()
 </script>
 
-<ul class="group-list">
+<div class="group-list">
   {#each groups as group}
-    <li>
-      <div class="info">
-        <span class="name">{group.name}</span>
-        <span class="due">{group.due_count} due</span>
+    <div class="group-card">
+      <div class="group-info">
+        <span class="group-name">{group.name}</span>
+        {#if group.is_preset}<span class="preset-badge">Preset</span>{/if}
       </div>
-      <button onclick={() => onPractice(group)}>Practice</button>
-    </li>
+      <div class="group-actions">
+        {#if group.audio_due > 0}
+          <button class="btn-lane" onclick={() => onPractice(group, 'audio')}>
+            🔊 Audio · {group.audio_due}
+          </button>
+        {/if}
+        {#if group.image_due > 0}
+          <button class="btn-lane" onclick={() => onPractice(group, 'image')}>
+            👁 Image · {group.image_due}
+          </button>
+        {/if}
+        {#if group.audio_due === 0 && group.image_due === 0}
+          <span class="all-done">All done</span>
+        {/if}
+      </div>
+    </div>
   {/each}
-</ul>
+</div>
 
 <style>
   .group-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
   }
-  li {
+  .group-card {
     background: var(--surface);
+    border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 0.75rem 0.875rem;
+    padding: 0.875rem 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
     box-shadow: var(--shadow);
   }
-  .info {
+  .group-info {
     display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
+    align-items: center;
+    gap: 0.5rem;
   }
-  .name {
-    color: var(--text);
-    font-size: 0.875rem;
+  .group-name {
+    font-size: 0.9375rem;
     font-weight: 600;
+    color: var(--text);
   }
-  .due {
+  .preset-badge {
+    font-size: 0.625rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     color: var(--text-muted);
-    font-size: 0.6875rem;
+    background: var(--border);
+    border-radius: 4px;
+    padding: 0.125rem 0.375rem;
   }
-  button {
-    background: var(--accent-hover);
-    color: #fff;
-    border: none;
-    border-radius: 6px;
-    padding: 0.375rem 0.75rem;
+  .group-actions {
+    display: flex;
+    gap: 0.5rem;
+  }
+  .btn-lane {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text-secondary);
+    border-radius: 8px;
+    padding: 0.375rem 0.625rem;
     font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
+    box-shadow: var(--shadow);
+  }
+  .all-done {
+    font-size: 0.75rem;
+    color: var(--text-muted);
   }
 </style>

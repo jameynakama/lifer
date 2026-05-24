@@ -1,12 +1,12 @@
 <script lang="ts">
   import type { BirdCard } from '../types'
-  let { card, onReveal }: { card: BirdCard, onReveal: () => void } = $props()
+  let { card, onReveal }: { card: BirdCard; onReveal: () => void } = $props()
   let guess: string = $state('')
 </script>
 
 <div class="quiz-card">
-  <div class="audio-wrapper">
-    <audio controls src={card.media_url}>Your browser does not support audio.</audio>
+  <div class="image-wrapper">
+    <img src={card.media_url} alt="Identify this bird" class="quiz-photo" />
   </div>
   <input
     bind:value={guess}
@@ -23,15 +23,17 @@
     flex-direction: column;
     gap: 0.75rem;
   }
-  .audio-wrapper {
+  .image-wrapper {
     background: var(--surface);
     border-radius: 8px;
-    padding: 0.25rem;
+    overflow: hidden;
     box-shadow: var(--shadow);
   }
-  audio {
+  .quiz-photo {
     width: 100%;
     display: block;
+    max-height: 280px;
+    object-fit: cover;
   }
   .guess-input {
     background: var(--surface);

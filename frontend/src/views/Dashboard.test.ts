@@ -8,30 +8,34 @@ import Dashboard from './Dashboard.svelte'
 describe('Dashboard', () => {
   beforeEach(() => {
     view.set('dashboard')
-    session.set({ groupId: null })
+    session.set({ groupId: null, lane: null })
   })
 
-  it('renders a Start Practice button', () => {
-    render(Dashboard)
-    expect(screen.getByRole('button', { name: /start practice/i })).toBeInTheDocument()
-  })
-
-  it('renders the group with the most due cards prominently', () => {
+  it('renders group names', () => {
     render(Dashboard)
     expect(screen.getAllByText(/pacific northwest/i).length).toBeGreaterThan(0)
+    expect(screen.getAllByText(/my warblers/i).length).toBeGreaterThan(0)
   })
 
-  it('sets session.groupId and switches to quiz when Start Practice clicked', async () => {
+  it('renders audio and image practice buttons', () => {
     render(Dashboard)
-    await fireEvent.click(screen.getByRole('button', { name: /start practice/i }))
-    expect(get(session).groupId).toBe('1')
+    expect(screen.getAllByRole('button', { name: /audio/i }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /image/i }).length).toBeGreaterThan(0)
+  })
+
+  it('sets session and switches to quiz when audio button clicked', async () => {
+    render(Dashboard)
+    await fireEvent.click(screen.getAllByRole('button', { name: /audio/i })[0])
+    expect(get(session).groupId).toBeTruthy()
+    expect(get(session).lane).toBe('audio')
     expect(get(view)).toBe('quiz')
   })
 
-  it('switches to quiz when a group Practice button is clicked', async () => {
+  it('sets session and switches to quiz when image button clicked', async () => {
     render(Dashboard)
-    const buttons = screen.getAllByRole('button', { name: /practice/i })
-    await fireEvent.click(buttons[0])
+    await fireEvent.click(screen.getAllByRole('button', { name: /image/i })[0])
+    expect(get(session).groupId).toBeTruthy()
+    expect(get(session).lane).toBe('image')
     expect(get(view)).toBe('quiz')
   })
 })

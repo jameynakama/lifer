@@ -40,7 +40,7 @@ describe('App', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }))
     render(App)
     await vi.waitFor(() => {
-      expect(screen.getByRole('button', { name: /start practice/i })).toBeInTheDocument()
+      expect(screen.getAllByRole('button', { name: /audio/i }).length).toBeGreaterThan(0)
     })
     expect(get(auth)).toEqual(user)
   })

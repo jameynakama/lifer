@@ -3,11 +3,12 @@ import { render, screen, fireEvent } from '@testing-library/svelte'
 import RevealCard from './RevealCard.svelte'
 
 const card = {
-  id: '1',
-  recording_path: '/recordings/song-sparrow.mp3',
+  species_id: 1,
   common_name: 'Song Sparrow',
   scientific_name: 'Melospiza melodia',
-  photo_path: '/photos/song-sparrow.jpg',
+  media_url: '/recordings/song-sparrow.mp3',
+  photo_url: '/photos/song-sparrow.jpg',
+  lane: 'audio' as const,
 }
 
 describe('RevealCard', () => {

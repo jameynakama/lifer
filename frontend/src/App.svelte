@@ -1,6 +1,7 @@
 <script lang="ts">
   import { auth } from './stores/auth'
   import { view } from './stores/view'
+  import { session } from './stores/session'
   import { getCurrentTheme, toggleTheme } from './lib/theme'
   import Login from './views/Login.svelte'
   import Dashboard from './views/Dashboard.svelte'
@@ -53,7 +54,7 @@
   {#if $view === 'dashboard'}
     <Dashboard />
   {:else if $view === 'quiz'}
-    <Quiz />
+    <Quiz groupId={$session.groupId!} lane={$session.lane!} />
   {/if}
 {/if}
 

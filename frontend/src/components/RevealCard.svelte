@@ -11,7 +11,7 @@
 </script>
 
 <div class="reveal-card">
-  <img src={card.photo_path} alt={card.common_name} class="photo" />
+  <img src={card.photo_url} alt={card.common_name} class="photo" />
   <div class="species">
     <p class="common-name">{card.common_name}</p>
     <p class="scientific-name">{card.scientific_name}</p>
