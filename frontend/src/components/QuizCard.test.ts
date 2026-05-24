@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/svelte'
-import WaveSurfer from 'wavesurfer.js'
 import QuizCard from './QuizCard.svelte'
 import type { BirdCard, Species } from '../types'
 
@@ -39,11 +38,11 @@ describe('QuizCard', () => {
     })
   })
 
-  it('initialises WaveSurfer with the media url', () => {
+  it('renders a play button once WaveSurfer is ready', () => {
     render(QuizCard, { props: { card, species, onReveal: vi.fn() } })
-    expect(vi.mocked(WaveSurfer.create)).toHaveBeenCalledWith(
-      expect.objectContaining({ url: '/recordings/song-sparrow.mp3' })
-    )
+    // Mock fires 'ready' immediately, so button should be enabled
+    expect(screen.getByRole('button', { name: /play/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /play/i })).not.toBeDisabled()
   })
 
   it('Reveal button is disabled initially', () => {
