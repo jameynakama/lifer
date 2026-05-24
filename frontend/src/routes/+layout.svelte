@@ -1,12 +1,10 @@
 <script lang="ts">
-  import { auth } from './stores/auth'
-  import { view } from './stores/view'
-  import { session } from './stores/session'
-  import { getCurrentTheme, toggleTheme } from './lib/theme'
-  import Login from './views/Login.svelte'
-  import Dashboard from './views/Dashboard.svelte'
-  import Quiz from './views/Quiz.svelte'
+  import '../app.css'
+  import { auth } from '$stores/auth'
+  import { getCurrentTheme, toggleTheme } from '$lib/theme'
+  import Login from '../views/Login.svelte'
 
+  let { children } = $props()
   let checking = $state(true)
   let theme = $state(getCurrentTheme())
 
@@ -14,19 +12,11 @@
     fetch('/api/v1/me')
       .then(async (res) => {
         if (res.ok) {
-          const user = await res.json()
-          $auth = user
-          $view = 'dashboard'
-        } else {
-          $view = 'login'
+          $auth = await res.json()
         }
       })
-      .catch(() => {
-        $view = 'login'
-      })
-      .finally(() => {
-        checking = false
-      })
+      .catch(() => {})
+      .finally(() => { checking = false })
   })
 
   function handleToggle() {
@@ -39,11 +29,15 @@
   <div class="loading">
     <span class="spinner"></span>
   </div>
-{:else if $view === 'login'}
+{:else if !$auth}
   <Login />
 {:else}
   <header>
-    <span class="wordmark">Lifer</span>
+    <a href="/" class="wordmark">Lifer</a>
+    <nav>
+      <a href="/groups">Groups</a>
+      <a href="/explore">Explore</a>
+    </nav>
     <button
       onclick={handleToggle}
       aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
@@ -51,11 +45,9 @@
       {theme === 'dark' ? '☀️' : '🌙'}
     </button>
   </header>
-  {#if $view === 'dashboard'}
-    <Dashboard />
-  {:else if $view === 'quiz'}
-    <Quiz groupId={$session.groupId!} lane={$session.lane!} />
-  {/if}
+  <main>
+    {@render children?.()}
+  </main>
 {/if}
 
 <style>
@@ -87,6 +79,20 @@
     font-weight: 700;
     color: var(--text);
     letter-spacing: -0.02em;
+    text-decoration: none;
+  }
+  nav {
+    display: flex;
+    gap: 1rem;
+  }
+  nav a {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+  }
+  nav a:hover {
+    color: var(--text);
   }
   header button {
     background: var(--surface);
@@ -98,5 +104,8 @@
     cursor: pointer;
     line-height: 1;
     box-shadow: var(--shadow);
+  }
+  main {
+    padding-bottom: 2rem;
   }
 </style>
