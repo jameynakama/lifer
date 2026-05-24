@@ -168,6 +168,57 @@ func TestUpdateGroup_WrongOwner_Returns403(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, w.Code)
 }
 
+func TestUpdateGroup_EmptyName_Returns400(t *testing.T) {
+	q := &groupStubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{ID: id, OwnerID: ownerID(1)}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":""}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/groups/42", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.updateGroup(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestUpdateGroup_InvalidGroupID_Returns400(t *testing.T) {
+	h := makeHandler(&groupStubQuerier{})
+	body := `{"name":"New Name"}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/groups/notanumber", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "notanumber")
+	w := httptest.NewRecorder()
+
+	h.updateGroup(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestUpdateGroup_InvalidBody_Returns400(t *testing.T) {
+	q := &groupStubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{ID: id, OwnerID: ownerID(1)}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/groups/42", strings.NewReader("not-json"))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.updateGroup(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 func TestDeleteGroup_DeletesGroup(t *testing.T) {
 	deleted := false
 	q := &groupStubQuerier{
