@@ -9,13 +9,19 @@
   let playing = $state(false)
   let ready = $state(false)
 
-  // WaveSurfer's default mode fetches audio via XHR to decode waveform peaks.
-  // External URLs (xeno-canto CDN) have no CORS headers, so that XHR fails.
-  // Fix: hand WaveSurfer a native <audio> element (loaded by the browser without
-  // CORS restrictions) and NO peaks. Without peaks, WaveSurfer fires 'ready' on
-  // the audio element's 'canplay' event, at which point audio.duration is valid.
-  // This ensures progress tracking and scrubbing use the real duration from the
-  // start -- fake peaks caused duration mismatch that pushed the cursor to the end.
+  // WaveSurfer's default mode fetches the audio via XHR to decode waveform peaks.
+  // External audio URLs (xeno-canto CDN) don't have CORS headers, so that fetch
+  // fails. Instead: hand WaveSurfer a native <audio> element (loaded by the
+  // browser without CORS restrictions) and supply pre-generated peaks so it
+  // never needs to XHR-fetch anything.
+  function generatePeaks(count: number): number[][] {
+    return [Array.from({ length: count }, (_, i) => {
+      const x = i / count
+      const envelope = Math.pow(Math.sin(x * Math.PI), 0.4) * 0.85
+      return Math.random() * envelope + 0.05
+    })]
+  }
+
   onMount(() => {
     const style = getComputedStyle(document.documentElement)
     const waveColor = style.getPropertyValue('--text-secondary').trim() || '#94a3b8'
@@ -28,6 +34,7 @@
     ws = WaveSurfer.create({
       container,
       media: audio,
+      peaks: generatePeaks(200),
       waveColor,
       progressColor,
       cursorColor: 'transparent',
