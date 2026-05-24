@@ -19,3 +19,10 @@ export interface Group {
     audio_due: number;
     image_due: number;
 }
+
+export interface Species {
+    id: number;
+    common_name: string;
+    scientific_name: string;
+    ebird_code: string;
+}
