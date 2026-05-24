@@ -1,12 +1,14 @@
 <script lang="ts">
-  import type { BirdCard } from '../types'
-  import { view } from '../stores/view'
-  import QuizCard from '../components/QuizCard.svelte'
-  import ImageQuizCard from '../components/ImageQuizCard.svelte'
-  import RevealCard from '../components/RevealCard.svelte'
-  import StatsBar from '../components/StatsBar.svelte'
+  import { goto } from '$app/navigation'
+  import { page } from '$app/state'
+  import type { BirdCard } from '../../../../types'
+  import QuizCard from '$components/QuizCard.svelte'
+  import ImageQuizCard from '$components/ImageQuizCard.svelte'
+  import RevealCard from '$components/RevealCard.svelte'
+  import StatsBar from '$components/StatsBar.svelte'
 
-  let { groupId, lane }: { groupId: string; lane: 'audio' | 'image' } = $props()
+  let groupId = $derived(page.params.id)
+  let lane = $derived(page.url.searchParams.get('lane') as 'audio' | 'image' ?? 'audio')
 
   let card: BirdCard | null = $state(null)
   let revealed = $state(false)
@@ -43,7 +45,7 @@
         body: JSON.stringify({ species_id: card.species_id, lane: card.lane, rating }),
       })
     } catch {
-      // non-fatal: FSRS miss is recoverable on next session
+      // non-fatal
     }
     reviewed += 1
     revealed = false
@@ -59,7 +61,9 @@
     { label: 'Lane', value: lane === 'audio' ? '🔊 Audio' : '👁 Image' },
   ])
 
-  fetchNext()
+  $effect(() => {
+    if (groupId) fetchNext()
+  })
 </script>
 
 <div class="quiz">
@@ -72,7 +76,7 @@
   {:else if done}
     <div class="done">
       <p>All done for now!</p>
-      <button onclick={() => $view = 'dashboard'}>Back to dashboard</button>
+      <button onclick={() => goto(`/groups/${groupId}`)}>Back to group</button>
     </div>
   {:else if card}
     {#if revealed}
