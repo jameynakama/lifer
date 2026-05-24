@@ -32,22 +32,24 @@
 {:else if !$auth}
   <Login />
 {:else}
-  <header>
-    <a href="/" class="wordmark">Lifer</a>
-    <nav>
-      <a href="/groups">Groups</a>
-      <a href="/explore">Explore</a>
-    </nav>
-    <button
-      onclick={handleToggle}
-      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-    >
-      {theme === 'dark' ? '☀️' : '🌙'}
-    </button>
-  </header>
-  <main>
-    {@render children?.()}
-  </main>
+  <div class="app-container">
+    <header>
+      <a href="/" class="wordmark">Lifer</a>
+      <nav>
+        <a href="/groups">Groups</a>
+        <a href="/explore">Explore</a>
+      </nav>
+      <button
+        onclick={handleToggle}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? '☀️' : '🌙'}
+      </button>
+    </header>
+    <main>
+      {@render children?.()}
+    </main>
+  </div>
 {/if}
 
 <style>
@@ -105,7 +107,14 @@
     line-height: 1;
     box-shadow: var(--shadow);
   }
+  .app-container {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 1.5rem 2rem;
+  }
   main {
-    padding-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
   }
 </style>

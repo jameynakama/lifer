@@ -55,8 +55,4 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-#app {
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 0 1.5rem 2rem;
-}
+/* Container applied via .app-container in +layout.svelte */

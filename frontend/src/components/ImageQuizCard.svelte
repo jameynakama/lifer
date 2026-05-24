@@ -12,8 +12,11 @@
 </script>
 
 <div class="quiz-card">
-  <div class="image-wrapper">
-    <img src={card.media_url} alt="Identify this bird" class="quiz-photo" />
+  <div class="photo-card">
+    <div class="photo-wrapper">
+      <img src={card.media_url} alt="Identify this bird" class="quiz-photo" />
+    </div>
+    <p class="prompt">What bird is this?</p>
   </div>
   <SpeciesTypeahead {species} onSelect={(s) => { selected = s }} />
   <div class="actions">
@@ -36,17 +39,30 @@
     flex-direction: column;
     gap: 0.75rem;
   }
-  .image-wrapper {
+  .photo-card {
     background: var(--surface);
-    border-radius: 8px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
     overflow: hidden;
     box-shadow: var(--shadow);
   }
+  .photo-wrapper {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
   .quiz-photo {
     width: 100%;
-    display: block;
-    max-height: 280px;
+    height: 100%;
     object-fit: cover;
+    object-position: center top;
+    display: block;
+  }
+  .prompt {
+    padding: 0.625rem 1rem;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    font-style: italic;
   }
   .actions {
     display: grid;
@@ -54,30 +70,30 @@
     gap: 0.5rem;
   }
   .btn-reveal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
+    background: var(--accent);
+    color: #fff;
+    border: none;
     border-radius: 10px;
-    padding: 0.75rem;
-    font-size: 0.875rem;
+    padding: 0.8125rem;
+    font-size: 0.9375rem;
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
-    box-shadow: var(--shadow);
   }
   .btn-reveal:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
   }
   .btn-skip {
-    background: transparent;
+    background: var(--surface);
     border: 1px solid var(--border);
     color: var(--text-muted);
     border-radius: 10px;
-    padding: 0.75rem 1rem;
-    font-size: 0.8125rem;
+    padding: 0.8125rem 1rem;
+    font-size: 0.875rem;
     cursor: pointer;
     font-family: inherit;
     white-space: nowrap;
+    box-shadow: var(--shadow);
   }
 </style>

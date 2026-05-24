@@ -12,7 +12,7 @@
 </script>
 
 <div class="quiz-card">
-  <div class="audio-wrapper">
+  <div class="audio-card">
     <audio controls src={card.media_url}>Your browser does not support audio.</audio>
   </div>
   <SpeciesTypeahead {species} onSelect={(s) => { selected = s }} />
@@ -36,10 +36,11 @@
     flex-direction: column;
     gap: 0.75rem;
   }
-  .audio-wrapper {
+  .audio-card {
     background: var(--surface);
-    border-radius: 8px;
-    padding: 0.25rem;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
     box-shadow: var(--shadow);
   }
   audio {
@@ -52,30 +53,30 @@
     gap: 0.5rem;
   }
   .btn-reveal {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    color: var(--text-secondary);
+    background: var(--accent);
+    color: #fff;
+    border: none;
     border-radius: 10px;
-    padding: 0.75rem;
-    font-size: 0.875rem;
+    padding: 0.8125rem;
+    font-size: 0.9375rem;
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
-    box-shadow: var(--shadow);
   }
   .btn-reveal:disabled {
-    opacity: 0.4;
+    opacity: 0.35;
     cursor: not-allowed;
   }
   .btn-skip {
-    background: transparent;
+    background: var(--surface);
     border: 1px solid var(--border);
     color: var(--text-muted);
     border-radius: 10px;
-    padding: 0.75rem 1rem;
-    font-size: 0.8125rem;
+    padding: 0.8125rem 1rem;
+    font-size: 0.875rem;
     cursor: pointer;
     font-family: inherit;
     white-space: nowrap;
+    box-shadow: var(--shadow);
   }
 </style>
