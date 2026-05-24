@@ -47,8 +47,20 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth(cfg.JWTSecret))
 			r.Get("/me", h.getMe)
+
+			r.Get("/groups", h.listGroups)
+			r.Post("/groups", h.createGroup)
+			r.Patch("/groups/{id}", h.updateGroup)
+			r.Delete("/groups/{id}", h.deleteGroup)
+
+			r.Get("/groups/{id}/species", h.listGroupSpecies)
+			r.Post("/groups/{id}/species", h.addSpeciesToGroup)
+			r.Delete("/groups/{id}/species/{species_id}", h.removeSpeciesFromGroup)
+
 			r.Get("/groups/{id}/next", h.getNextCard)
 			r.Post("/groups/{id}/rate", h.rateCard)
+
+			r.Get("/species", h.searchSpecies)
 			r.Put("/species/{id}/preferences", h.updatePreferences)
 		})
 	})
