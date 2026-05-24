@@ -1,13 +1,14 @@
 # Lifer -- Claude Code Context
 
 ## What this is
-A spaced repetition web app for bird song/call and image identification practice. Users hear a recording, type the species name, reveal the answer, and rate confidence 1-4. FSRS drives scheduling. Groups let users practice by region (eBird-sourced presets) or custom species sets.
+A spaced repetition web app for bird song/call and image identification practice. Users hear a recording or see a photo, type the species name via a typeahead, reveal the answer, and advance. Rating is automatic: correct → Good (3), wrong → Again (1). FSRS drives scheduling. Groups let users practice by region (eBird-sourced presets) or custom species sets.
 
 ## Stack decisions
 - **Go + chi + sqlc + PostgreSQL** -- Go backend as a learning project. chi is idiomatic stdlib-style routing. sqlc generates typed Go from raw SQL -- no ORM. Schema changes caught at compile time.
-- **Svelte (Vite, no SvelteKit yet)** -- lighter than React, less boilerplate, compiles to vanilla JS. Good for a quiz app with real interactivity (audio, reveal, rating).
+- **SvelteKit (adapter-static, SPA mode)** -- migrated from plain Vite. File-based routing, `export const ssr = false` in `+layout.ts`, `fallback: 'index.html'` in adapter config. Go serves the built static files and all `/api/*` routes.
 - **Google OAuth → HttpOnly cookie JWT** -- no passwords to manage. JWT stored in HttpOnly cookie (not localStorage) so JS can't read/steal it. State param in OAuth flow prevents CSRF.
-- **FSRS over SM-2** -- more accurate memory model, still simple to integrate. Not yet implemented -- cards table is ready, algorithm comes next.
+- **FSRS over SM-2** -- more accurate memory model, still simple to integrate. Backend endpoints exist; full FSRS scheduling not yet implemented.
+- **WaveSurfer.js** -- waveform audio player. Uses a native `<audio>` element (passed as `media:`) to avoid CORS issues with xeno-canto CDN URLs; fake peaks provided for visual bars since XHR decode is blocked.
 
 ## Data model
 - `users` -- google_id, email, name, picture, is_admin
@@ -30,43 +31,45 @@ Cards are user-scoped. Species/recordings/images are global shared catalog. is_a
 - [x] `GET /health`, `GET /api/v1/me` (auth-protected)
 - [x] Justfile with test/run/build/migrate-up/migrate-down/generate/migration
 - [x] Docker Compose for PostgreSQL (port 5435)
-- [x] Svelte 5 frontend: Login, Dashboard, Quiz views + StatsBar, GroupList, QuizCard, RevealCard components
-- [x] Google OAuth login button, auth check on load, state-based routing
 - [x] Full styling: dark/light themes (CSS custom properties), Inter font, atmospheric login, token-based components
 - [x] Theme toggle (sun/moon) with localStorage persistence + OS preference fallback
 - [x] `cmd/ingest` binary: eBird taxonomy + region species lists → xeno-canto (API v3, quality A/B) + Macaulay Library photos; buffered channel worker pool (default 5); idempotent upserts; post-run cleanup removes species missing recordings or images from DB and disk; `--skip-media` flag stores external URLs instead of downloading files (no `ASSETS_DIR` required)
 - [x] Migration 002: `type text` column on `species_recordings`
 - [x] Migration 003: rename `recordings` → `species_recordings`
+- [x] SvelteKit migration: adapter-static SPA mode, file-based routing under `src/routes/`
+- [x] Group detail page with species search (typeahead) and add/remove
+- [x] `GET /api/v1/groups/:id/next` -- returns next due card (204 when done)
+- [x] `POST /api/v1/groups/:id/rate` -- accepts `{ species_id, lane, rating }`
+- [x] Quiz page: fetches real cards, audio lane (WavePlayer) + image lane (photo), auto-rates correct→3/wrong→1, single Next button (no self-reporting)
+- [x] SpeciesTypeahead component: filters by common/scientific name, ARIA combobox pattern, `onmousedown` (not `onclick`) to avoid blur-before-click race
+- [x] QuizCard + ImageQuizCard: typeahead auto-check (`selected.id === card.species_id`), `{#key card.species_id}` to reset state between cards
+- [x] RevealCard: shows result banner (correct/incorrect), reference photo, species names, Next button
+- [x] WavePlayer: WaveSurfer.js with native `<audio>` element to avoid CORS; fake peaks for bar visualization
 
 ## What's next
 
-### 1. FSRS + quiz endpoints
-- `GET /api/v1/groups/:id/next` -- returns next due card for the group
-- `POST /api/v1/groups/:id/rate` -- takes rating 1-4, updates FSRS fields (stability, difficulty, due, state)
-- Swap `MOCK_CARDS` in `Quiz.svelte` for real fetch calls
+### 1. FSRS algorithm
+- Backend `POST /api/v1/groups/:id/rate` stub exists but full FSRS scheduling (stability, difficulty updates, next due date) not yet implemented
+- Library options: port open-spaced-repetition/fsrs-go or implement the algorithm directly
 
-**Quiz lanes:** audio and image recognition are separate FSRS lanes per species, independently scheduled. A wigeon can be mature in image lane but new in audio lane. Lane preference is global per user×species (not per group) -- default both enabled. Data model implications:
-- Audio lane: `user × (species, call_type)` -- one FSRS card per species per type ("song"/"call"), but each review shows a **random recording** from that pool so the user generalises rather than memorising one clip. Existing `cards` table needs updating (currently `user × recording`).
-- Image lane: `user × species` (recognizing the species from any photo, not memorizing individual photos) -- needs new cards-like structure
-- Preference: new `user_species_preferences (user_id, species_id, audio_enabled, image_enabled)` table
+### 2. R2 media hosting (pre-launch)
+- Currently using `--skip-media` (external CDN URLs) which works for local dev
+- For production: teach `cmd/ingest` to stream audio/images from xeno-canto/Macaulay directly into R2 via S3-compatible PUT (no temp files needed -- pipe `io.Reader` straight through)
+- Fixes CORS issues, URL rot, and unreliable scrubbing on streaming responses
 
-### 3. SvelteKit migration (before catalog view)
-- Current plain Vite + store-based routing will get unwieldy with more views
-- Migrate before adding the catalog/browse view
-
-### 4. Catalog / "Learn" view
+### 3. Catalog / "Learn" view
 - Browse all species, filterable by region and alphabetically
 - Shows recordings, photos, and species info
 - Users can add species to custom groups from list or detail view
-- Requires SvelteKit routing + backend search/filter API (too many species to load all client-side)
+- Requires backend search/filter API (too many species to load all client-side)
 - Design group management UI alongside this (same "add to list" action)
 
-### 5. Group management
+### 4. Group management
 - Admin: create/edit preset groups (region-based)
 - Users: create custom groups, add/remove species
 - Shared UI surface with catalog view
 
-### 6. Admin UI
+### 5. Admin UI
 - Catalog management: add/edit species, recordings, images
 
 ## Key non-obvious choices
@@ -75,6 +78,9 @@ Cards are user-scoped. Species/recordings/images are global shared catalog. is_a
 - OAuth state stored as short-lived cookie (5min) to prevent CSRF -- verified on callback
 - `UpsertUser` updates name/picture on every login so profile changes from Google sync automatically
 - Generated sqlc files (`internal/store/*.go` except `queries/`) are committed -- don't `.gitignore` them
+- SvelteKit mounts into `<div style="display: contents">`, not `<div id="app">` -- `#app` CSS is dead after migration; use `.app-container` in `+layout.svelte`
+- WaveSurfer: xeno-canto CDN has no CORS headers, so XHR decode fails. Pass `media: audio` (native `<audio>` element) -- no XHR. Provide fake `peaks` so WaveSurfer draws bars immediately without needing to decode. Without peaks, `ready` fires on `canplay` which is slower.
+- Quiz auto-rating: no self-reporting; `correct ? 3 : 1` posted to `/rate`. Correct = `selected.id === card.species_id`.
 
 ## Local setup on a new machine
 ```
