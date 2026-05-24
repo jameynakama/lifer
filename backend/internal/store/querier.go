@@ -6,14 +6,20 @@ package store
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Querier interface {
+	AddSpeciesToGroup(ctx context.Context, arg AddSpeciesToGroupParams) error
+	CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error)
 	DeleteCard(ctx context.Context, arg DeleteCardParams) error
+	DeleteGroup(ctx context.Context, id int64) error
 	DeleteRecordingsBySpeciesID(ctx context.Context, speciesID int64) error
 	DeleteSpeciesByID(ctx context.Context, id int64) error
 	DeleteSpeciesImagesBySpeciesID(ctx context.Context, speciesID int64) error
 	GetCard(ctx context.Context, arg GetCardParams) (Card, error)
+	GetGroup(ctx context.Context, id int64) (Group, error)
 	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
 	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)
 	GetRandomImage(ctx context.Context, speciesID int64) (string, error)
@@ -21,8 +27,13 @@ type Querier interface {
 	GetUserByGoogleID(ctx context.Context, googleID string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, error)
+	ListGroupSpecies(ctx context.Context, groupID int64) ([]ListGroupSpeciesRow, error)
 	ListIncompleteSpecies(ctx context.Context) ([]ListIncompleteSpeciesRow, error)
+	ListUserGroups(ctx context.Context, userID int64) ([]ListUserGroupsRow, error)
+	RemoveSpeciesFromGroup(ctx context.Context, arg RemoveSpeciesFromGroupParams) error
+	SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]SearchSpeciesRow, error)
 	UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error)
+	UpdateGroupName(ctx context.Context, arg UpdateGroupNameParams) (Group, error)
 	UpsertCard(ctx context.Context, arg UpsertCardParams) error
 	UpsertPreferences(ctx context.Context, arg UpsertPreferencesParams) (UserSpeciesPreference, error)
 	UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (SpeciesRecording, error)
