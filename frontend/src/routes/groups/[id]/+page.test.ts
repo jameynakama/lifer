@@ -74,5 +74,8 @@ describe('Group detail page', () => {
     await vi.waitFor(() => screen.getByRole('button', { name: /remove/i }))
     await fireEvent.click(screen.getByRole('button', { name: /remove/i }))
     await vi.waitFor(() => { expect(deleteCalled).toBe(true) })
+    await vi.waitFor(() => {
+      expect(screen.queryByText(/song sparrow/i)).toBeNull()
+    })
   })
 })

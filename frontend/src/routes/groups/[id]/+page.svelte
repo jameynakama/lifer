@@ -17,9 +17,14 @@
   let searchTimer: ReturnType<typeof setTimeout> | null = null
 
   async function loadSpecies() {
-    const res = await fetch(`/api/v1/groups/${groupId}/species`)
-    if (res.ok) groupSpecies = await res.json()
-    loading = false
+    try {
+      const res = await fetch(`/api/v1/groups/${groupId}/species`)
+      if (res.ok) groupSpecies = await res.json()
+    } catch {
+      // network error, leave groupSpecies empty
+    } finally {
+      loading = false
+    }
   }
 
   function onSearchInput() {
@@ -56,6 +61,12 @@
 
   $effect(() => {
     if (groupId) loadSpecies()
+  })
+
+  $effect(() => {
+    return () => {
+      if (searchTimer) clearTimeout(searchTimer)
+    }
   })
 </script>
 
