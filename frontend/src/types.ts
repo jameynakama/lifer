@@ -13,7 +13,7 @@ export interface BirdCard {
 }
 
 export interface Group {
-    id: string;
+    id: number;
     name: string;
     is_preset: boolean;
     audio_due: number;

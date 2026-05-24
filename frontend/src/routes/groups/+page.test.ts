@@ -41,6 +41,9 @@ describe('Groups page', () => {
     await fireEvent.input(screen.getByPlaceholderText(/group name/i), { target: { value: 'New Group' } })
     await fireEvent.click(screen.getByRole('button', { name: /create/i }))
     await vi.waitFor(() => { expect(postCalled).toBe(true) })
+    await vi.waitFor(() => {
+      expect(screen.queryByText(/new group/i)).not.toBeNull()
+    })
   })
 
   it('navigates to group detail when name clicked', async () => {
@@ -67,5 +70,8 @@ describe('Groups page', () => {
     await vi.waitFor(() => screen.getByRole('button', { name: /delete/i }))
     await fireEvent.click(screen.getByRole('button', { name: /delete/i }))
     await vi.waitFor(() => { expect(deleteCalled).toBe(true) })
+    await vi.waitFor(() => {
+      expect(screen.queryByText(/my warblers/i)).toBeNull()
+    })
   })
 })

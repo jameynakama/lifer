@@ -7,9 +7,14 @@
   let creating = $state(false)
 
   async function loadGroups() {
-    const res = await fetch('/api/v1/groups')
-    if (res.ok) groups = await res.json()
-    loading = false
+    try {
+      const res = await fetch('/api/v1/groups')
+      if (res.ok) groups = await res.json()
+    } catch {
+      // network error, loading still ends
+    } finally {
+      loading = false
+    }
   }
 
   async function createGroup() {
@@ -32,9 +37,13 @@
   }
 
   async function deleteGroup(id: number) {
-    const res = await fetch(`/api/v1/groups/${id}`, { method: 'DELETE' })
-    if (res.ok) {
-      groups = groups.filter((g) => g.id !== id)
+    try {
+      const res = await fetch(`/api/v1/groups/${id}`, { method: 'DELETE' })
+      if (res.ok) {
+        groups = groups.filter((g) => g.id !== id)
+      }
+    } catch {
+      // network error, leave state unchanged
     }
   }
 
@@ -63,7 +72,7 @@
       {#each groups as group (group.id)}
         <li class="group-row">
           <a href="/groups/{group.id}">{group.name}</a>
-          <button class="btn-delete" onclick={() => deleteGroup(group.id as unknown as number)}>Delete</button>
+          <button class="btn-delete" onclick={() => deleteGroup(group.id)}>Delete</button>
         </li>
       {/each}
     </ul>
