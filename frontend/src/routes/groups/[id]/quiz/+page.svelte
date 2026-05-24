@@ -1,7 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
   import { page } from '$app/state'
-  import type { BirdCard } from '../../../../types'
+  import type { BirdCard, Species } from '../../../../types'
   import QuizCard from '$components/QuizCard.svelte'
   import ImageQuizCard from '$components/ImageQuizCard.svelte'
   import RevealCard from '$components/RevealCard.svelte'
@@ -13,11 +13,23 @@
   )
 
   let card: BirdCard | null = $state(null)
+  let groupSpecies: Species[] = $state([])
   let revealed = $state(false)
   let done = $state(false)
   let reviewed = $state(0)
   let loading = $state(true)
   let error = $state('')
+  let guessed: Species | null = $state(null)
+  let correct = $state(false)
+
+  async function loadGroupSpecies() {
+    try {
+      const res = await fetch(`/api/v1/groups/${groupId}/species`)
+      if (res.ok) groupSpecies = await res.json()
+    } catch {
+      // non-fatal -- typeahead will be empty but quiz still works
+    }
+  }
 
   async function fetchNext() {
     loading = true
@@ -38,6 +50,12 @@
     }
   }
 
+  function onReveal(selected: Species | null) {
+    guessed = selected
+    correct = selected !== null && card !== null && selected.id === card.species_id
+    revealed = true
+  }
+
   async function onRate(rating: number) {
     if (!card) return
     try {
@@ -51,11 +69,8 @@
     }
     reviewed += 1
     revealed = false
+    guessed = null
     await fetchNext()
-  }
-
-  function onReveal() {
-    revealed = true
   }
 
   const stats = $derived([
@@ -69,6 +84,10 @@
       done = false
       revealed = false
       card = null
+      guessed = null
+      correct = false
+      groupSpecies = []
+      loadGroupSpecies()
       fetchNext()
     }
   })
@@ -88,11 +107,11 @@
     </div>
   {:else if card}
     {#if revealed}
-      <RevealCard {card} {onRate} />
+      <RevealCard {card} {correct} {guessed} {onRate} />
     {:else if lane === 'audio'}
-      <QuizCard {card} {onReveal} />
+      <QuizCard {card} species={groupSpecies} {onReveal} />
     {:else}
-      <ImageQuizCard {card} {onReveal} />
+      <ImageQuizCard {card} species={groupSpecies} {onReveal} />
     {/if}
   {:else}
     <p class="status error">Something went wrong. <button onclick={fetchNext}>Retry</button></p>
