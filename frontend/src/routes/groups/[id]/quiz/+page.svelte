@@ -70,6 +70,7 @@
     reviewed += 1
     revealed = false
     guessed = null
+    correct = false
     await fetchNext()
   }
 
