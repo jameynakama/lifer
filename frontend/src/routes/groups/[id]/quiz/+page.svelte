@@ -8,7 +8,9 @@
   import StatsBar from '$components/StatsBar.svelte'
 
   let groupId = $derived(page.params.id)
-  let lane = $derived(page.url.searchParams.get('lane') as 'audio' | 'image' ?? 'audio')
+  let lane: 'audio' | 'image' = $derived(
+    page.url.searchParams.get('lane') === 'image' ? 'image' : 'audio'
+  )
 
   let card: BirdCard | null = $state(null)
   let revealed = $state(false)
@@ -62,7 +64,13 @@
   ])
 
   $effect(() => {
-    if (groupId) fetchNext()
+    if (groupId) {
+      reviewed = 0
+      done = false
+      revealed = false
+      card = null
+      fetchNext()
+    }
   })
 </script>
 
@@ -86,6 +94,8 @@
     {:else}
       <ImageQuizCard {card} {onReveal} />
     {/if}
+  {:else}
+    <p class="status error">Something went wrong. <button onclick={fetchNext}>Retry</button></p>
   {/if}
 </div>
 

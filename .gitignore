@@ -21,3 +21,4 @@ backend/ingest
 frontend/node_modules/
 frontend/dist/
 frontend/.svelte-kit/
+frontend/build/
