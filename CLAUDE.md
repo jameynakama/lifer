@@ -61,6 +61,14 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Requires backend search/filter API (too many species to load all client-side)
 - Design group management UI alongside this (same "add to list" action)
 
+**Region browsing approach** (decided, not yet built):
+- eBird region codes are not stored in the DB -- no "which regions contain this species" endpoint exists
+- Instead: client requests subregions from eBird on demand, then intersects the species list with our catalog
+- Flow: user picks state → frontend hits backend proxy → backend calls `GET /v2/ref/region/list/subnational2/{stateCode}` → returns county list; user picks county → backend calls `GET /v2/product/spplist/{countyCode}` → returns species codes → backend intersects with our DB and returns matches
+- Must proxy through backend to keep the eBird API key server-side
+- `regionType` values: `country`, `subnational1` (states/provinces), `subnational2` (counties)
+- Example: `GET /v2/ref/region/list/subnational1/US` → all US states; `GET /v2/ref/region/list/subnational2/US-NE` → all Nebraska counties
+
 ### 3. Group management (some is done)
 - Admin: create/edit preset groups (region-based)
 - Users: create custom groups, add/remove species
