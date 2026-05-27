@@ -41,6 +41,7 @@ func NewWithEndpoint(endpoint, accessKeyID, secretKey, bucket, pubURL string) (*
 	client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		o.BaseEndpoint = aws.String(endpoint)
 		o.UsePathStyle = true
+		o.Retryer = aws.NopRetryer{} // our Upload loop handles retries
 	})
 	return &Client{s3: client, bucket: bucket, pubURL: pubURL}, nil
 }
