@@ -4,7 +4,7 @@ export interface Stat {
 }
 
 export interface BirdCard {
-    species_id: number;
+    ebird_code: string;
     common_name: string;
     scientific_name: string;
     media_url: string;
@@ -21,8 +21,7 @@ export interface Group {
 }
 
 export interface Species {
-    id: number;
+    ebird_code: string;
     common_name: string;
     scientific_name: string;
-    ebird_code: string;
 }

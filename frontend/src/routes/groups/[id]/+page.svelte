@@ -3,10 +3,9 @@
   import { page } from '$app/state'
 
   interface Species {
-    id: number
+    ebird_code: string
     common_name: string
     scientific_name: string
-    ebird_code: string
   }
 
   let groupId = $derived(page.params.id)
@@ -36,26 +35,26 @@
     }, 300)
   }
 
-  async function addSpecies(speciesId: number) {
+  async function addSpecies(ebirdCode: string) {
     const res = await fetch(`/api/v1/groups/${groupId}/species`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ species_id: speciesId }),
+      body: JSON.stringify({ ebird_code: ebirdCode }),
     })
     if (res.ok) {
-      const added = searchResults.find((s) => s.id === speciesId)
+      const added = searchResults.find((s) => s.ebird_code === ebirdCode)
       if (added) groupSpecies = [...groupSpecies, added]
       searchQuery = ''
       searchResults = []
     }
   }
 
-  async function removeSpecies(speciesId: number) {
-    const res = await fetch(`/api/v1/groups/${groupId}/species/${speciesId}`, {
+  async function removeSpecies(ebirdCode: string) {
+    const res = await fetch(`/api/v1/groups/${groupId}/species/${ebirdCode}`, {
       method: 'DELETE',
     })
     if (res.ok) {
-      groupSpecies = groupSpecies.filter((s) => s.id !== speciesId)
+      groupSpecies = groupSpecies.filter((s) => s.ebird_code !== ebirdCode)
     }
   }
 
@@ -86,13 +85,13 @@
     <p class="empty">No species yet. Search below to add some.</p>
   {:else}
     <ul class="species-list">
-      {#each groupSpecies as s (s.id)}
+      {#each groupSpecies as s (s.ebird_code)}
         <li class="species-row">
           <span>
             <strong>{s.common_name}</strong>
             <em>{s.scientific_name}</em>
           </span>
-          <button class="btn-remove" onclick={() => removeSpecies(s.id)}>Remove</button>
+          <button class="btn-remove" onclick={() => removeSpecies(s.ebird_code)}>Remove</button>
         </li>
       {/each}
     </ul>
@@ -107,13 +106,13 @@
     />
     {#if searchResults.length > 0}
       <ul class="search-results">
-        {#each searchResults as s (s.id)}
+        {#each searchResults as s (s.ebird_code)}
           <li class="search-row">
             <span>
               <strong>{s.common_name}</strong>
               <em>{s.scientific_name}</em>
             </span>
-            <button class="btn-add" onclick={() => addSpecies(s.id)}>Add</button>
+            <button class="btn-add" onclick={() => addSpecies(s.ebird_code)}>Add</button>
           </li>
         {/each}
       </ul>

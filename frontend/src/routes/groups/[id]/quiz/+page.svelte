@@ -52,7 +52,7 @@
 
   function onReveal(selected: Species | null) {
     guessed = selected
-    correct = selected !== null && card !== null && selected.id === card.species_id
+    correct = selected !== null && card !== null && selected.ebird_code === card.ebird_code
     revealed = true
   }
 
@@ -63,7 +63,7 @@
       await fetch(`/api/v1/groups/${groupId}/rate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ species_id: card.species_id, lane: card.lane, rating }),
+        body: JSON.stringify({ ebird_code: card.ebird_code, lane: card.lane, rating }),
       })
     } catch {
       // non-fatal
@@ -116,11 +116,11 @@
     {#if revealed}
       <RevealCard {card} {correct} {guessed} {onNext} />
     {:else if lane === 'audio'}
-      {#key card.species_id}
+      {#key card.ebird_code}
         <QuizCard {card} species={groupSpecies} {onReveal} />
       {/key}
     {:else}
-      {#key card.species_id}
+      {#key card.ebird_code}
         <ImageQuizCard {card} species={groupSpecies} {onReveal} />
       {/key}
     {/if}
