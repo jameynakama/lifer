@@ -187,6 +187,10 @@ func (h *Handler) addSpeciesToGroup(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
+	if req.EbirdCode == "" {
+		http.Error(w, "ebird_code is required", http.StatusBadRequest)
+		return
+	}
 
 	if err := h.queries.AddSpeciesToGroup(r.Context(), store.AddSpeciesToGroupParams{
 		GroupID:     groupID,

@@ -117,6 +117,10 @@ func (h *Handler) rateCard(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "lane must be audio or image", http.StatusBadRequest)
 		return
 	}
+	if req.EbirdCode == "" {
+		http.Error(w, "ebird_code is required", http.StatusBadRequest)
+		return
+	}
 
 	current, err := h.queries.GetCard(r.Context(), store.GetCardParams{
 		UserID:      userID,
