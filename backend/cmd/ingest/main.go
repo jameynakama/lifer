@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -121,6 +122,7 @@ func main() {
 	var mu sync.Mutex
 	started, done := 0, 0
 	total := len(codes)
+	failedSpecies := map[string][]string{} // ebird_code → upload failure reasons
 
 	for _, code := range codes {
 		entry, ok := taxMap[code]
@@ -138,8 +140,14 @@ func main() {
 		go func(code string, entry ebird.TaxonomyEntry) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if err := ingestSpecies(ctx, q, xcClient, macaulayClient, entry, *maxRecordings, *maxImages, r2c); err != nil {
+			failures, err := ingestSpecies(ctx, q, xcClient, macaulayClient, entry, *maxRecordings, *maxImages, r2c)
+			if err != nil {
 				log.Printf("error %s (%s): %v", entry.CommonName, code, err)
+			}
+			if len(failures) > 0 {
+				mu.Lock()
+				failedSpecies[code] = failures
+				mu.Unlock()
 			}
 			mu.Lock()
 			done++
@@ -173,6 +181,42 @@ func main() {
 		}
 	}
 	log.Printf("cleanup: removed %d incomplete species", len(incomplete))
+
+	if len(failedSpecies) > 0 {
+		failedCodes := make([]string, 0, len(failedSpecies))
+		for code := range failedSpecies {
+			failedCodes = append(failedCodes, code)
+		}
+		sort.Strings(failedCodes)
+
+		log.Printf("\n=== PARTIAL UPLOAD FAILURES (%d species) ===", len(failedSpecies))
+		for _, code := range failedCodes {
+			name := taxMap[code].CommonName
+			log.Printf("  %s (%s):", name, code)
+			for _, reason := range failedSpecies[code] {
+				log.Printf("    - %s", reason)
+			}
+		}
+		log.Printf("cleaning up partial R2 uploads and DB entries for failed species...")
+		for _, code := range failedCodes {
+			for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
+				if err := r2c.DeletePrefix(ctx, prefix); err != nil {
+					log.Printf("  warn: R2 delete %s: %v", prefix, err)
+				}
+			}
+			if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {
+				log.Printf("  warn: DB delete recordings %s: %v", code, err)
+			}
+			if err := q.DeleteSpeciesImagesBySpeciesCode(ctx, code); err != nil {
+				log.Printf("  warn: DB delete images %s: %v", code, err)
+			}
+			if err := q.DeleteSpeciesByCode(ctx, code); err != nil {
+				log.Printf("  warn: DB delete species %s: %v", code, err)
+			}
+		}
+		log.Printf("re-run failed species with:")
+		log.Printf("  just ingest --species %s <region>", strings.Join(failedCodes, ","))
+	}
 }
 
 func filterBySpecies(codes []string, taxMap map[string]ebird.TaxonomyEntry, want []string) []string {
@@ -212,6 +256,8 @@ func filterComplete(codes []string, complete map[string]struct{}) []string {
 	return out
 }
 
+// ingestSpecies fetches and uploads media for one species.
+// Returns a list of upload failure reasons (non-empty = partial failure needing cleanup).
 func ingestSpecies(
 	ctx context.Context,
 	q *store.Queries,
@@ -220,14 +266,14 @@ func ingestSpecies(
 	entry ebird.TaxonomyEntry,
 	maxRec, maxImg int,
 	r2c *r2.Client,
-) error {
+) ([]string, error) {
 	sp, err := q.UpsertSpecies(ctx, store.UpsertSpeciesParams{
 		EbirdCode:      entry.SpeciesCode,
 		CommonName:     entry.CommonName,
 		ScientificName: entry.SciName,
 	})
 	if err != nil {
-		return fmt.Errorf("upsert species: %w", err)
+		return nil, fmt.Errorf("upsert species: %w", err)
 	}
 
 	perType := maxRec / 2
@@ -245,7 +291,18 @@ func ingestSpecies(
 		}(recType)
 	}
 
-	var recWg sync.WaitGroup
+	var (
+		recWg    sync.WaitGroup
+		failMu   sync.Mutex
+		failures []string
+	)
+
+	recordFailure := func(reason string) {
+		failMu.Lock()
+		failures = append(failures, reason)
+		failMu.Unlock()
+	}
+
 	for range 2 {
 		result := <-searchCh
 		if result.err != nil {
@@ -264,6 +321,7 @@ func ingestSpecies(
 				filePath, err := fetchAndUpload(ctx, r2c, rec.FileURL, key, "audio/mpeg")
 				if err != nil {
 					log.Printf("  warn: upload recording %s: %v", rec.ID, err)
+					recordFailure(fmt.Sprintf("recording %s: %v", rec.ID, err))
 					return
 				}
 				if _, err := q.UpsertRecording(ctx, store.UpsertRecordingParams{
@@ -283,7 +341,7 @@ func ingestSpecies(
 	photos, err := mac.Photos(ctx, entry.SpeciesCode, maxImg)
 	if err != nil {
 		log.Printf("  warn: macaulay %s: %v", entry.SpeciesCode, err)
-		return nil
+		return failures, nil
 	}
 
 	var imgWg sync.WaitGroup
@@ -295,6 +353,7 @@ func ingestSpecies(
 			filePath, err := fetchAndUpload(ctx, r2c, mac.PhotoURL(photo.AssetID), key, "image/jpeg")
 			if err != nil {
 				log.Printf("  warn: upload image %s: %v", photo.AssetID, err)
+				recordFailure(fmt.Sprintf("image %s: %v", photo.AssetID, err))
 				return
 			}
 			if _, err := q.UpsertSpeciesImage(ctx, store.UpsertSpeciesImageParams{
@@ -308,10 +367,10 @@ func ingestSpecies(
 		}(photo)
 	}
 	imgWg.Wait()
-	return nil
+	return failures, nil
 }
 
-// retryDelays controls the wait between attempts on a 429 response.
+// retryDelays controls the wait between attempts on a 429 response from the source CDN.
 // Overridable in tests.
 var retryDelays = []time.Duration{2 * time.Second, 4 * time.Second, 8 * time.Second}
 
