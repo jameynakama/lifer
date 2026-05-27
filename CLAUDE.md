@@ -66,7 +66,7 @@ Cards are user-scoped. Species/recordings/images are global shared catalog. is_a
 - Requires backend search/filter API (too many species to load all client-side)
 - Design group management UI alongside this (same "add to list" action)
 
-### 4. Group management
+### 4. Group management (some is done)
 - Admin: create/edit preset groups (region-based)
 - Users: create custom groups, add/remove species
 - Shared UI surface with catalog view
