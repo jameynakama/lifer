@@ -9,15 +9,16 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
-	"github.com/jameynakama/lifer/internal/auth"
-	"github.com/jameynakama/lifer/internal/store"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
+
+	"github.com/jameynakama/lifer/internal/auth"
+	"github.com/jameynakama/lifer/internal/store"
 )
 
 type nextCardResponse struct {
-	SpeciesID      int64  `json:"species_id"`
+	EbirdCode      string `json:"ebird_code"`
 	CommonName     string `json:"common_name"`
 	ScientificName string `json:"scientific_name"`
 	MediaURL       string `json:"media_url"`
@@ -57,12 +58,12 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 
 	var mediaURL string
 	if lane == "audio" {
-		mediaURL, err = h.queries.GetRandomRecording(r.Context(), card.SpeciesID)
+		mediaURL, err = h.queries.GetRandomRecording(r.Context(), card.SpeciesCode)
 	} else {
-		mediaURL, err = h.queries.GetRandomImage(r.Context(), card.SpeciesID)
+		mediaURL, err = h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
-		log.Printf("no media for species %d lane %s", card.SpeciesID, lane)
+		log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
 		http.Error(w, "no media available", http.StatusInternalServerError)
 		return
 	}
@@ -72,11 +73,9 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// For audio lane, fetch a separate photo for the reveal.
-	// For image lane, the reveal shows the same photo the user just saw.
 	photoURL := mediaURL
 	if lane == "audio" {
-		photoURL, err = h.queries.GetRandomImage(r.Context(), card.SpeciesID)
+		photoURL, err = h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
 		if errors.Is(err, pgx.ErrNoRows) {
 			photoURL = ""
 		} else if err != nil {
@@ -87,7 +86,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, nextCardResponse{
-		SpeciesID:      card.SpeciesID,
+		EbirdCode:      card.SpeciesCode,
 		CommonName:     card.CommonName,
 		ScientificName: card.ScientificName,
 		MediaURL:       mediaURL,
@@ -97,7 +96,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 }
 
 type rateCardRequest struct {
-	SpeciesID int64  `json:"species_id"`
+	EbirdCode string `json:"ebird_code"`
 	Lane      string `json:"lane"`
 	Rating    int    `json:"rating"`
 }
@@ -120,9 +119,9 @@ func (h *Handler) rateCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	current, err := h.queries.GetCard(r.Context(), store.GetCardParams{
-		UserID:    userID,
-		SpeciesID: req.SpeciesID,
-		Lane:      req.Lane,
+		UserID:      userID,
+		SpeciesCode: req.EbirdCode,
+		Lane:        req.Lane,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "card not found", http.StatusNotFound)
@@ -159,14 +158,14 @@ func (h *Handler) rateCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	updated, err := h.queries.UpdateCardSchedule(r.Context(), store.UpdateCardScheduleParams{
-		UserID:     userID,
-		SpeciesID:  req.SpeciesID,
-		Lane:       req.Lane,
-		Stability:  result.Stability,
-		Difficulty: result.Difficulty,
-		Due:        due,
-		Lapses:     int32(result.Lapses),
-		State:      int16(result.State),
+		UserID:      userID,
+		SpeciesCode: req.EbirdCode,
+		Lane:        req.Lane,
+		Stability:   result.Stability,
+		Difficulty:  result.Difficulty,
+		Due:         due,
+		Lapses:      int32(result.Lapses),
+		State:       int16(result.State),
 	})
 	if err != nil {
 		log.Printf("UpdateCardSchedule error: %v", err)

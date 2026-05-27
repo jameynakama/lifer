@@ -268,7 +268,7 @@ func TestListGroupSpecies_ReturnsList(t *testing.T) {
 		listGroupSpecies: func(_ context.Context, groupID int64) ([]store.ListGroupSpeciesRow, error) {
 			assert.Equal(t, int64(42), groupID)
 			return []store.ListGroupSpeciesRow{
-				{ID: 7, CommonName: "Song Sparrow", ScientificName: "Melospiza melodia", EbirdCode: "sonspa"},
+				{EbirdCode: "sonspa", CommonName: "Song Sparrow", ScientificName: "Melospiza melodia"},
 			}, nil
 		},
 	}
@@ -295,7 +295,7 @@ func TestAddSpeciesToGroup_InsertsAndUpsertsBothCards(t *testing.T) {
 		},
 		addSpeciesToGroup: func(_ context.Context, arg store.AddSpeciesToGroupParams) error {
 			assert.Equal(t, int64(42), arg.GroupID)
-			assert.Equal(t, int64(7), arg.SpeciesID)
+			assert.Equal(t, "sonspa", arg.SpeciesCode)
 			return nil
 		},
 		upsertCard: func(_ context.Context, arg store.UpsertCardParams) error {
@@ -304,7 +304,7 @@ func TestAddSpeciesToGroup_InsertsAndUpsertsBothCards(t *testing.T) {
 		},
 	}
 	h := makeHandler(q)
-	body := `{"species_id":7}`
+	body := `{"ebird_code":"sonspa"}`
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/groups/42/species", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	r = injectUserID(r, 1)
@@ -325,15 +325,15 @@ func TestRemoveSpeciesFromGroup_RemovesEntry(t *testing.T) {
 		},
 		removeSpeciesFromGroup: func(_ context.Context, arg store.RemoveSpeciesFromGroupParams) error {
 			assert.Equal(t, int64(42), arg.GroupID)
-			assert.Equal(t, int64(7), arg.SpeciesID)
+			assert.Equal(t, "sonspa", arg.SpeciesCode)
 			removed = true
 			return nil
 		},
 	}
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodDelete, "/api/v1/groups/42/species/7", nil)
+	r := httptest.NewRequest(http.MethodDelete, "/api/v1/groups/42/species/sonspa", nil)
 	r = injectUserID(r, 1)
-	r = withChiParams(r, map[string]string{"id": "42", "species_id": "7"})
+	r = withChiParams(r, map[string]string{"id": "42", "ebird_code": "sonspa"})
 	w := httptest.NewRecorder()
 
 	h.removeSpeciesFromGroup(w, r)

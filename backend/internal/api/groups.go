@@ -23,7 +23,7 @@ type updateGroupRequest struct {
 }
 
 type addSpeciesRequest struct {
-	SpeciesID int64 `json:"species_id"`
+	EbirdCode string `json:"ebird_code"`
 }
 
 // groupOwnerCheck fetches the group, writes 404/403 and returns false if the
@@ -189,8 +189,8 @@ func (h *Handler) addSpeciesToGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := h.queries.AddSpeciesToGroup(r.Context(), store.AddSpeciesToGroupParams{
-		GroupID:   groupID,
-		SpeciesID: req.SpeciesID,
+		GroupID:     groupID,
+		SpeciesCode: req.EbirdCode,
 	}); err != nil {
 		log.Printf("AddSpeciesToGroup error: %v", err)
 		http.Error(w, "server error", http.StatusInternalServerError)
@@ -199,9 +199,9 @@ func (h *Handler) addSpeciesToGroup(w http.ResponseWriter, r *http.Request) {
 
 	for _, lane := range []string{"audio", "image"} {
 		if err := h.queries.UpsertCard(r.Context(), store.UpsertCardParams{
-			UserID:    userID,
-			SpeciesID: req.SpeciesID,
-			Lane:      lane,
+			UserID:      userID,
+			SpeciesCode: req.EbirdCode,
+			Lane:        lane,
 		}); err != nil {
 			log.Printf("UpsertCard error: %v", err)
 			http.Error(w, "server error", http.StatusInternalServerError)
@@ -221,20 +221,15 @@ func (h *Handler) removeSpeciesFromGroup(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	speciesID, err := strconv.ParseInt(chi.URLParam(r, "species_id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid species id", http.StatusBadRequest)
-		return
-	}
+	ebirdCode := chi.URLParam(r, "ebird_code")
 
 	if !h.groupOwnerCheck(w, r, groupID, userID) {
 		return
 	}
 
-	_ = userID // cards are not deleted (become dormant)
 	if err := h.queries.RemoveSpeciesFromGroup(r.Context(), store.RemoveSpeciesFromGroupParams{
-		GroupID:   groupID,
-		SpeciesID: speciesID,
+		GroupID:     groupID,
+		SpeciesCode: ebirdCode,
 	}); err != nil {
 		log.Printf("RemoveSpeciesFromGroup error: %v", err)
 		http.Error(w, "server error", http.StatusInternalServerError)

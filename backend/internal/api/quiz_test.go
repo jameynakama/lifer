@@ -10,21 +10,20 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jameynakama/lifer/internal/auth"
-	"github.com/jameynakama/lifer/internal/store"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jameynakama/lifer/internal/auth"
+	"github.com/jameynakama/lifer/internal/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // stubQuerier embeds store.Querier (nil) so unimplemented methods panic if called.
-// Tests override only the methods they need.
 type stubQuerier struct {
 	store.Querier
 	getNextDueCard     func(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error)
-	getRandomRecording func(ctx context.Context, speciesID int64) (string, error)
-	getRandomImage     func(ctx context.Context, speciesID int64) (string, error)
+	getRandomRecording func(ctx context.Context, speciesCode string) (string, error)
+	getRandomImage     func(ctx context.Context, speciesCode string) (string, error)
 	getCard            func(ctx context.Context, arg store.GetCardParams) (store.Card, error)
 	updateCardSchedule func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
 }
@@ -32,11 +31,11 @@ type stubQuerier struct {
 func (s *stubQuerier) GetNextDueCard(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
 	return s.getNextDueCard(ctx, arg)
 }
-func (s *stubQuerier) GetRandomRecording(ctx context.Context, speciesID int64) (string, error) {
-	return s.getRandomRecording(ctx, speciesID)
+func (s *stubQuerier) GetRandomRecording(ctx context.Context, speciesCode string) (string, error) {
+	return s.getRandomRecording(ctx, speciesCode)
 }
-func (s *stubQuerier) GetRandomImage(ctx context.Context, speciesID int64) (string, error) {
-	return s.getRandomImage(ctx, speciesID)
+func (s *stubQuerier) GetRandomImage(ctx context.Context, speciesCode string) (string, error) {
+	return s.getRandomImage(ctx, speciesCode)
 }
 func (s *stubQuerier) GetCard(ctx context.Context, arg store.GetCardParams) (store.Card, error) {
 	return s.getCard(ctx, arg)
@@ -81,19 +80,19 @@ func TestGetNextCard_Audio_ReturnsDueCard(t *testing.T) {
 			assert.Equal(t, int64(42), arg.GroupID)
 			assert.Equal(t, "audio", arg.Lane)
 			return store.GetNextDueCardRow{
-				SpeciesID:      99,
+				SpeciesCode:    "spotto",
 				Lane:           "audio",
 				CommonName:     "Spotted Towhee",
 				ScientificName: "Pipilo maculatus",
 				Due:            due,
 			}, nil
 		},
-		getRandomRecording: func(_ context.Context, speciesID int64) (string, error) {
-			assert.Equal(t, int64(99), speciesID)
-			return "https://xeno-canto.org/123/download", nil
+		getRandomRecording: func(_ context.Context, speciesCode string) (string, error) {
+			assert.Equal(t, "spotto", speciesCode)
+			return "https://r2.example.com/recordings/spotto/123.mp3", nil
 		},
-		getRandomImage: func(_ context.Context, speciesID int64) (string, error) {
-			return "https://cdn.example.com/photo.jpg", nil
+		getRandomImage: func(_ context.Context, speciesCode string) (string, error) {
+			return "https://r2.example.com/images/spotto/456.jpg", nil
 		},
 	}
 
@@ -108,10 +107,10 @@ func TestGetNextCard_Audio_ReturnsDueCard(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var body nextCardResponse
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
-	assert.Equal(t, int64(99), body.SpeciesID)
+	assert.Equal(t, "spotto", body.EbirdCode)
 	assert.Equal(t, "Spotted Towhee", body.CommonName)
-	assert.Equal(t, "https://xeno-canto.org/123/download", body.MediaURL)
-	assert.Equal(t, "https://cdn.example.com/photo.jpg", body.PhotoURL)
+	assert.Equal(t, "https://r2.example.com/recordings/spotto/123.mp3", body.MediaURL)
+	assert.Equal(t, "https://r2.example.com/images/spotto/456.jpg", body.PhotoURL)
 	assert.Equal(t, "audio", body.Lane)
 }
 
@@ -163,29 +162,29 @@ func TestRateCard_UpdatesSchedule(t *testing.T) {
 	require.NoError(t, due.Scan(now.Add(24*time.Hour)))
 
 	updatedCard := store.Card{
-		UserID:    1,
-		SpeciesID: 99,
-		Lane:      "audio",
-		Stability: 2.5,
-		Due:       due,
-		State:     2,
+		UserID:      1,
+		SpeciesCode: "spotto",
+		Lane:        "audio",
+		Stability:   2.5,
+		Due:         due,
+		State:       2,
 	}
 
 	q := &stubQuerier{
 		getCard: func(_ context.Context, arg store.GetCardParams) (store.Card, error) {
 			assert.Equal(t, int64(1), arg.UserID)
-			assert.Equal(t, int64(99), arg.SpeciesID)
+			assert.Equal(t, "spotto", arg.SpeciesCode)
 			assert.Equal(t, "audio", arg.Lane)
 			return store.Card{
-				UserID:    1,
-				SpeciesID: 99,
-				Lane:      "audio",
-				State:     0,
+				UserID:      1,
+				SpeciesCode: "spotto",
+				Lane:        "audio",
+				State:       0,
 			}, nil
 		},
 		updateCardSchedule: func(_ context.Context, arg store.UpdateCardScheduleParams) (store.Card, error) {
 			assert.Equal(t, int64(1), arg.UserID)
-			assert.Equal(t, int64(99), arg.SpeciesID)
+			assert.Equal(t, "spotto", arg.SpeciesCode)
 			assert.Equal(t, "audio", arg.Lane)
 			assert.Greater(t, arg.Stability, 0.0)
 			return updatedCard, nil
@@ -193,7 +192,7 @@ func TestRateCard_UpdatesSchedule(t *testing.T) {
 	}
 
 	h := makeHandler(q)
-	body := `{"species_id":99,"lane":"audio","rating":3}`
+	body := `{"ebird_code":"spotto","lane":"audio","rating":3}`
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/groups/42/rate", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	r = injectUserID(r, 1)
@@ -205,13 +204,13 @@ func TestRateCard_UpdatesSchedule(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 	var got store.Card
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
-	assert.Equal(t, int64(99), got.SpeciesID)
+	assert.Equal(t, "spotto", got.SpeciesCode)
 	assert.Equal(t, "audio", got.Lane)
 }
 
 func TestRateCard_InvalidRating_Returns400(t *testing.T) {
 	h := makeHandler(&stubQuerier{})
-	body := `{"species_id":99,"lane":"audio","rating":9}`
+	body := `{"ebird_code":"spotto","lane":"audio","rating":9}`
 	r := httptest.NewRequest(http.MethodPost, "/api/v1/groups/42/rate", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	r = injectUserID(r, 1)
@@ -229,9 +228,9 @@ func TestGetNextCard_NoMedia_Returns500(t *testing.T) {
 
 	q := &stubQuerier{
 		getNextDueCard: func(_ context.Context, _ store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
-			return store.GetNextDueCardRow{SpeciesID: 99, Lane: "audio", Due: due}, nil
+			return store.GetNextDueCardRow{SpeciesCode: "spotto", Lane: "audio", Due: due}, nil
 		},
-		getRandomRecording: func(_ context.Context, _ int64) (string, error) {
+		getRandomRecording: func(_ context.Context, _ string) (string, error) {
 			return "", pgx.ErrNoRows
 		},
 	}

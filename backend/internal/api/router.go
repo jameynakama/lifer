@@ -55,13 +55,13 @@ func NewRouter(cfg RouterConfig) http.Handler {
 
 			r.Get("/groups/{id}/species", h.listGroupSpecies)
 			r.Post("/groups/{id}/species", h.addSpeciesToGroup)
-			r.Delete("/groups/{id}/species/{species_id}", h.removeSpeciesFromGroup)
+			r.Delete("/groups/{id}/species/{ebird_code}", h.removeSpeciesFromGroup)
 
 			r.Get("/groups/{id}/next", h.getNextCard)
 			r.Post("/groups/{id}/rate", h.rateCard)
 
 			r.Get("/species", h.searchSpecies)
-			r.Put("/species/{id}/preferences", h.updatePreferences)
+			r.Put("/species/{ebird_code}/preferences", h.updatePreferences)
 		})
 	})
 

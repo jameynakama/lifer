@@ -36,12 +36,12 @@ func TestUpdatePreferences_EnablesBothLanes(t *testing.T) {
 	q := &prefStubQuerier{
 		upsertPreferences: func(_ context.Context, arg store.UpsertPreferencesParams) (store.UserSpeciesPreference, error) {
 			assert.Equal(t, int64(1), arg.UserID)
-			assert.Equal(t, int64(55), arg.SpeciesID)
+			assert.Equal(t, "busti", arg.SpeciesCode)
 			assert.True(t, arg.AudioEnabled)
 			assert.True(t, arg.ImageEnabled)
 			return store.UserSpeciesPreference{
 				UserID:       arg.UserID,
-				SpeciesID:    arg.SpeciesID,
+				SpeciesCode:  arg.SpeciesCode,
 				AudioEnabled: arg.AudioEnabled,
 				ImageEnabled: arg.ImageEnabled,
 			}, nil
@@ -58,10 +58,10 @@ func TestUpdatePreferences_EnablesBothLanes(t *testing.T) {
 
 	h := makeHandler(q)
 	body := `{"audio_enabled":true,"image_enabled":true}`
-	r := httptest.NewRequest(http.MethodPut, "/api/v1/species/55/preferences", strings.NewReader(body))
+	r := httptest.NewRequest(http.MethodPut, "/api/v1/species/busti/preferences", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	r = injectUserID(r, 1)
-	r = withChiParam(r, "id", "55")
+	r = withChiParam(r, "ebird_code", "busti")
 	w := httptest.NewRecorder()
 
 	h.updatePreferences(w, r)
@@ -71,7 +71,7 @@ func TestUpdatePreferences_EnablesBothLanes(t *testing.T) {
 	assert.True(t, upsertCalls["image"], "should upsert image card")
 	var pref store.UserSpeciesPreference
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&pref))
-	assert.Equal(t, int64(55), pref.SpeciesID)
+	assert.Equal(t, "busti", pref.SpeciesCode)
 }
 
 func TestUpdatePreferences_DisablesAudioLane(t *testing.T) {
@@ -79,7 +79,7 @@ func TestUpdatePreferences_DisablesAudioLane(t *testing.T) {
 	q := &prefStubQuerier{
 		upsertPreferences: func(_ context.Context, arg store.UpsertPreferencesParams) (store.UserSpeciesPreference, error) {
 			return store.UserSpeciesPreference{
-				UserID: arg.UserID, SpeciesID: arg.SpeciesID,
+				UserID: arg.UserID, SpeciesCode: arg.SpeciesCode,
 				AudioEnabled: arg.AudioEnabled, ImageEnabled: arg.ImageEnabled,
 			}, nil
 		},
@@ -95,10 +95,10 @@ func TestUpdatePreferences_DisablesAudioLane(t *testing.T) {
 
 	h := makeHandler(q)
 	body := `{"audio_enabled":false,"image_enabled":true}`
-	r := httptest.NewRequest(http.MethodPut, "/api/v1/species/55/preferences", strings.NewReader(body))
+	r := httptest.NewRequest(http.MethodPut, "/api/v1/species/busti/preferences", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	r = injectUserID(r, 1)
-	r = withChiParam(r, "id", "55")
+	r = withChiParam(r, "ebird_code", "busti")
 	w := httptest.NewRecorder()
 
 	h.updatePreferences(w, r)

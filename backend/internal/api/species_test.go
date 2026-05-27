@@ -27,8 +27,8 @@ func TestSearchSpecies_ReturnsMatches(t *testing.T) {
 		searchSpecies: func(_ context.Context, query pgtype.Text) ([]store.SearchSpeciesRow, error) {
 			assert.Equal(t, "sparrow", query.String)
 			return []store.SearchSpeciesRow{
-				{ID: 1, CommonName: "Song Sparrow", ScientificName: "Melospiza melodia", EbirdCode: "sonspa"},
-				{ID: 2, CommonName: "Fox Sparrow", ScientificName: "Passerella iliaca", EbirdCode: "foxspa"},
+				{EbirdCode: "sonspa", CommonName: "Song Sparrow", ScientificName: "Melospiza melodia"},
+				{EbirdCode: "foxspa", CommonName: "Fox Sparrow", ScientificName: "Passerella iliaca"},
 			}, nil
 		},
 	}
