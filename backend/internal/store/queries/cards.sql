@@ -1,11 +1,11 @@
 -- name: GetNextDueCard :one
-SELECT c.id, c.user_id, c.species_id, c.lane,
+SELECT c.id, c.user_id, c.species_code, c.lane,
        c.stability, c.difficulty, c.due, c.last_review,
        c.reps, c.lapses, c.state, c.created_at,
        s.common_name, s.scientific_name
 FROM cards c
-JOIN species s ON s.id = c.species_id
-JOIN group_species gs ON gs.species_id = c.species_id
+JOIN species s ON s.ebird_code = c.species_code
+JOIN group_species gs ON gs.species_code = c.species_code
 WHERE c.user_id = $1
   AND gs.group_id = $2
   AND c.lane = $3
@@ -15,21 +15,21 @@ LIMIT 1;
 
 -- name: GetRandomRecording :one
 SELECT file_path FROM species_recordings
-WHERE species_id = $1 AND quality IN ('A', 'B')
+WHERE species_code = $1 AND quality IN ('A', 'B')
 ORDER BY random()
 LIMIT 1;
 
 -- name: GetRandomImage :one
 SELECT file_path FROM species_images
-WHERE species_id = $1
+WHERE species_code = $1
 ORDER BY random()
 LIMIT 1;
 
 -- name: GetCard :one
-SELECT id, user_id, species_id, lane, stability, difficulty, due,
+SELECT id, user_id, species_code, lane, stability, difficulty, due,
        last_review, reps, lapses, state, created_at
 FROM cards
-WHERE user_id = $1 AND species_id = $2 AND lane = $3;
+WHERE user_id = $1 AND species_code = $2 AND lane = $3;
 
 -- name: UpdateCardSchedule :one
 UPDATE cards
@@ -40,15 +40,15 @@ SET stability   = $4,
     reps        = reps + 1,
     lapses      = $7,
     state       = $8
-WHERE user_id = $1 AND species_id = $2 AND lane = $3
-RETURNING id, user_id, species_id, lane, stability, difficulty, due,
+WHERE user_id = $1 AND species_code = $2 AND lane = $3
+RETURNING id, user_id, species_code, lane, stability, difficulty, due,
           last_review, reps, lapses, state, created_at;
 
 -- name: UpsertCard :exec
-INSERT INTO cards (user_id, species_id, lane)
+INSERT INTO cards (user_id, species_code, lane)
 VALUES ($1, $2, $3)
-ON CONFLICT (user_id, species_id, lane) DO NOTHING;
+ON CONFLICT (user_id, species_code, lane) DO NOTHING;
 
 -- name: DeleteCard :exec
 DELETE FROM cards
-WHERE user_id = $1 AND species_id = $2 AND lane = $3;
+WHERE user_id = $1 AND species_code = $2 AND lane = $3;

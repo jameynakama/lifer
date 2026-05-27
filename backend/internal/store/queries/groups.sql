@@ -4,7 +4,7 @@ SELECT g.id, g.name, g.description, g.is_preset, g.owner_id, g.created_at,
     COUNT(CASE WHEN c.lane = 'image' AND c.due <= NOW() THEN 1 END) AS image_due
 FROM groups g
 LEFT JOIN group_species gs ON gs.group_id = g.id
-LEFT JOIN cards c ON c.species_id = gs.species_id AND c.user_id = $1
+LEFT JOIN cards c ON c.species_code = gs.species_code AND c.user_id = $1
 WHERE g.owner_id = $1
 GROUP BY g.id
 ORDER BY g.name;
@@ -27,17 +27,17 @@ RETURNING id, name, description, is_preset, owner_id, created_at;
 DELETE FROM groups WHERE id = $1;
 
 -- name: ListGroupSpecies :many
-SELECT s.id, s.common_name, s.scientific_name, s.ebird_code
+SELECT s.ebird_code, s.common_name, s.scientific_name
 FROM species s
-JOIN group_species gs ON gs.species_id = s.id
+JOIN group_species gs ON gs.species_code = s.ebird_code
 WHERE gs.group_id = $1
 ORDER BY s.common_name;
 
 -- name: AddSpeciesToGroup :exec
-INSERT INTO group_species (group_id, species_id)
+INSERT INTO group_species (group_id, species_code)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING;
 
 -- name: RemoveSpeciesFromGroup :exec
 DELETE FROM group_species
-WHERE group_id = $1 AND species_id = $2;
+WHERE group_id = $1 AND species_code = $2;
