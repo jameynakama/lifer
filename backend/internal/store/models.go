@@ -9,18 +9,18 @@ import (
 )
 
 type Card struct {
-	ID         int64              `db:"id" json:"id"`
-	UserID     int64              `db:"user_id" json:"user_id"`
-	SpeciesID  int64              `db:"species_id" json:"species_id"`
-	Lane       string             `db:"lane" json:"lane"`
-	Stability  float64            `db:"stability" json:"stability"`
-	Difficulty float64            `db:"difficulty" json:"difficulty"`
-	Due        pgtype.Timestamptz `db:"due" json:"due"`
-	LastReview pgtype.Timestamptz `db:"last_review" json:"last_review"`
-	Reps       int32              `db:"reps" json:"reps"`
-	Lapses     int32              `db:"lapses" json:"lapses"`
-	State      int16              `db:"state" json:"state"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	ID          int64              `db:"id" json:"id"`
+	UserID      int64              `db:"user_id" json:"user_id"`
+	SpeciesCode string             `db:"species_code" json:"species_code"`
+	Lane        string             `db:"lane" json:"lane"`
+	Stability   float64            `db:"stability" json:"stability"`
+	Difficulty  float64            `db:"difficulty" json:"difficulty"`
+	Due         pgtype.Timestamptz `db:"due" json:"due"`
+	LastReview  pgtype.Timestamptz `db:"last_review" json:"last_review"`
+	Reps        int32              `db:"reps" json:"reps"`
+	Lapses      int32              `db:"lapses" json:"lapses"`
+	State       int16              `db:"state" json:"state"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type Group struct {
@@ -33,31 +33,28 @@ type Group struct {
 }
 
 type GroupSpecy struct {
-	GroupID   int64 `db:"group_id" json:"group_id"`
-	SpeciesID int64 `db:"species_id" json:"species_id"`
+	GroupID     int64  `db:"group_id" json:"group_id"`
+	SpeciesCode string `db:"species_code" json:"species_code"`
 }
 
 type Species struct {
-	ID             int64              `db:"id" json:"id"`
+	EbirdCode      string             `db:"ebird_code" json:"ebird_code"`
 	CommonName     string             `db:"common_name" json:"common_name"`
 	ScientificName string             `db:"scientific_name" json:"scientific_name"`
-	EbirdCode      string             `db:"ebird_code" json:"ebird_code"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type SpeciesImage struct {
-	ID         int64              `db:"id" json:"id"`
-	SpeciesID  int64              `db:"species_id" json:"species_id"`
-	MacaulayID string             `db:"macaulay_id" json:"macaulay_id"`
-	FilePath   string             `db:"file_path" json:"file_path"`
-	Credit     string             `db:"credit" json:"credit"`
-	CreatedAt  pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	MacaulayID  string             `db:"macaulay_id" json:"macaulay_id"`
+	SpeciesCode string             `db:"species_code" json:"species_code"`
+	FilePath    string             `db:"file_path" json:"file_path"`
+	Credit      string             `db:"credit" json:"credit"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
 type SpeciesRecording struct {
-	ID          int64              `db:"id" json:"id"`
-	SpeciesID   int64              `db:"species_id" json:"species_id"`
 	XenoCantoID string             `db:"xeno_canto_id" json:"xeno_canto_id"`
+	SpeciesCode string             `db:"species_code" json:"species_code"`
 	FilePath    string             `db:"file_path" json:"file_path"`
 	Quality     string             `db:"quality" json:"quality"`
 	Type        string             `db:"type" json:"type"`
@@ -76,7 +73,7 @@ type User struct {
 
 type UserSpeciesPreference struct {
 	UserID       int64              `db:"user_id" json:"user_id"`
-	SpeciesID    int64              `db:"species_id" json:"species_id"`
+	SpeciesCode  string             `db:"species_code" json:"species_code"`
 	AudioEnabled bool               `db:"audio_enabled" json:"audio_enabled"`
 	ImageEnabled bool               `db:"image_enabled" json:"image_enabled"`
 	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`

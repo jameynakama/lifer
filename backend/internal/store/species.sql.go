@@ -12,7 +12,7 @@ import (
 )
 
 const searchSpecies = `-- name: SearchSpecies :many
-SELECT id, common_name, scientific_name, ebird_code
+SELECT ebird_code, common_name, scientific_name
 FROM species
 WHERE common_name ILIKE '%' || $1 || '%'
    OR scientific_name ILIKE '%' || $1 || '%'
@@ -21,10 +21,9 @@ LIMIT 20
 `
 
 type SearchSpeciesRow struct {
-	ID             int64  `db:"id" json:"id"`
+	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
 	CommonName     string `db:"common_name" json:"common_name"`
 	ScientificName string `db:"scientific_name" json:"scientific_name"`
-	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
 }
 
 func (q *Queries) SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]SearchSpeciesRow, error) {
@@ -36,12 +35,7 @@ func (q *Queries) SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]Se
 	var items []SearchSpeciesRow
 	for rows.Next() {
 		var i SearchSpeciesRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.CommonName,
-			&i.ScientificName,
-			&i.EbirdCode,
-		); err != nil {
+		if err := rows.Scan(&i.EbirdCode, &i.CommonName, &i.ScientificName); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

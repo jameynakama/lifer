@@ -12,18 +12,18 @@ import (
 )
 
 const addSpeciesToGroup = `-- name: AddSpeciesToGroup :exec
-INSERT INTO group_species (group_id, species_id)
+INSERT INTO group_species (group_id, species_code)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING
 `
 
 type AddSpeciesToGroupParams struct {
-	GroupID   int64 `db:"group_id" json:"group_id"`
-	SpeciesID int64 `db:"species_id" json:"species_id"`
+	GroupID     int64  `db:"group_id" json:"group_id"`
+	SpeciesCode string `db:"species_code" json:"species_code"`
 }
 
 func (q *Queries) AddSpeciesToGroup(ctx context.Context, arg AddSpeciesToGroupParams) error {
-	_, err := q.db.Exec(ctx, addSpeciesToGroup, arg.GroupID, arg.SpeciesID)
+	_, err := q.db.Exec(ctx, addSpeciesToGroup, arg.GroupID, arg.SpeciesCode)
 	return err
 }
 
@@ -82,18 +82,17 @@ func (q *Queries) GetGroup(ctx context.Context, id int64) (Group, error) {
 }
 
 const listGroupSpecies = `-- name: ListGroupSpecies :many
-SELECT s.id, s.common_name, s.scientific_name, s.ebird_code
+SELECT s.ebird_code, s.common_name, s.scientific_name
 FROM species s
-JOIN group_species gs ON gs.species_id = s.id
+JOIN group_species gs ON gs.species_code = s.ebird_code
 WHERE gs.group_id = $1
 ORDER BY s.common_name
 `
 
 type ListGroupSpeciesRow struct {
-	ID             int64  `db:"id" json:"id"`
+	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
 	CommonName     string `db:"common_name" json:"common_name"`
 	ScientificName string `db:"scientific_name" json:"scientific_name"`
-	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
 }
 
 func (q *Queries) ListGroupSpecies(ctx context.Context, groupID int64) ([]ListGroupSpeciesRow, error) {
@@ -105,12 +104,7 @@ func (q *Queries) ListGroupSpecies(ctx context.Context, groupID int64) ([]ListGr
 	var items []ListGroupSpeciesRow
 	for rows.Next() {
 		var i ListGroupSpeciesRow
-		if err := rows.Scan(
-			&i.ID,
-			&i.CommonName,
-			&i.ScientificName,
-			&i.EbirdCode,
-		); err != nil {
+		if err := rows.Scan(&i.EbirdCode, &i.CommonName, &i.ScientificName); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -127,7 +121,7 @@ SELECT g.id, g.name, g.description, g.is_preset, g.owner_id, g.created_at,
     COUNT(CASE WHEN c.lane = 'image' AND c.due <= NOW() THEN 1 END) AS image_due
 FROM groups g
 LEFT JOIN group_species gs ON gs.group_id = g.id
-LEFT JOIN cards c ON c.species_id = gs.species_id AND c.user_id = $1
+LEFT JOIN cards c ON c.species_code = gs.species_code AND c.user_id = $1
 WHERE g.owner_id = $1
 GROUP BY g.id
 ORDER BY g.name
@@ -175,16 +169,16 @@ func (q *Queries) ListUserGroups(ctx context.Context, userID int64) ([]ListUserG
 
 const removeSpeciesFromGroup = `-- name: RemoveSpeciesFromGroup :exec
 DELETE FROM group_species
-WHERE group_id = $1 AND species_id = $2
+WHERE group_id = $1 AND species_code = $2
 `
 
 type RemoveSpeciesFromGroupParams struct {
-	GroupID   int64 `db:"group_id" json:"group_id"`
-	SpeciesID int64 `db:"species_id" json:"species_id"`
+	GroupID     int64  `db:"group_id" json:"group_id"`
+	SpeciesCode string `db:"species_code" json:"species_code"`
 }
 
 func (q *Queries) RemoveSpeciesFromGroup(ctx context.Context, arg RemoveSpeciesFromGroupParams) error {
-	_, err := q.db.Exec(ctx, removeSpeciesFromGroup, arg.GroupID, arg.SpeciesID)
+	_, err := q.db.Exec(ctx, removeSpeciesFromGroup, arg.GroupID, arg.SpeciesCode)
 	return err
 }
 

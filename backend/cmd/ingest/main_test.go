@@ -2,130 +2,15 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
-	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/jameynakama/lifer/internal/ebird"
+	"github.com/jameynakama/lifer/internal/r2"
 )
-
-func TestDownloadFile(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("bird audio"))
-	}))
-	defer ts.Close()
-
-	dest := filepath.Join(t.TempDir(), "song.mp3")
-	if err := downloadFile(context.Background(), ts.URL, dest); err != nil {
-		t.Fatalf("Should download without error: %v", err)
-	}
-	got, _ := os.ReadFile(dest)
-	if string(got) != "bird audio" {
-		t.Errorf("Should write response body: got %q", got)
-	}
-}
-
-func TestDownloadFileNonOKStatus(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNotFound)
-	}))
-	defer ts.Close()
-
-	err := downloadFile(context.Background(), ts.URL, filepath.Join(t.TempDir(), "song.mp3"))
-	if err == nil {
-		t.Error("Should return error for non-200 response")
-	}
-}
-
-func TestDownloadFileConcurrentCallsSucceed(t *testing.T) {
-	var served atomic.Int32
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		served.Add(1)
-		time.Sleep(20 * time.Millisecond)
-		w.Write([]byte("data"))
-	}))
-	defer ts.Close()
-
-	dir := t.TempDir()
-	// Simulate the parallel fan-out that ingestSpecies now does.
-	type result struct{ err error }
-	results := make(chan result, 4)
-	for i := range 4 {
-		go func(i int) {
-			err := downloadFile(context.Background(), ts.URL, filepath.Join(dir, filepath.FromSlash(fmt.Sprintf("file%d", i))))
-			results <- result{err}
-		}(i)
-	}
-	deadline := time.After(200 * time.Millisecond) // sequential would take ~80ms; concurrent << 200ms
-	for range 4 {
-		select {
-		case r := <-results:
-			if r.err != nil {
-				t.Errorf("Should download without error: %v", r.err)
-			}
-		case <-deadline:
-			t.Fatal("Should complete 4 concurrent downloads within 200ms")
-		}
-	}
-	if n := served.Load(); n != 4 {
-		t.Errorf("Should serve 4 requests, got %d", n)
-	}
-}
-
-func TestDownloadFileRetries429(t *testing.T) {
-	origDelays := retryDelays
-	retryDelays = []time.Duration{0, 0, 0}
-	t.Cleanup(func() { retryDelays = origDelays })
-
-	attempts := 0
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		attempts++
-		if attempts < 3 {
-			w.WriteHeader(http.StatusTooManyRequests)
-			return
-		}
-		w.Write([]byte("bird audio"))
-	}))
-	defer ts.Close()
-
-	dest := filepath.Join(t.TempDir(), "song.mp3")
-	if err := downloadFile(context.Background(), ts.URL, dest); err != nil {
-		t.Fatalf("Should succeed after retries: %v", err)
-	}
-	if attempts != 3 {
-		t.Errorf("Should take 3 attempts (1 + 2 retries), got %d", attempts)
-	}
-	got, _ := os.ReadFile(dest)
-	if string(got) != "bird audio" {
-		t.Errorf("Should write response body after retries: got %q", got)
-	}
-}
-
-func TestDownloadFileExhaustsRetries(t *testing.T) {
-	origDelays := retryDelays
-	retryDelays = []time.Duration{0, 0, 0}
-	t.Cleanup(func() { retryDelays = origDelays })
-
-	attempts := 0
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		attempts++
-		w.WriteHeader(http.StatusTooManyRequests)
-	}))
-	defer ts.Close()
-
-	err := downloadFile(context.Background(), ts.URL, filepath.Join(t.TempDir(), "song.mp3"))
-	if err == nil {
-		t.Error("Should return error after exhausting retries")
-	}
-	if attempts != 4 { // 1 initial + 3 retries
-		t.Errorf("Should attempt 4 times (1 + 3 retries), got %d", attempts)
-	}
-}
 
 func TestFilterBySpecies(t *testing.T) {
 	taxMap := map[string]ebird.TaxonomyEntry{
@@ -208,5 +93,84 @@ func TestFilterComplete(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestFetchAndUpload_Success(t *testing.T) {
+	src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("audio bytes"))
+	}))
+	defer src.Close()
+
+	var uploaded string
+	r2s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			b, _ := io.ReadAll(r.Body)
+			uploaded = string(b)
+			w.Header().Set("ETag", `"x"`)
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer r2s.Close()
+
+	r2c, err := r2.NewWithEndpoint(r2s.URL, "k", "s", "bucket", "https://pub.example.com")
+	if err != nil {
+		t.Fatalf("Should create r2 client: %v", err)
+	}
+
+	url, err := fetchAndUpload(context.Background(), r2c, src.URL, "recordings/busti/123.mp3", "audio/mpeg")
+	if err != nil {
+		t.Fatalf("Should fetch and upload without error: %v", err)
+	}
+	if url != "https://pub.example.com/recordings/busti/123.mp3" {
+		t.Errorf("Should return public URL, got %q", url)
+	}
+	if uploaded != "audio bytes" {
+		t.Errorf("Should upload source body, got %q", uploaded)
+	}
+}
+
+func TestFetchAndUpload_SourceNonOK_ReturnsError(t *testing.T) {
+	src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer src.Close()
+
+	r2c, _ := r2.NewWithEndpoint("http://localhost:1", "k", "s", "bucket", "https://pub.example.com")
+	_, err := fetchAndUpload(context.Background(), r2c, src.URL, "key", "audio/mpeg")
+	if err == nil {
+		t.Error("Should return error for non-200 source response")
+	}
+}
+
+func TestFetchAndUpload_Retries429(t *testing.T) {
+	origDelays := retryDelays
+	retryDelays = []time.Duration{0, 0, 0}
+	t.Cleanup(func() { retryDelays = origDelays })
+
+	attempts := 0
+	src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts < 3 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			return
+		}
+		w.Write([]byte("ok"))
+	}))
+	defer src.Close()
+
+	r2s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"x"`)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer r2s.Close()
+
+	r2c, _ := r2.NewWithEndpoint(r2s.URL, "k", "s", "bucket", "https://pub.example.com")
+	_, err := fetchAndUpload(context.Background(), r2c, src.URL, "key", "audio/mpeg")
+	if err != nil {
+		t.Fatalf("Should succeed after retries: %v", err)
+	}
+	if attempts != 3 {
+		t.Errorf("Should take 3 attempts, got %d", attempts)
 	}
 }

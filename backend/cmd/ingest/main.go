@@ -4,11 +4,9 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -16,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jameynakama/lifer/internal/ebird"
 	"github.com/jameynakama/lifer/internal/macaulay"
+	"github.com/jameynakama/lifer/internal/r2"
 	"github.com/jameynakama/lifer/internal/store"
 	"github.com/jameynakama/lifer/internal/xenocanto"
 )
@@ -25,7 +24,6 @@ func main() {
 	maxImages := flag.Int("max-images", 3, "max images per species")
 	workers := flag.Int("workers", 5, "concurrent worker count")
 	skipComplete := flag.Bool("skip-complete", false, "skip species that already have ≥1 recording and ≥1 image in the DB")
-	skipMedia := flag.Bool("skip-media", false, "store external URLs instead of downloading files (ASSETS_DIR not required)")
 	speciesFilter := flag.String("species", "", "comma-separated ebird codes or common names to process (e.g. busti or \"Bushtit,American Robin\")")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: ingest [flags] <region-code> [region-code...]\n\n")
@@ -45,10 +43,11 @@ func main() {
 	ebirdKey := mustEnv("EBIRD_API_KEY")
 	xcKey := mustEnv("XENO_CANTO_API_KEY")
 	dbURL := mustEnv("DATABASE_URL")
-	var assetsDir string
-	if !*skipMedia {
-		assetsDir = mustEnv("ASSETS_DIR")
-	}
+	r2AccountID := mustEnv("R2_ACCOUNT_ID")
+	r2AccessKey := mustEnv("R2_ACCESS_KEY_ID")
+	r2SecretKey := mustEnv("R2_SECRET_ACCESS_KEY")
+	r2Bucket := mustEnv("R2_BUCKET_NAME")
+	r2PubURL := mustEnv("R2_PUBLIC_URL")
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dbURL)
@@ -56,6 +55,11 @@ func main() {
 		log.Fatalf("db connect: %v", err)
 	}
 	defer pool.Close()
+
+	r2c, err := r2.New(r2AccountID, r2AccessKey, r2SecretKey, r2Bucket, r2PubURL)
+	if err != nil {
+		log.Fatalf("r2 client: %v", err)
+	}
 
 	q := store.New(pool)
 	ebirdClient := ebird.New(ebirdKey)
@@ -134,7 +138,7 @@ func main() {
 		go func(code string, entry ebird.TaxonomyEntry) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			if err := ingestSpecies(ctx, q, xcClient, macaulayClient, entry, *maxRecordings, *maxImages, assetsDir, *skipMedia); err != nil {
+			if err := ingestSpecies(ctx, q, xcClient, macaulayClient, entry, *maxRecordings, *maxImages, r2c); err != nil {
 				log.Printf("error %s (%s): %v", entry.CommonName, code, err)
 			}
 			mu.Lock()
@@ -157,19 +161,15 @@ func main() {
 	if err != nil {
 		log.Fatalf("cleanup: %v", err)
 	}
-	for _, sp := range incomplete {
-		if !*skipMedia {
-			os.RemoveAll(filepath.Join(assetsDir, "images", sp.EbirdCode))
-			os.RemoveAll(filepath.Join(assetsDir, "recordings", sp.EbirdCode))
+	for _, code := range incomplete {
+		if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {
+			log.Printf("  warn: cleanup recordings %s: %v", code, err)
 		}
-		if err := q.DeleteRecordingsBySpeciesID(ctx, sp.ID); err != nil {
-			log.Printf("  warn: cleanup recordings %s: %v", sp.EbirdCode, err)
+		if err := q.DeleteSpeciesImagesBySpeciesCode(ctx, code); err != nil {
+			log.Printf("  warn: cleanup images %s: %v", code, err)
 		}
-		if err := q.DeleteSpeciesImagesBySpeciesID(ctx, sp.ID); err != nil {
-			log.Printf("  warn: cleanup images %s: %v", sp.EbirdCode, err)
-		}
-		if err := q.DeleteSpeciesByID(ctx, sp.ID); err != nil {
-			log.Printf("  warn: cleanup species %s: %v", sp.EbirdCode, err)
+		if err := q.DeleteSpeciesByCode(ctx, code); err != nil {
+			log.Printf("  warn: cleanup species %s: %v", code, err)
 		}
 	}
 	log.Printf("cleanup: removed %d incomplete species", len(incomplete))
@@ -179,7 +179,6 @@ func filterBySpecies(codes []string, taxMap map[string]ebird.TaxonomyEntry, want
 	if len(want) == 0 {
 		return []string{}
 	}
-	// Build a set of matching ebird codes from want, accepting either codes or common names.
 	match := make(map[string]struct{}, len(want))
 	for _, w := range want {
 		lower := strings.ToLower(w)
@@ -220,21 +219,19 @@ func ingestSpecies(
 	mac *macaulay.Client,
 	entry ebird.TaxonomyEntry,
 	maxRec, maxImg int,
-	assetsDir string,
-	skipMedia bool,
+	r2c *r2.Client,
 ) error {
 	sp, err := q.UpsertSpecies(ctx, store.UpsertSpeciesParams{
+		EbirdCode:      entry.SpeciesCode,
 		CommonName:     entry.CommonName,
 		ScientificName: entry.SciName,
-		EbirdCode:      entry.SpeciesCode,
 	})
 	if err != nil {
 		return fmt.Errorf("upsert species: %w", err)
 	}
 
-	perType := maxRec / 2 // integer division; --max-recordings 3 gives 1 per type
+	perType := maxRec / 2
 
-	// Fan out song + call searches concurrently.
 	type searchResult struct {
 		recType string
 		recs    []xenocanto.Recording
@@ -248,7 +245,6 @@ func ingestSpecies(
 		}(recType)
 	}
 
-	// Collect search results and fan out downloads.
 	var recWg sync.WaitGroup
 	for range 2 {
 		result := <-searchCh
@@ -264,20 +260,15 @@ func ingestSpecies(
 			recWg.Add(1)
 			go func(rec xenocanto.Recording) {
 				defer recWg.Done()
-				var filePath string
-				if skipMedia {
-					filePath = rec.FileURL
-				} else {
-					destPath := filepath.Join(assetsDir, "recordings", entry.SpeciesCode, rec.ID+".mp3")
-					if err := downloadFile(ctx, rec.FileURL, destPath); err != nil {
-						log.Printf("  warn: download recording %s: %v", rec.ID, err)
-						return
-					}
-					filePath = filepath.Join("recordings", entry.SpeciesCode, rec.ID+".mp3")
+				key := "recordings/" + sp.EbirdCode + "/" + rec.ID + ".mp3"
+				filePath, err := fetchAndUpload(ctx, r2c, rec.FileURL, key, "audio/mpeg")
+				if err != nil {
+					log.Printf("  warn: upload recording %s: %v", rec.ID, err)
+					return
 				}
 				if _, err := q.UpsertRecording(ctx, store.UpsertRecordingParams{
-					SpeciesID:   sp.ID,
 					XenoCantoID: rec.ID,
+					SpeciesCode: sp.EbirdCode,
 					FilePath:    filePath,
 					Quality:     rec.Quality,
 					Type:        rec.Type,
@@ -292,31 +283,25 @@ func ingestSpecies(
 	photos, err := mac.Photos(ctx, entry.SpeciesCode, maxImg)
 	if err != nil {
 		log.Printf("  warn: macaulay %s: %v", entry.SpeciesCode, err)
-		return nil // photos are optional; don't fail the species on image errors
+		return nil
 	}
 
-	// Fan out image downloads concurrently.
 	var imgWg sync.WaitGroup
 	for _, photo := range photos {
 		imgWg.Add(1)
 		go func(photo macaulay.Photo) {
 			defer imgWg.Done()
-			var filePath string
-			if skipMedia {
-				filePath = mac.PhotoURL(photo.AssetID)
-			} else {
-				destPath := filepath.Join(assetsDir, "images", entry.SpeciesCode, photo.AssetID+".jpg")
-				if err := downloadFile(ctx, mac.PhotoURL(photo.AssetID), destPath); err != nil {
-					log.Printf("  warn: download image %s: %v", photo.AssetID, err)
-					return
-				}
-				filePath = filepath.Join("images", entry.SpeciesCode, photo.AssetID+".jpg")
+			key := "images/" + sp.EbirdCode + "/" + photo.AssetID + ".jpg"
+			filePath, err := fetchAndUpload(ctx, r2c, mac.PhotoURL(photo.AssetID), key, "image/jpeg")
+			if err != nil {
+				log.Printf("  warn: upload image %s: %v", photo.AssetID, err)
+				return
 			}
 			if _, err := q.UpsertSpeciesImage(ctx, store.UpsertSpeciesImageParams{
-				SpeciesID:  sp.ID,
-				MacaulayID: photo.AssetID,
-				FilePath:   filePath,
-				Credit:     photo.UserDisplayName,
+				MacaulayID:  photo.AssetID,
+				SpeciesCode: sp.EbirdCode,
+				FilePath:    filePath,
+				Credit:      photo.UserDisplayName,
 			}); err != nil {
 				log.Printf("  warn: upsert image %s: %v", photo.AssetID, err)
 			}
@@ -330,58 +315,43 @@ func ingestSpecies(
 // Overridable in tests.
 var retryDelays = []time.Duration{2 * time.Second, 4 * time.Second, 8 * time.Second}
 
-func downloadFile(ctx context.Context, rawURL, destPath string) error {
-	if err := os.MkdirAll(filepath.Dir(destPath), 0o755); err != nil {
-		return err
-	}
+// fetchAndUpload GETs from sourceURL and uploads the body to R2 at key.
+// Retries on 429 from the source. Returns the full public R2 URL.
+func fetchAndUpload(ctx context.Context, r2c *r2.Client, sourceURL, key, contentType string) (string, error) {
 	var lastErr error
 	for attempt := range len(retryDelays) + 1 {
 		if attempt > 0 {
 			select {
 			case <-time.After(retryDelays[attempt-1]):
 			case <-ctx.Done():
-				return ctx.Err()
+				return "", ctx.Err()
 			}
 		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
 		if err != nil {
-			return err
+			return "", err
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
-			return err
+			return "", err
 		}
 		if resp.StatusCode == http.StatusTooManyRequests {
 			resp.Body.Close()
-			lastErr = fmt.Errorf("download %s: status 429", rawURL)
+			lastErr = fmt.Errorf("fetch %s: status 429", sourceURL)
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
 			resp.Body.Close()
-			return fmt.Errorf("download %s: status %d", rawURL, resp.StatusCode)
+			return "", fmt.Errorf("fetch %s: status %d", sourceURL, resp.StatusCode)
 		}
-		tmp, err := os.CreateTemp(filepath.Dir(destPath), ".tmp-*")
-		if err != nil {
-			resp.Body.Close()
-			return err
-		}
-		tmpName := tmp.Name()
-		copyErr := func() error {
-			_, err := io.Copy(tmp, resp.Body)
-			return err
-		}()
+		url, err := r2c.Upload(ctx, key, contentType, resp.Body)
 		resp.Body.Close()
-		closeErr := tmp.Close()
-		if copyErr != nil || closeErr != nil {
-			os.Remove(tmpName)
-			if copyErr != nil {
-				return copyErr
-			}
-			return closeErr
+		if err != nil {
+			return "", err
 		}
-		return os.Rename(tmpName, destPath)
+		return url, nil
 	}
-	return lastErr
+	return "", lastErr
 }
 
 func mustEnv(key string) string {

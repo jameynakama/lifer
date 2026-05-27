@@ -15,20 +15,20 @@ type Querier interface {
 	CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error)
 	DeleteCard(ctx context.Context, arg DeleteCardParams) error
 	DeleteGroup(ctx context.Context, id int64) error
-	DeleteRecordingsBySpeciesID(ctx context.Context, speciesID int64) error
-	DeleteSpeciesByID(ctx context.Context, id int64) error
-	DeleteSpeciesImagesBySpeciesID(ctx context.Context, speciesID int64) error
+	DeleteRecordingsBySpeciesCode(ctx context.Context, speciesCode string) error
+	DeleteSpeciesByCode(ctx context.Context, ebirdCode string) error
+	DeleteSpeciesImagesBySpeciesCode(ctx context.Context, speciesCode string) error
 	GetCard(ctx context.Context, arg GetCardParams) (Card, error)
 	GetGroup(ctx context.Context, id int64) (Group, error)
 	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
 	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)
-	GetRandomImage(ctx context.Context, speciesID int64) (string, error)
-	GetRandomRecording(ctx context.Context, speciesID int64) (string, error)
+	GetRandomImage(ctx context.Context, speciesCode string) (string, error)
+	GetRandomRecording(ctx context.Context, speciesCode string) (string, error)
 	GetUserByGoogleID(ctx context.Context, googleID string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, error)
 	ListGroupSpecies(ctx context.Context, groupID int64) ([]ListGroupSpeciesRow, error)
-	ListIncompleteSpecies(ctx context.Context) ([]ListIncompleteSpeciesRow, error)
+	ListIncompleteSpecies(ctx context.Context) ([]string, error)
 	ListUserGroups(ctx context.Context, userID int64) ([]ListUserGroupsRow, error)
 	RemoveSpeciesFromGroup(ctx context.Context, arg RemoveSpeciesFromGroupParams) error
 	SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]SearchSpeciesRow, error)

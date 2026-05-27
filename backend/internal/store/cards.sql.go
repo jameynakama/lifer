@@ -13,40 +13,40 @@ import (
 
 const deleteCard = `-- name: DeleteCard :exec
 DELETE FROM cards
-WHERE user_id = $1 AND species_id = $2 AND lane = $3
+WHERE user_id = $1 AND species_code = $2 AND lane = $3
 `
 
 type DeleteCardParams struct {
-	UserID    int64  `db:"user_id" json:"user_id"`
-	SpeciesID int64  `db:"species_id" json:"species_id"`
-	Lane      string `db:"lane" json:"lane"`
+	UserID      int64  `db:"user_id" json:"user_id"`
+	SpeciesCode string `db:"species_code" json:"species_code"`
+	Lane        string `db:"lane" json:"lane"`
 }
 
 func (q *Queries) DeleteCard(ctx context.Context, arg DeleteCardParams) error {
-	_, err := q.db.Exec(ctx, deleteCard, arg.UserID, arg.SpeciesID, arg.Lane)
+	_, err := q.db.Exec(ctx, deleteCard, arg.UserID, arg.SpeciesCode, arg.Lane)
 	return err
 }
 
 const getCard = `-- name: GetCard :one
-SELECT id, user_id, species_id, lane, stability, difficulty, due,
+SELECT id, user_id, species_code, lane, stability, difficulty, due,
        last_review, reps, lapses, state, created_at
 FROM cards
-WHERE user_id = $1 AND species_id = $2 AND lane = $3
+WHERE user_id = $1 AND species_code = $2 AND lane = $3
 `
 
 type GetCardParams struct {
-	UserID    int64  `db:"user_id" json:"user_id"`
-	SpeciesID int64  `db:"species_id" json:"species_id"`
-	Lane      string `db:"lane" json:"lane"`
+	UserID      int64  `db:"user_id" json:"user_id"`
+	SpeciesCode string `db:"species_code" json:"species_code"`
+	Lane        string `db:"lane" json:"lane"`
 }
 
 func (q *Queries) GetCard(ctx context.Context, arg GetCardParams) (Card, error) {
-	row := q.db.QueryRow(ctx, getCard, arg.UserID, arg.SpeciesID, arg.Lane)
+	row := q.db.QueryRow(ctx, getCard, arg.UserID, arg.SpeciesCode, arg.Lane)
 	var i Card
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
-		&i.SpeciesID,
+		&i.SpeciesCode,
 		&i.Lane,
 		&i.Stability,
 		&i.Difficulty,
@@ -61,13 +61,13 @@ func (q *Queries) GetCard(ctx context.Context, arg GetCardParams) (Card, error) 
 }
 
 const getNextDueCard = `-- name: GetNextDueCard :one
-SELECT c.id, c.user_id, c.species_id, c.lane,
+SELECT c.id, c.user_id, c.species_code, c.lane,
        c.stability, c.difficulty, c.due, c.last_review,
        c.reps, c.lapses, c.state, c.created_at,
        s.common_name, s.scientific_name
 FROM cards c
-JOIN species s ON s.id = c.species_id
-JOIN group_species gs ON gs.species_id = c.species_id
+JOIN species s ON s.ebird_code = c.species_code
+JOIN group_species gs ON gs.species_code = c.species_code
 WHERE c.user_id = $1
   AND gs.group_id = $2
   AND c.lane = $3
@@ -85,7 +85,7 @@ type GetNextDueCardParams struct {
 type GetNextDueCardRow struct {
 	ID             int64              `db:"id" json:"id"`
 	UserID         int64              `db:"user_id" json:"user_id"`
-	SpeciesID      int64              `db:"species_id" json:"species_id"`
+	SpeciesCode    string             `db:"species_code" json:"species_code"`
 	Lane           string             `db:"lane" json:"lane"`
 	Stability      float64            `db:"stability" json:"stability"`
 	Difficulty     float64            `db:"difficulty" json:"difficulty"`
@@ -105,7 +105,7 @@ func (q *Queries) GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) 
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
-		&i.SpeciesID,
+		&i.SpeciesCode,
 		&i.Lane,
 		&i.Stability,
 		&i.Difficulty,
@@ -123,13 +123,13 @@ func (q *Queries) GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) 
 
 const getRandomImage = `-- name: GetRandomImage :one
 SELECT file_path FROM species_images
-WHERE species_id = $1
+WHERE species_code = $1
 ORDER BY random()
 LIMIT 1
 `
 
-func (q *Queries) GetRandomImage(ctx context.Context, speciesID int64) (string, error) {
-	row := q.db.QueryRow(ctx, getRandomImage, speciesID)
+func (q *Queries) GetRandomImage(ctx context.Context, speciesCode string) (string, error) {
+	row := q.db.QueryRow(ctx, getRandomImage, speciesCode)
 	var file_path string
 	err := row.Scan(&file_path)
 	return file_path, err
@@ -137,13 +137,13 @@ func (q *Queries) GetRandomImage(ctx context.Context, speciesID int64) (string, 
 
 const getRandomRecording = `-- name: GetRandomRecording :one
 SELECT file_path FROM species_recordings
-WHERE species_id = $1 AND quality IN ('A', 'B')
+WHERE species_code = $1 AND quality IN ('A', 'B')
 ORDER BY random()
 LIMIT 1
 `
 
-func (q *Queries) GetRandomRecording(ctx context.Context, speciesID int64) (string, error) {
-	row := q.db.QueryRow(ctx, getRandomRecording, speciesID)
+func (q *Queries) GetRandomRecording(ctx context.Context, speciesCode string) (string, error) {
+	row := q.db.QueryRow(ctx, getRandomRecording, speciesCode)
 	var file_path string
 	err := row.Scan(&file_path)
 	return file_path, err
@@ -158,26 +158,26 @@ SET stability   = $4,
     reps        = reps + 1,
     lapses      = $7,
     state       = $8
-WHERE user_id = $1 AND species_id = $2 AND lane = $3
-RETURNING id, user_id, species_id, lane, stability, difficulty, due,
+WHERE user_id = $1 AND species_code = $2 AND lane = $3
+RETURNING id, user_id, species_code, lane, stability, difficulty, due,
           last_review, reps, lapses, state, created_at
 `
 
 type UpdateCardScheduleParams struct {
-	UserID     int64              `db:"user_id" json:"user_id"`
-	SpeciesID  int64              `db:"species_id" json:"species_id"`
-	Lane       string             `db:"lane" json:"lane"`
-	Stability  float64            `db:"stability" json:"stability"`
-	Difficulty float64            `db:"difficulty" json:"difficulty"`
-	Due        pgtype.Timestamptz `db:"due" json:"due"`
-	Lapses     int32              `db:"lapses" json:"lapses"`
-	State      int16              `db:"state" json:"state"`
+	UserID      int64              `db:"user_id" json:"user_id"`
+	SpeciesCode string             `db:"species_code" json:"species_code"`
+	Lane        string             `db:"lane" json:"lane"`
+	Stability   float64            `db:"stability" json:"stability"`
+	Difficulty  float64            `db:"difficulty" json:"difficulty"`
+	Due         pgtype.Timestamptz `db:"due" json:"due"`
+	Lapses      int32              `db:"lapses" json:"lapses"`
+	State       int16              `db:"state" json:"state"`
 }
 
 func (q *Queries) UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error) {
 	row := q.db.QueryRow(ctx, updateCardSchedule,
 		arg.UserID,
-		arg.SpeciesID,
+		arg.SpeciesCode,
 		arg.Lane,
 		arg.Stability,
 		arg.Difficulty,
@@ -189,7 +189,7 @@ func (q *Queries) UpdateCardSchedule(ctx context.Context, arg UpdateCardSchedule
 	err := row.Scan(
 		&i.ID,
 		&i.UserID,
-		&i.SpeciesID,
+		&i.SpeciesCode,
 		&i.Lane,
 		&i.Stability,
 		&i.Difficulty,
@@ -204,18 +204,18 @@ func (q *Queries) UpdateCardSchedule(ctx context.Context, arg UpdateCardSchedule
 }
 
 const upsertCard = `-- name: UpsertCard :exec
-INSERT INTO cards (user_id, species_id, lane)
+INSERT INTO cards (user_id, species_code, lane)
 VALUES ($1, $2, $3)
-ON CONFLICT (user_id, species_id, lane) DO NOTHING
+ON CONFLICT (user_id, species_code, lane) DO NOTHING
 `
 
 type UpsertCardParams struct {
-	UserID    int64  `db:"user_id" json:"user_id"`
-	SpeciesID int64  `db:"species_id" json:"species_id"`
-	Lane      string `db:"lane" json:"lane"`
+	UserID      int64  `db:"user_id" json:"user_id"`
+	SpeciesCode string `db:"species_code" json:"species_code"`
+	Lane        string `db:"lane" json:"lane"`
 }
 
 func (q *Queries) UpsertCard(ctx context.Context, arg UpsertCardParams) error {
-	_, err := q.db.Exec(ctx, upsertCard, arg.UserID, arg.SpeciesID, arg.Lane)
+	_, err := q.db.Exec(ctx, upsertCard, arg.UserID, arg.SpeciesCode, arg.Lane)
 	return err
 }

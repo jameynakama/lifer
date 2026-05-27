@@ -9,38 +9,38 @@ import (
 	"context"
 )
 
-const deleteRecordingsBySpeciesID = `-- name: DeleteRecordingsBySpeciesID :exec
-DELETE FROM species_recordings WHERE species_id = $1
+const deleteRecordingsBySpeciesCode = `-- name: DeleteRecordingsBySpeciesCode :exec
+DELETE FROM species_recordings WHERE species_code = $1
 `
 
-func (q *Queries) DeleteRecordingsBySpeciesID(ctx context.Context, speciesID int64) error {
-	_, err := q.db.Exec(ctx, deleteRecordingsBySpeciesID, speciesID)
+func (q *Queries) DeleteRecordingsBySpeciesCode(ctx context.Context, speciesCode string) error {
+	_, err := q.db.Exec(ctx, deleteRecordingsBySpeciesCode, speciesCode)
 	return err
 }
 
-const deleteSpeciesByID = `-- name: DeleteSpeciesByID :exec
-DELETE FROM species WHERE id = $1
+const deleteSpeciesByCode = `-- name: DeleteSpeciesByCode :exec
+DELETE FROM species WHERE ebird_code = $1
 `
 
-func (q *Queries) DeleteSpeciesByID(ctx context.Context, id int64) error {
-	_, err := q.db.Exec(ctx, deleteSpeciesByID, id)
+func (q *Queries) DeleteSpeciesByCode(ctx context.Context, ebirdCode string) error {
+	_, err := q.db.Exec(ctx, deleteSpeciesByCode, ebirdCode)
 	return err
 }
 
-const deleteSpeciesImagesBySpeciesID = `-- name: DeleteSpeciesImagesBySpeciesID :exec
-DELETE FROM species_images WHERE species_id = $1
+const deleteSpeciesImagesBySpeciesCode = `-- name: DeleteSpeciesImagesBySpeciesCode :exec
+DELETE FROM species_images WHERE species_code = $1
 `
 
-func (q *Queries) DeleteSpeciesImagesBySpeciesID(ctx context.Context, speciesID int64) error {
-	_, err := q.db.Exec(ctx, deleteSpeciesImagesBySpeciesID, speciesID)
+func (q *Queries) DeleteSpeciesImagesBySpeciesCode(ctx context.Context, speciesCode string) error {
+	_, err := q.db.Exec(ctx, deleteSpeciesImagesBySpeciesCode, speciesCode)
 	return err
 }
 
 const listCompleteSpeciesEbirdCodes = `-- name: ListCompleteSpeciesEbirdCodes :many
 SELECT s.ebird_code
 FROM species s
-WHERE EXISTS (SELECT 1 FROM species_recordings r WHERE r.species_id = s.id)
-  AND EXISTS (SELECT 1 FROM species_images si WHERE si.species_id = s.id)
+WHERE EXISTS (SELECT 1 FROM species_recordings r WHERE r.species_code = s.ebird_code)
+  AND EXISTS (SELECT 1 FROM species_images si WHERE si.species_code = s.ebird_code)
 `
 
 func (q *Queries) ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, error) {
@@ -64,29 +64,24 @@ func (q *Queries) ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, 
 }
 
 const listIncompleteSpecies = `-- name: ListIncompleteSpecies :many
-SELECT id, ebird_code FROM species
-WHERE id NOT IN (SELECT DISTINCT species_id FROM species_recordings)
-   OR id NOT IN (SELECT DISTINCT species_id FROM species_images)
+SELECT ebird_code FROM species
+WHERE ebird_code NOT IN (SELECT DISTINCT species_code FROM species_recordings)
+   OR ebird_code NOT IN (SELECT DISTINCT species_code FROM species_images)
 `
 
-type ListIncompleteSpeciesRow struct {
-	ID        int64  `db:"id" json:"id"`
-	EbirdCode string `db:"ebird_code" json:"ebird_code"`
-}
-
-func (q *Queries) ListIncompleteSpecies(ctx context.Context) ([]ListIncompleteSpeciesRow, error) {
+func (q *Queries) ListIncompleteSpecies(ctx context.Context) ([]string, error) {
 	rows, err := q.db.Query(ctx, listIncompleteSpecies)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListIncompleteSpeciesRow
+	var items []string
 	for rows.Next() {
-		var i ListIncompleteSpeciesRow
-		if err := rows.Scan(&i.ID, &i.EbirdCode); err != nil {
+		var ebird_code string
+		if err := rows.Scan(&ebird_code); err != nil {
 			return nil, err
 		}
-		items = append(items, i)
+		items = append(items, ebird_code)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
@@ -95,18 +90,18 @@ func (q *Queries) ListIncompleteSpecies(ctx context.Context) ([]ListIncompleteSp
 }
 
 const upsertRecording = `-- name: UpsertRecording :one
-INSERT INTO species_recordings (species_id, xeno_canto_id, file_path, quality, type)
+INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type)
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (xeno_canto_id) DO UPDATE
     SET file_path = EXCLUDED.file_path,
         quality   = EXCLUDED.quality,
         type      = EXCLUDED.type
-RETURNING id, species_id, xeno_canto_id, file_path, quality, type, created_at
+RETURNING xeno_canto_id, species_code, file_path, quality, type, created_at
 `
 
 type UpsertRecordingParams struct {
-	SpeciesID   int64  `db:"species_id" json:"species_id"`
 	XenoCantoID string `db:"xeno_canto_id" json:"xeno_canto_id"`
+	SpeciesCode string `db:"species_code" json:"species_code"`
 	FilePath    string `db:"file_path" json:"file_path"`
 	Quality     string `db:"quality" json:"quality"`
 	Type        string `db:"type" json:"type"`
@@ -114,17 +109,16 @@ type UpsertRecordingParams struct {
 
 func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (SpeciesRecording, error) {
 	row := q.db.QueryRow(ctx, upsertRecording,
-		arg.SpeciesID,
 		arg.XenoCantoID,
+		arg.SpeciesCode,
 		arg.FilePath,
 		arg.Quality,
 		arg.Type,
 	)
 	var i SpeciesRecording
 	err := row.Scan(
-		&i.ID,
-		&i.SpeciesID,
 		&i.XenoCantoID,
+		&i.SpeciesCode,
 		&i.FilePath,
 		&i.Quality,
 		&i.Type,
@@ -134,61 +128,59 @@ func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams
 }
 
 const upsertSpecies = `-- name: UpsertSpecies :one
-INSERT INTO species (common_name, scientific_name, ebird_code)
+INSERT INTO species (ebird_code, common_name, scientific_name)
 VALUES ($1, $2, $3)
 ON CONFLICT (ebird_code) DO UPDATE
     SET common_name     = EXCLUDED.common_name,
         scientific_name = EXCLUDED.scientific_name
-RETURNING id, common_name, scientific_name, ebird_code, created_at
+RETURNING ebird_code, common_name, scientific_name, created_at
 `
 
 type UpsertSpeciesParams struct {
+	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
 	CommonName     string `db:"common_name" json:"common_name"`
 	ScientificName string `db:"scientific_name" json:"scientific_name"`
-	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
 }
 
 func (q *Queries) UpsertSpecies(ctx context.Context, arg UpsertSpeciesParams) (Species, error) {
-	row := q.db.QueryRow(ctx, upsertSpecies, arg.CommonName, arg.ScientificName, arg.EbirdCode)
+	row := q.db.QueryRow(ctx, upsertSpecies, arg.EbirdCode, arg.CommonName, arg.ScientificName)
 	var i Species
 	err := row.Scan(
-		&i.ID,
+		&i.EbirdCode,
 		&i.CommonName,
 		&i.ScientificName,
-		&i.EbirdCode,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const upsertSpeciesImage = `-- name: UpsertSpeciesImage :one
-INSERT INTO species_images (species_id, macaulay_id, file_path, credit)
+INSERT INTO species_images (macaulay_id, species_code, file_path, credit)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (macaulay_id) DO UPDATE
     SET file_path = EXCLUDED.file_path,
         credit    = EXCLUDED.credit
-RETURNING id, species_id, macaulay_id, file_path, credit, created_at
+RETURNING macaulay_id, species_code, file_path, credit, created_at
 `
 
 type UpsertSpeciesImageParams struct {
-	SpeciesID  int64  `db:"species_id" json:"species_id"`
-	MacaulayID string `db:"macaulay_id" json:"macaulay_id"`
-	FilePath   string `db:"file_path" json:"file_path"`
-	Credit     string `db:"credit" json:"credit"`
+	MacaulayID  string `db:"macaulay_id" json:"macaulay_id"`
+	SpeciesCode string `db:"species_code" json:"species_code"`
+	FilePath    string `db:"file_path" json:"file_path"`
+	Credit      string `db:"credit" json:"credit"`
 }
 
 func (q *Queries) UpsertSpeciesImage(ctx context.Context, arg UpsertSpeciesImageParams) (SpeciesImage, error) {
 	row := q.db.QueryRow(ctx, upsertSpeciesImage,
-		arg.SpeciesID,
 		arg.MacaulayID,
+		arg.SpeciesCode,
 		arg.FilePath,
 		arg.Credit,
 	)
 	var i SpeciesImage
 	err := row.Scan(
-		&i.ID,
-		&i.SpeciesID,
 		&i.MacaulayID,
+		&i.SpeciesCode,
 		&i.FilePath,
 		&i.Credit,
 		&i.CreatedAt,
