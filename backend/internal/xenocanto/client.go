@@ -39,12 +39,11 @@ func newWithBaseURL(apiKey, baseURL string) *Client {
 }
 
 // Search returns recordings for a species of the given type ("song" or "call"),
-// filtered to quality A or B, A-first. Uses the English common name with xeno-canto's
-// en:"..." syntax so taxonomy mismatches between eBird and xeno-canto don't cause
-// empty results. url.PathEscape is required (not url.Values) because xeno-canto needs
-// %20 for spaces inside quotes, not +.
-func (c *Client) Search(ctx context.Context, commonName, recType string) ([]Recording, error) {
-	queryStr := fmt.Sprintf("type:%s en:\"%s\"", recType, strings.ToLower(commonName))
+// filtered to quality A or B, A-first. genus and species come from the eBird scientific
+// name (or a manual override for species where XC uses different taxonomy).
+// url.PathEscape is required (not url.Values) because xeno-canto needs %20, not +.
+func (c *Client) Search(ctx context.Context, genus, species, recType string) ([]Recording, error) {
+	queryStr := fmt.Sprintf("type:%s gen:%s sp:%s", recType, genus, species)
 	endpoint := fmt.Sprintf("%s/api/3/recordings?key=%s&query=%s",
 		c.baseURL,
 		url.QueryEscape(c.apiKey),

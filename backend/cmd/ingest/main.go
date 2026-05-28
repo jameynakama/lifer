@@ -26,6 +26,7 @@ func main() {
 	workers := flag.Int("workers", 5, "concurrent worker count")
 	skipComplete := flag.Bool("skip-complete", false, "skip species that already have ≥1 recording and ≥1 image in the DB")
 	speciesFilter := flag.String("species", "", "comma-separated ebird codes or common names to process (e.g. busti or \"Bushtit,American Robin\")")
+	xcOverrideFlag := flag.String("xc-override", "", "comma-separated xeno-canto taxonomy overrides, e.g. \"comrav=Corvus:corax,calsja=Aphelocoma:californica\"")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: ingest [flags] <region-code> [region-code...]\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
@@ -39,6 +40,11 @@ func main() {
 	regions := flag.Args()
 	if len(regions) == 0 {
 		log.Fatal("usage: ingest [flags] <region-code> [region-code...]")
+	}
+
+	xcOverrides, err := parseXCOverrides(*xcOverrideFlag)
+	if err != nil {
+		log.Fatalf("--xc-override: %v", err)
 	}
 
 	ebirdKey := mustEnv("EBIRD_API_KEY")
@@ -122,7 +128,8 @@ func main() {
 	var mu sync.Mutex
 	started, done := 0, 0
 	total := len(codes)
-	failedSpecies := map[string][]string{} // ebird_code → upload failure reasons
+	failedSpecies := map[string][]string{}    // ebird_code → upload failure reasons
+	missingMedia := map[string]ingestStats{}  // ebird_code → stats for species with 0 recordings or 0 images
 
 	for _, code := range codes {
 		entry, ok := taxMap[code]
@@ -140,16 +147,16 @@ func main() {
 		go func(code string, entry ebird.TaxonomyEntry) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			failures, err := ingestSpecies(ctx, q, xcClient, macaulayClient, entry, *maxRecordings, *maxImages, r2c)
+			stats, err := ingestSpecies(ctx, q, xcClient, macaulayClient, entry, *maxRecordings, *maxImages, r2c, xcOverrides)
 			if err != nil {
 				log.Printf("error %s (%s): %v", entry.CommonName, code, err)
 			}
-			if len(failures) > 0 {
-				mu.Lock()
-				failedSpecies[code] = failures
-				mu.Unlock()
-			}
 			mu.Lock()
+			if len(stats.failures) > 0 {
+				failedSpecies[code] = stats.failures
+			} else if err == nil && (stats.recordings == 0 || stats.images == 0) {
+				missingMedia[code] = stats
+			}
 			done++
 			n := done
 			mu.Unlock()
@@ -170,6 +177,11 @@ func main() {
 		log.Fatalf("cleanup: %v", err)
 	}
 	for _, code := range incomplete {
+		for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
+			if err := r2c.DeletePrefix(ctx, prefix); err != nil {
+				log.Printf("  warn: cleanup R2 %s: %v", prefix, err)
+			}
+		}
 		if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {
 			log.Printf("  warn: cleanup recordings %s: %v", code, err)
 		}
@@ -217,6 +229,36 @@ func main() {
 		log.Printf("re-run failed species with:")
 		log.Printf("  just ingest --species %s <region>", strings.Join(failedCodes, ","))
 	}
+
+	if len(missingMedia) > 0 {
+		missingCodes := make([]string, 0, len(missingMedia))
+		for code := range missingMedia {
+			missingCodes = append(missingCodes, code)
+		}
+		sort.Strings(missingCodes)
+
+		log.Printf("\n=== MISSING MEDIA (%d species) ===", len(missingMedia))
+		var xcMisses []string
+		for _, code := range missingCodes {
+			stats := missingMedia[code]
+			name := taxMap[code].CommonName
+			switch {
+			case stats.recordings == 0 && stats.images == 0:
+				log.Printf("  %s (%s): no recordings, no images", name, code)
+				xcMisses = append(xcMisses, code)
+			case stats.recordings == 0:
+				log.Printf("  %s (%s): no recordings (xeno-canto miss -- check taxonomy)", name, code)
+				xcMisses = append(xcMisses, code)
+			case stats.images == 0:
+				log.Printf("  %s (%s): no images (macaulay miss)", name, code)
+			}
+		}
+		if len(xcMisses) > 0 {
+			log.Printf("for xeno-canto misses, research the species on xeno-canto.org then re-run:")
+			log.Printf("  just ingest --xc-override \"<code>=Genus:species,...\" --skip-complete <region>")
+			log.Printf("  missing codes: %s", strings.Join(xcMisses, ","))
+		}
+	}
 }
 
 func filterBySpecies(codes []string, taxMap map[string]ebird.TaxonomyEntry, want []string) []string {
@@ -256,8 +298,15 @@ func filterComplete(codes []string, complete map[string]struct{}) []string {
 	return out
 }
 
+type ingestStats struct {
+	failures   []string
+	recordings int
+	images     int
+}
+
 // ingestSpecies fetches and uploads media for one species.
-// Returns a list of upload failure reasons (non-empty = partial failure needing cleanup).
+// xcOverrides maps ebird codes to [genus, species] pairs for species where
+// xeno-canto uses different taxonomy than eBird.
 func ingestSpecies(
 	ctx context.Context,
 	q *store.Queries,
@@ -266,16 +315,18 @@ func ingestSpecies(
 	entry ebird.TaxonomyEntry,
 	maxRec, maxImg int,
 	r2c *r2.Client,
-) ([]string, error) {
+	xcOverrides map[string][2]string,
+) (ingestStats, error) {
 	sp, err := q.UpsertSpecies(ctx, store.UpsertSpeciesParams{
 		EbirdCode:      entry.SpeciesCode,
 		CommonName:     entry.CommonName,
 		ScientificName: entry.SciName,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("upsert species: %w", err)
+		return ingestStats{}, fmt.Errorf("upsert species: %w", err)
 	}
 
+	xcGenus, xcSpecies := xcGenSp(entry.SpeciesCode, entry.SciName, xcOverrides)
 	perType := maxRec / 2
 
 	type searchResult struct {
@@ -286,21 +337,21 @@ func ingestSpecies(
 	searchCh := make(chan searchResult, 2)
 	for _, recType := range []string{"song", "call"} {
 		go func(rt string) {
-			recs, err := xc.Search(ctx, entry.CommonName, rt)
+			recs, err := xc.Search(ctx, xcGenus, xcSpecies, rt)
 			searchCh <- searchResult{rt, recs, err}
 		}(recType)
 	}
 
 	var (
 		recWg    sync.WaitGroup
-		failMu   sync.Mutex
-		failures []string
+		statsMu  sync.Mutex
+		stats    ingestStats
 	)
 
 	recordFailure := func(reason string) {
-		failMu.Lock()
-		failures = append(failures, reason)
-		failMu.Unlock()
+		statsMu.Lock()
+		stats.failures = append(stats.failures, reason)
+		statsMu.Unlock()
 	}
 
 	for range 2 {
@@ -332,7 +383,11 @@ func ingestSpecies(
 					Type:        rec.Type,
 				}); err != nil {
 					log.Printf("  warn: upsert recording %s: %v", rec.ID, err)
+					return
 				}
+				statsMu.Lock()
+				stats.recordings++
+				statsMu.Unlock()
 			}(rec)
 		}
 	}
@@ -341,7 +396,7 @@ func ingestSpecies(
 	photos, err := mac.Photos(ctx, entry.SpeciesCode, maxImg)
 	if err != nil {
 		log.Printf("  warn: macaulay %s: %v", entry.SpeciesCode, err)
-		return failures, nil
+		return stats, nil
 	}
 
 	var imgWg sync.WaitGroup
@@ -363,11 +418,49 @@ func ingestSpecies(
 				Credit:      photo.UserDisplayName,
 			}); err != nil {
 				log.Printf("  warn: upsert image %s: %v", photo.AssetID, err)
+				return
 			}
+			statsMu.Lock()
+			stats.images++
+			statsMu.Unlock()
 		}(photo)
 	}
 	imgWg.Wait()
-	return failures, nil
+	return stats, nil
+}
+
+// xcGenSp returns the genus and species to use for a xeno-canto query.
+// Checks xcOverrides first; falls back to parsing the eBird scientific name.
+func xcGenSp(ebirdCode, sciName string, xcOverrides map[string][2]string) (genus, species string) {
+	if override, ok := xcOverrides[ebirdCode]; ok {
+		return override[0], override[1]
+	}
+	parts := strings.Fields(sciName)
+	if len(parts) >= 2 {
+		return parts[0], parts[1]
+	}
+	return sciName, ""
+}
+
+// parseXCOverrides parses "--xc-override comrav=Corvus:corax,calsja=Aphelocoma:californica"
+// into a map of ebird code → [genus, species].
+func parseXCOverrides(s string) (map[string][2]string, error) {
+	out := make(map[string][2]string)
+	if s == "" {
+		return out, nil
+	}
+	for _, entry := range strings.Split(s, ",") {
+		kv := strings.SplitN(entry, "=", 2)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("expected code=Genus:species, got %q", entry)
+		}
+		genSp := strings.SplitN(kv[1], ":", 2)
+		if len(genSp) != 2 {
+			return nil, fmt.Errorf("expected Genus:species after =, got %q", kv[1])
+		}
+		out[kv[0]] = [2]string{genSp[0], genSp[1]}
+	}
+	return out, nil
 }
 
 // retryDelays controls the wait between attempts on a 429 response from the source CDN.
