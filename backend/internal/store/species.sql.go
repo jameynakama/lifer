@@ -11,13 +11,183 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const getGroupsForSpecies = `-- name: GetGroupsForSpecies :many
+SELECT group_id
+FROM group_species
+WHERE species_code = $1
+  AND group_id IN (SELECT id FROM groups WHERE owner_id = $2)
+`
+
+type GetGroupsForSpeciesParams struct {
+	SpeciesCode string      `db:"species_code" json:"species_code"`
+	OwnerID     pgtype.Int8 `db:"owner_id" json:"owner_id"`
+}
+
+func (q *Queries) GetGroupsForSpecies(ctx context.Context, arg GetGroupsForSpeciesParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, getGroupsForSpecies, arg.SpeciesCode, arg.OwnerID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var group_id int64
+		if err := rows.Scan(&group_id); err != nil {
+			return nil, err
+		}
+		items = append(items, group_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSpeciesByCode = `-- name: GetSpeciesByCode :one
+SELECT ebird_code, common_name, scientific_name
+FROM species
+WHERE ebird_code = $1
+`
+
+type GetSpeciesByCodeRow struct {
+	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
+	CommonName     string `db:"common_name" json:"common_name"`
+	ScientificName string `db:"scientific_name" json:"scientific_name"`
+}
+
+func (q *Queries) GetSpeciesByCode(ctx context.Context, ebirdCode string) (GetSpeciesByCodeRow, error) {
+	row := q.db.QueryRow(ctx, getSpeciesByCode, ebirdCode)
+	var i GetSpeciesByCodeRow
+	err := row.Scan(&i.EbirdCode, &i.CommonName, &i.ScientificName)
+	return i, err
+}
+
+const getSpeciesImages = `-- name: GetSpeciesImages :many
+SELECT macaulay_id, file_path, credit
+FROM species_images
+WHERE species_code = $1
+`
+
+type GetSpeciesImagesRow struct {
+	MacaulayID string `db:"macaulay_id" json:"macaulay_id"`
+	FilePath   string `db:"file_path" json:"file_path"`
+	Credit     string `db:"credit" json:"credit"`
+}
+
+func (q *Queries) GetSpeciesImages(ctx context.Context, speciesCode string) ([]GetSpeciesImagesRow, error) {
+	rows, err := q.db.Query(ctx, getSpeciesImages, speciesCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSpeciesImagesRow
+	for rows.Next() {
+		var i GetSpeciesImagesRow
+		if err := rows.Scan(&i.MacaulayID, &i.FilePath, &i.Credit); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getSpeciesRecordings = `-- name: GetSpeciesRecordings :many
+SELECT xeno_canto_id, file_path, quality, type
+FROM species_recordings
+WHERE species_code = $1
+ORDER BY quality, type
+`
+
+type GetSpeciesRecordingsRow struct {
+	XenoCantoID string `db:"xeno_canto_id" json:"xeno_canto_id"`
+	FilePath    string `db:"file_path" json:"file_path"`
+	Quality     string `db:"quality" json:"quality"`
+	Type        string `db:"type" json:"type"`
+}
+
+func (q *Queries) GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]GetSpeciesRecordingsRow, error) {
+	rows, err := q.db.Query(ctx, getSpeciesRecordings, speciesCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetSpeciesRecordingsRow
+	for rows.Next() {
+		var i GetSpeciesRecordingsRow
+		if err := rows.Scan(
+			&i.XenoCantoID,
+			&i.FilePath,
+			&i.Quality,
+			&i.Type,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listSpecies = `-- name: ListSpecies :many
+SELECT
+    ebird_code,
+    common_name,
+    scientific_name,
+    COUNT(*) OVER() AS total_count
+FROM species
+ORDER BY common_name
+LIMIT $1 OFFSET $2
+`
+
+type ListSpeciesParams struct {
+	Limit  int32 `db:"limit" json:"limit"`
+	Offset int32 `db:"offset" json:"offset"`
+}
+
+type ListSpeciesRow struct {
+	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
+	CommonName     string `db:"common_name" json:"common_name"`
+	ScientificName string `db:"scientific_name" json:"scientific_name"`
+	TotalCount     int64  `db:"total_count" json:"total_count"`
+}
+
+func (q *Queries) ListSpecies(ctx context.Context, arg ListSpeciesParams) ([]ListSpeciesRow, error) {
+	rows, err := q.db.Query(ctx, listSpecies, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSpeciesRow
+	for rows.Next() {
+		var i ListSpeciesRow
+		if err := rows.Scan(
+			&i.EbirdCode,
+			&i.CommonName,
+			&i.ScientificName,
+			&i.TotalCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const searchSpecies = `-- name: SearchSpecies :many
 SELECT ebird_code, common_name, scientific_name
 FROM species
 WHERE common_name ILIKE '%' || $1 || '%'
    OR scientific_name ILIKE '%' || $1 || '%'
 ORDER BY common_name
-LIMIT 20
+LIMIT 50
 `
 
 type SearchSpeciesRow struct {
