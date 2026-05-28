@@ -60,7 +60,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			r.Get("/groups/{id}/next", h.getNextCard)
 			r.Post("/groups/{id}/rate", h.rateCard)
 
-			r.Get("/species", h.searchSpecies)
+			r.Get("/species", h.listSpecies)
 			r.Put("/species/{ebird_code}/preferences", h.updatePreferences)
 		})
 	})
