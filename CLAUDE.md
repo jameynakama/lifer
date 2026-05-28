@@ -113,6 +113,11 @@ just ingest --species busti US-OR          # single species
 just ingest --skip-complete US-OR US-WA    # skip already-ingested species
 just ingest --max-recordings 2 US-OR       # fewer recordings per species
 
+# XC taxonomy overrides -- for species where XC uses a different genus than eBird.
+# Run a full ingest first; the MISSING MEDIA report at the end lists affected species.
+# Research the correct XC genus at xeno-canto.org, then re-run:
+just ingest --xc-override "comrav=Corvus:corax,amgos=Accipiter:gentilis" --skip-complete US-OR
+
 # After ingest: dump local DB and restore in prod
 pg_dump $DATABASE_URL | psql $PROD_DATABASE_URL
 ```
@@ -131,10 +136,11 @@ All three are **ingestion-only** -- hit them once to populate the DB and R2, nev
 ### Xeno-canto
 - **Used for:** bird call/song recordings (the core quiz content)
 - **Auth:** API key required (v3); free for registered members with verified email
-- **Approach:** query separately for `type:song` and `type:call` using `en:"common name"` (lowercased, quoted); filter to quality A or B; stream download URL directly to R2 via `fetchAndUpload`
-- **Key endpoint:** `GET https://xeno-canto.org/api/3/recordings?key={key}&query=type:call%20en:%22cooper%27s%20hawk%22` -- **v3, not v2**
-- **Do NOT use** `gen:` + `sp:` -- eBird reclassifies genera faster than xeno-canto updates (e.g. Cooper's Hawk is `Astur` in eBird but `Accipiter` in xeno-canto), causing silent empty results. `en:` by common name is accurate and stable.
-- **Encoding gotcha:** `en:` with multi-word names requires `%20` for spaces inside the quotes, NOT `+`. Use `url.PathEscape` (not `url.Values.Encode`) to build the query parameter.
+- **Approach:** query separately for `type:song` and `type:call` using `gen:Genus sp:species` parsed from eBird's `SciName`; filter to quality A or B; stream download URL directly to R2 via `fetchAndUpload`
+- **Key endpoint:** `GET https://xeno-canto.org/api/3/recordings?key={key}&query=type:call%20gen:Corvus%20sp:corax` -- **v3, not v2**
+- **Do NOT use** `en:` -- XC uses different English names than eBird (e.g. "Northern Raven" vs "Common Raven", "Scrub Jay" vs "California Scrub-Jay"), causing silent empty results.
+- **Taxonomy lag:** eBird reclassifies genera faster than XC updates. When `gen:+sp:` returns 0 results, use `--xc-override code=Genus:species` to supply the genus/species XC actually uses. Run `just ingest --skip-complete <region>` after a full ingest to see the miss report and identify which species need overrides.
+- **Encoding:** use `url.PathEscape` (not `url.Values.Encode`) -- XC needs `%20` for spaces, not `+`.
 - Do NOT use `q:A` in query -- filter client-side instead.
 - **License:** all recordings are Creative Commons -- safe to store and serve
 - **Docs:** https://xeno-canto.org/explore/api
