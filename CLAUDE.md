@@ -77,6 +77,35 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 ### 4. Admin UI
 - Catalog management: add/edit species, recordings, images
 
+### 5. Caching -- reduce species API hits
+
+**Goal:** species catalog data is global/shared and changes rarely (only after an ingest run). No reason to hit the Go server on every keystroke or every user.
+
+**Approach (two parts, do together):**
+
+**A. TanStack Query -- `staleTime: Infinity` on species queries**
+- Set `staleTime: Infinity` on the `['species', ...]` query in the explore page
+- TanStack never refetches in the background; cache lives until page refresh/tab close
+- Zero code change to the backend; eliminates repeat hits within a session
+- If load-all-once is implemented later (see below), same setting applies there
+
+**B. Cache-Control headers on the backend**
+- Add `Cache-Control: public, max-age=3600` to `GET /api/v1/species` responses (list + search)
+- Do NOT add to auth-protected endpoints -- use `Cache-Control: private` or `no-store` there
+- With a CDN in front, edge nodes serve cached species responses to all users; Go server only sees cache misses
+- Header value should match the `staleTime` window (both 1 hour, or both longer)
+
+**C. Cloudflare CDN (free tier, ~5 min setup)**
+- Point domain nameservers at Cloudflare; it proxies all traffic automatically
+- Species list/search responses with `Cache-Control: public` get edge-cached globally
+- Auth-protected routes bypass cache automatically via `Cache-Control: private`
+- Also provides free TLS and basic DDoS protection -- worth doing before public launch anyway
+
+**Future: load-all-once (if catalog grows)**
+- If the catalog stays regional (< ~600 species), fetch all species once per session and filter client-side -- eliminates per-keystroke hits entirely
+- If it grows to multi-state scale, revert to server-side search (already built) -- just a one-file change in the explore page
+- Don't implement prematurely; A+B+C above cover most real-world usage at current scale
+
 ## Bugs / fixes
 - **Enter to submit answer** -- pressing Enter in the SpeciesTypeahead should trigger "Reveal answer" (same as clicking the button) when a species is selected
 
