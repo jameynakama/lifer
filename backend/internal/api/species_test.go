@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jameynakama/lifer/internal/store"
 	"github.com/stretchr/testify/assert"
@@ -127,4 +128,86 @@ func TestListSpecies_EmptyResults_ReturnsEmptySlice(t *testing.T) {
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
 	assert.Equal(t, int64(0), body.Count)
 	assert.NotNil(t, body.Results) // must be [] not null
+}
+
+// speciesDetailStubQuerier stubs the three queries used by getSpeciesDetail.
+type speciesDetailStubQuerier struct {
+	store.Querier
+	getSpeciesByCode     func(ctx context.Context, ebirdCode string) (store.GetSpeciesByCodeRow, error)
+	getSpeciesRecordings func(ctx context.Context, speciesCode string) ([]store.GetSpeciesRecordingsRow, error)
+	getSpeciesImages     func(ctx context.Context, speciesCode string) ([]store.GetSpeciesImagesRow, error)
+}
+
+func (s *speciesDetailStubQuerier) GetSpeciesByCode(ctx context.Context, ebirdCode string) (store.GetSpeciesByCodeRow, error) {
+	return s.getSpeciesByCode(ctx, ebirdCode)
+}
+func (s *speciesDetailStubQuerier) GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]store.GetSpeciesRecordingsRow, error) {
+	return s.getSpeciesRecordings(ctx, speciesCode)
+}
+func (s *speciesDetailStubQuerier) GetSpeciesImages(ctx context.Context, speciesCode string) ([]store.GetSpeciesImagesRow, error) {
+	return s.getSpeciesImages(ctx, speciesCode)
+}
+
+func TestGetSpeciesDetail_ReturnsFullDetail(t *testing.T) {
+	q := &speciesDetailStubQuerier{
+		getSpeciesByCode: func(_ context.Context, ebirdCode string) (store.GetSpeciesByCodeRow, error) {
+			assert.Equal(t, "amro", ebirdCode)
+			return store.GetSpeciesByCodeRow{
+				EbirdCode:      "amro",
+				CommonName:     "American Robin",
+				ScientificName: "Turdus migratorius",
+			}, nil
+		},
+		getSpeciesRecordings: func(_ context.Context, speciesCode string) ([]store.GetSpeciesRecordingsRow, error) {
+			return []store.GetSpeciesRecordingsRow{
+				{XenoCantoID: "xc123", FilePath: "https://r2.example.com/xc123.mp3", Quality: "A", Type: "song"},
+			}, nil
+		},
+		getSpeciesImages: func(_ context.Context, speciesCode string) ([]store.GetSpeciesImagesRow, error) {
+			return []store.GetSpeciesImagesRow{
+				{MacaulayID: "ml456", FilePath: "https://r2.example.com/ml456.jpg", Credit: "J. Doe"},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/amro", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "ebird_code", "amro")
+	w := httptest.NewRecorder()
+
+	h.getSpeciesDetail(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body SpeciesDetail
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Equal(t, "amro", body.EbirdCode)
+	assert.Equal(t, "American Robin", body.CommonName)
+	assert.Len(t, body.Recordings, 1)
+	assert.Equal(t, "xc123", body.Recordings[0].XenoCantoID)
+	assert.Equal(t, "song", body.Recordings[0].Type)
+	assert.Len(t, body.Images, 1)
+	assert.Equal(t, "ml456", body.Images[0].MacaulayID)
+}
+
+func TestGetSpeciesDetail_NotFound_Returns404(t *testing.T) {
+	q := &speciesDetailStubQuerier{
+		getSpeciesByCode: func(_ context.Context, ebirdCode string) (store.GetSpeciesByCodeRow, error) {
+			return store.GetSpeciesByCodeRow{}, pgx.ErrNoRows
+		},
+		getSpeciesRecordings: func(_ context.Context, _ string) ([]store.GetSpeciesRecordingsRow, error) {
+			return nil, nil
+		},
+		getSpeciesImages: func(_ context.Context, _ string) ([]store.GetSpeciesImagesRow, error) {
+			return nil, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/nope", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "ebird_code", "nope")
+	w := httptest.NewRecorder()
+
+	h.getSpeciesDetail(w, r)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }
