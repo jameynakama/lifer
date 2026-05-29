@@ -45,6 +45,8 @@
     error = ''
     noMedia = false
     done = false
+    cards = []
+    index = 0
     try {
       const res = await fetch(`/api/v1/groups/${groupId}/practice?lane=${lane}`)
       if (!res.ok) throw new Error(`Server error ${res.status}`)
@@ -99,7 +101,7 @@
 </script>
 
 <div class="quiz">
-  {#if !noMedia && !error && cards.length > 0}
+  {#if !done && !noMedia && !error && cards.length > 0}
     <StatsBar {stats} />
   {/if}
 
@@ -116,7 +118,7 @@
     <div class="done">
       <p class="done-icon">🎉</p>
       <p class="done-title">All done!</p>
-      <p class="done-sub">{cards.length} {cards.length === 1 ? 'species' : 'species'} practiced.</p>
+      <p class="done-sub">{cards.length} species practiced.</p>
       <button class="btn-primary" onclick={practiceAgain}>Practice Again</button>
       <button class="btn-secondary" onclick={() => goto(`/groups/${groupId}`)}>Back to Group</button>
     </div>
