@@ -46,7 +46,7 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - [x] RevealCard: shows result banner (correct/incorrect), reference photo, species names, Next button
 - [x] WavePlayer: WaveSurfer.js with native `<audio>` element to avoid CORS; fake peaks for bar visualization
 - [x] FSRS scheduling: `rateCard` fetches current card state, runs `f.Next()`, persists updated stability/difficulty/due/lapses/state
-- [x] **Explore feature** (`feat/explore` branch, not yet merged):
+- [x] **Explore feature:**
   - `GET /api/v1/species` -- unified paginated list + search; `{ count, next, previous, results }` shape; `limit`/`offset` params; `next`/`previous` are absolute URLs; `image_url` (first image for species, nullable) included in both list and search results
   - `GET /api/v1/species/:ebird_code` -- species detail with recordings + images
   - `GET /api/v1/species/:ebird_code/groups` -- which of the current user's groups contain this species
@@ -55,20 +55,26 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
   - `GroupDropdown`: per-species dropdown with checkboxes for each user group (checked = member), inline "create new group" input; TanStack Query mutations for add/remove/create; clicks inside dropdown don't bubble to window close handler
   - `@tanstack/svelte-query` added; `QueryClientProvider` wraps the layout
   - Groups list page now shows `audio_due`/`image_due` badge counts per group
+- [x] **Practice mode (free drill):**
+  - `GET /api/v1/groups/:id/practice?lane=` -- returns all species in group with random media URLs; COALESCE-safe SQL, ordered by common_name; access check allows owner or preset groups, blocks other users' private groups
+  - `/groups/[id]/practice` page: fetches all species upfront, Fisher-Yates shuffle, index cycling, no POST to `/rate`; "Practiced: X/Y" stat; done screen with "Practice Again" (reshuffle) + "Back to Group"
+  - Groups list: "Free Practice" toggle -- shows banner + swaps due badges for quick "▶ Audio" / "◉ Image" launch buttons per group
+  - Group detail: "Study Audio/Image" (filled, FSRS queue → `/quiz`) + "Practice Audio/Image" (outline, free drill → `/practice`)
+  - Per-species audio/image lane preferences (`PUT /api/v1/species/:ebird_code/preferences`, `user_species_preferences` table): backend complete, frontend UI not yet built
 
 ## What's next
 
-### 1. Ad-hoc / practice mode
-- Study all cards in a group at any time, not just due ones -- cycle through every species regardless of schedule
-- Results don't count toward FSRS ratings (no POST to `/rate`)
-- Useful for drilling a group before a birdwatching trip, or learning new species before they've been scheduled
-
-### 2. Explore -- region filter (separate from the Explore list/detail already built)
+### 1. Explore -- region filter (separate from the Explore list/detail already built)
 - eBird region codes are not stored in the DB -- no "which regions contain this species" endpoint exists
 - Instead: client requests subregions from eBird on demand, then intersects the species list with our catalog
 - Flow: user picks state → frontend hits backend proxy → backend calls `GET /v2/ref/region/list/subnational2/{stateCode}` → returns county list; user picks county → backend calls `GET /v2/product/spplist/{countyCode}` → returns species codes → backend intersects with our DB and returns matches
 - Must proxy through backend to keep the eBird API key server-side
 - `regionType` values: `country`, `subnational1` (states/provinces), `subnational2` (counties)
+
+### 2. Per-species quiz lane preferences (UI only -- backend done)
+- `PUT /api/v1/species/:ebird_code/preferences` with `{ audio_enabled, image_enabled }` already exists; upserts preferences and creates/deletes cards automatically
+- Needs: toggle UI on the Explore species detail page and/or the group detail species list
+- Useful for users already proficient at one modality for a given bird
 
 ### 3. Group management (some is done)
 - Admin: create/edit preset groups (region-based)
