@@ -20,6 +20,7 @@ type Querier interface {
 	DeleteSpeciesImagesBySpeciesCode(ctx context.Context, speciesCode string) error
 	GetCard(ctx context.Context, arg GetCardParams) (Card, error)
 	GetGroup(ctx context.Context, id int64) (Group, error)
+	GetGroupPracticeCards(ctx context.Context, groupID int64) ([]GetGroupPracticeCardsRow, error)
 	GetGroupsForSpecies(ctx context.Context, arg GetGroupsForSpeciesParams) ([]int64, error)
 	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
 	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)

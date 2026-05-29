@@ -60,6 +60,53 @@ func (q *Queries) GetCard(ctx context.Context, arg GetCardParams) (Card, error) 
 	return i, err
 }
 
+const getGroupPracticeCards = `-- name: GetGroupPracticeCards :many
+SELECT s.ebird_code, s.common_name, s.scientific_name,
+       (SELECT file_path FROM species_recordings
+        WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
+        ORDER BY random() LIMIT 1) AS audio_url,
+       (SELECT file_path FROM species_images
+        WHERE species_code = s.ebird_code
+        ORDER BY random() LIMIT 1) AS image_url
+FROM species s
+JOIN group_species gs ON gs.species_code = s.ebird_code
+WHERE gs.group_id = $1
+`
+
+type GetGroupPracticeCardsRow struct {
+	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
+	CommonName     string `db:"common_name" json:"common_name"`
+	ScientificName string `db:"scientific_name" json:"scientific_name"`
+	AudioUrl       string `db:"audio_url" json:"audio_url"`
+	ImageUrl       string `db:"image_url" json:"image_url"`
+}
+
+func (q *Queries) GetGroupPracticeCards(ctx context.Context, groupID int64) ([]GetGroupPracticeCardsRow, error) {
+	rows, err := q.db.Query(ctx, getGroupPracticeCards, groupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetGroupPracticeCardsRow
+	for rows.Next() {
+		var i GetGroupPracticeCardsRow
+		if err := rows.Scan(
+			&i.EbirdCode,
+			&i.CommonName,
+			&i.ScientificName,
+			&i.AudioUrl,
+			&i.ImageUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getNextDueCard = `-- name: GetNextDueCard :one
 SELECT c.id, c.user_id, c.species_code, c.lane,
        c.stability, c.difficulty, c.due, c.last_review,
