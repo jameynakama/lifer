@@ -1,5 +1,6 @@
 <script lang="ts">
   import '../app.css'
+  import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query'
   import { auth } from '$stores/auth'
   import { getCurrentTheme, toggleTheme } from '$lib/theme'
   import Login from '../views/Login.svelte'
@@ -7,6 +8,8 @@
   let { children } = $props()
   let checking = $state(true)
   let theme = $state(getCurrentTheme())
+
+  const queryClient = new QueryClient()
 
   $effect(() => {
     fetch('/api/v1/me')
@@ -25,32 +28,34 @@
   }
 </script>
 
-{#if checking}
-  <div class="loading">
-    <span class="spinner"></span>
-  </div>
-{:else if !$auth}
-  <Login />
-{:else}
-  <div class="app-container">
-    <header>
-      <a href="/" class="wordmark">Lifer</a>
-      <nav>
-        <a href="/groups">Groups</a>
-        <a href="/explore">Explore</a>
-      </nav>
-      <button
-        onclick={handleToggle}
-        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-      >
-        {theme === 'dark' ? '☀️' : '🌙'}
-      </button>
-    </header>
-    <main>
-      {@render children?.()}
-    </main>
-  </div>
-{/if}
+<QueryClientProvider client={queryClient}>
+  {#if checking}
+    <div class="loading">
+      <span class="spinner"></span>
+    </div>
+  {:else if !$auth}
+    <Login />
+  {:else}
+    <div class="app-container">
+      <header>
+        <a href="/" class="wordmark">Lifer</a>
+        <nav>
+          <a href="/groups">Groups</a>
+          <a href="/explore">Explore</a>
+        </nav>
+        <button
+          onclick={handleToggle}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {theme === 'dark' ? '☀️' : '🌙'}
+        </button>
+      </header>
+      <main>
+        {@render children?.()}
+      </main>
+    </div>
+  {/if}
+</QueryClientProvider>
 
 <style>
   .loading {

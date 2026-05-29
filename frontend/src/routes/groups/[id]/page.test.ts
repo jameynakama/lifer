@@ -44,9 +44,14 @@ describe('Group detail page', () => {
       if (url.includes('/api/v1/species')) {
         return Promise.resolve({
           ok: true,
-          json: () => Promise.resolve([
-            { id: 8, common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', ebird_code: 'foxspa' },
-          ]),
+          json: () => Promise.resolve({
+            count: 1,
+            next: null,
+            previous: null,
+            results: [
+              { id: 8, common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', ebird_code: 'foxspa' },
+            ],
+          }),
         })
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve(species) })

@@ -31,7 +31,10 @@
     if (!searchQuery.trim()) { searchResults = []; return }
     searchTimer = setTimeout(async () => {
       const res = await fetch(`/api/v1/species?q=${encodeURIComponent(searchQuery)}`)
-      if (res.ok) searchResults = await res.json()
+      if (res.ok) {
+        const data = await res.json()
+        searchResults = data.results ?? []
+      }
     }, 300)
   }
 
