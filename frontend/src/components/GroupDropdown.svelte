@@ -92,7 +92,7 @@
   }
 </script>
 
-<div class="dropdown" role="dialog" aria-label="Add to group">
+<div class="dropdown" role="dialog" aria-label="Add to group" onclick={(e) => e.stopPropagation()}>
   <div class="create-section">
     <input
       class="create-input"
