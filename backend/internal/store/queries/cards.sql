@@ -55,12 +55,19 @@ WHERE user_id = $1 AND species_code = $2 AND lane = $3;
 
 -- name: GetGroupPracticeCards :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,
-       (SELECT file_path FROM species_recordings
-        WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
-        ORDER BY random() LIMIT 1) AS audio_url,
-       (SELECT file_path FROM species_images
-        WHERE species_code = s.ebird_code
-        ORDER BY random() LIMIT 1) AS image_url
+       COALESCE(
+           (SELECT file_path FROM species_recordings
+            WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
+            ORDER BY random() LIMIT 1),
+           ''
+       ) AS audio_url,
+       COALESCE(
+           (SELECT file_path FROM species_images
+            WHERE species_code = s.ebird_code
+            ORDER BY random() LIMIT 1),
+           ''
+       ) AS image_url
 FROM species s
 JOIN group_species gs ON gs.species_code = s.ebird_code
-WHERE gs.group_id = $1;
+WHERE gs.group_id = $1
+ORDER BY s.common_name;

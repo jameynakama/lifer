@@ -62,23 +62,30 @@ func (q *Queries) GetCard(ctx context.Context, arg GetCardParams) (Card, error) 
 
 const getGroupPracticeCards = `-- name: GetGroupPracticeCards :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,
-       (SELECT file_path FROM species_recordings
-        WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
-        ORDER BY random() LIMIT 1) AS audio_url,
-       (SELECT file_path FROM species_images
-        WHERE species_code = s.ebird_code
-        ORDER BY random() LIMIT 1) AS image_url
+       COALESCE(
+           (SELECT file_path FROM species_recordings
+            WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
+            ORDER BY random() LIMIT 1),
+           ''
+       ) AS audio_url,
+       COALESCE(
+           (SELECT file_path FROM species_images
+            WHERE species_code = s.ebird_code
+            ORDER BY random() LIMIT 1),
+           ''
+       ) AS image_url
 FROM species s
 JOIN group_species gs ON gs.species_code = s.ebird_code
 WHERE gs.group_id = $1
+ORDER BY s.common_name
 `
 
 type GetGroupPracticeCardsRow struct {
-	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
-	CommonName     string `db:"common_name" json:"common_name"`
-	ScientificName string `db:"scientific_name" json:"scientific_name"`
-	AudioUrl       string `db:"audio_url" json:"audio_url"`
-	ImageUrl       string `db:"image_url" json:"image_url"`
+	EbirdCode      string      `db:"ebird_code" json:"ebird_code"`
+	CommonName     string      `db:"common_name" json:"common_name"`
+	ScientificName string      `db:"scientific_name" json:"scientific_name"`
+	AudioUrl       interface{} `db:"audio_url" json:"audio_url"`
+	ImageUrl       interface{} `db:"image_url" json:"image_url"`
 }
 
 func (q *Queries) GetGroupPracticeCards(ctx context.Context, groupID int64) ([]GetGroupPracticeCardsRow, error) {
