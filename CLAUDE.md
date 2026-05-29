@@ -47,13 +47,14 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - [x] WavePlayer: WaveSurfer.js with native `<audio>` element to avoid CORS; fake peaks for bar visualization
 - [x] FSRS scheduling: `rateCard` fetches current card state, runs `f.Next()`, persists updated stability/difficulty/due/lapses/state
 - [x] **Explore feature** (`feat/explore` branch, not yet merged):
-  - `GET /api/v1/species` -- unified paginated list + search; `{ count, next, previous, results }` shape; `limit`/`offset` params; `next`/`previous` are absolute URLs
+  - `GET /api/v1/species` -- unified paginated list + search; `{ count, next, previous, results }` shape; `limit`/`offset` params; `next`/`previous` are absolute URLs; `image_url` (first image for species, nullable) included in both list and search results
   - `GET /api/v1/species/:ebird_code` -- species detail with recordings + images
   - `GET /api/v1/species/:ebird_code/groups` -- which of the current user's groups contain this species
-  - `/explore` page: searchable (debounced), paginated species list with `SpeciesRow` tiles
-  - `/explore/[ebird_code]` page: name-first detail layout with `RecordingsList` (WavePlayer per row), `PhotoGrid` (2-col), `GroupDropdown`
-  - `GroupDropdown`: per-species dropdown with checkboxes for each user group (checked = member), inline "create new group" input; TanStack Query mutations for add/remove/create
+  - `/explore` page: searchable (debounced), paginated species list with `SpeciesRow` tiles (44×44 thumbnail + names + group button)
+  - `/explore/[ebird_code]` page: name-first detail layout with `RecordingsList` (WavePlayer per row), `PhotoGrid` (2-col, click to open full-res, hover for credit overlay), `GroupDropdown`
+  - `GroupDropdown`: per-species dropdown with checkboxes for each user group (checked = member), inline "create new group" input; TanStack Query mutations for add/remove/create; clicks inside dropdown don't bubble to window close handler
   - `@tanstack/svelte-query` added; `QueryClientProvider` wraps the layout
+  - Groups list page now shows `audio_due`/`image_due` badge counts per group
 
 ## What's next
 
