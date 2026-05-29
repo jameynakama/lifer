@@ -211,3 +211,57 @@ func TestGetSpeciesDetail_NotFound_Returns404(t *testing.T) {
 
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
+
+// speciesGroupsStubQuerier stubs GetGroupsForSpecies.
+type speciesGroupsStubQuerier struct {
+	store.Querier
+	getGroupsForSpecies func(ctx context.Context, arg store.GetGroupsForSpeciesParams) ([]int64, error)
+}
+
+func (s *speciesGroupsStubQuerier) GetGroupsForSpecies(ctx context.Context, arg store.GetGroupsForSpeciesParams) ([]int64, error) {
+	return s.getGroupsForSpecies(ctx, arg)
+}
+
+func TestGetSpeciesGroups_ReturnsMembership(t *testing.T) {
+	q := &speciesGroupsStubQuerier{
+		getGroupsForSpecies: func(_ context.Context, arg store.GetGroupsForSpeciesParams) ([]int64, error) {
+			assert.Equal(t, "amro", arg.SpeciesCode)
+			assert.Equal(t, int64(1), arg.OwnerID.Int64)
+			assert.True(t, arg.OwnerID.Valid)
+			return []int64{2, 5}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/amro/groups", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "ebird_code", "amro")
+	w := httptest.NewRecorder()
+
+	h.getSpeciesGroups(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body SpeciesGroupsResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.ElementsMatch(t, []int64{2, 5}, body.GroupIDs)
+}
+
+func TestGetSpeciesGroups_NoMembership_ReturnsEmptySlice(t *testing.T) {
+	q := &speciesGroupsStubQuerier{
+		getGroupsForSpecies: func(_ context.Context, arg store.GetGroupsForSpeciesParams) ([]int64, error) {
+			return []int64{}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/amro/groups", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "ebird_code", "amro")
+	w := httptest.NewRecorder()
+
+	h.getSpeciesGroups(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body SpeciesGroupsResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.NotNil(t, body.GroupIDs)
+	assert.Empty(t, body.GroupIDs)
+}
