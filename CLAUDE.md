@@ -46,6 +46,14 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - [x] RevealCard: shows result banner (correct/incorrect), reference photo, species names, Next button
 - [x] WavePlayer: WaveSurfer.js with native `<audio>` element to avoid CORS; fake peaks for bar visualization
 - [x] FSRS scheduling: `rateCard` fetches current card state, runs `f.Next()`, persists updated stability/difficulty/due/lapses/state
+- [x] **Explore feature** (`feat/explore` branch, not yet merged):
+  - `GET /api/v1/species` -- unified paginated list + search; `{ count, next, previous, results }` shape; `limit`/`offset` params; `next`/`previous` are absolute URLs
+  - `GET /api/v1/species/:ebird_code` -- species detail with recordings + images
+  - `GET /api/v1/species/:ebird_code/groups` -- which of the current user's groups contain this species
+  - `/explore` page: searchable (debounced), paginated species list with `SpeciesRow` tiles
+  - `/explore/[ebird_code]` page: name-first detail layout with `RecordingsList` (WavePlayer per row), `PhotoGrid` (2-col), `GroupDropdown`
+  - `GroupDropdown`: per-species dropdown with checkboxes for each user group (checked = member), inline "create new group" input; TanStack Query mutations for add/remove/create
+  - `@tanstack/svelte-query` added; `QueryClientProvider` wraps the layout
 
 ## What's next
 
@@ -54,25 +62,17 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Results don't count toward FSRS ratings (no POST to `/rate`)
 - Useful for drilling a group before a birdwatching trip, or learning new species before they've been scheduled
 
-### 2. Catalog / "Learn" view
-- Browse all species, filterable by region and alphabetically
-- Shows recordings, photos, and species info
-- Users can add species to custom groups from list or detail view
-- Requires backend search/filter API (too many species to load all client-side)
-- Design group management UI alongside this (same "add to list" action)
-
-**Region browsing approach** (decided, not yet built):
+### 2. Explore -- region filter (separate from the Explore list/detail already built)
 - eBird region codes are not stored in the DB -- no "which regions contain this species" endpoint exists
 - Instead: client requests subregions from eBird on demand, then intersects the species list with our catalog
 - Flow: user picks state → frontend hits backend proxy → backend calls `GET /v2/ref/region/list/subnational2/{stateCode}` → returns county list; user picks county → backend calls `GET /v2/product/spplist/{countyCode}` → returns species codes → backend intersects with our DB and returns matches
 - Must proxy through backend to keep the eBird API key server-side
 - `regionType` values: `country`, `subnational1` (states/provinces), `subnational2` (counties)
-- Example: `GET /v2/ref/region/list/subnational1/US` → all US states; `GET /v2/ref/region/list/subnational2/US-NE` → all Nebraska counties
 
 ### 3. Group management (some is done)
 - Admin: create/edit preset groups (region-based)
 - Users: create custom groups, add/remove species
-- Shared UI surface with catalog view
+- Shared UI surface with Explore view
 
 ### 4. Admin UI
 - Catalog management: add/edit species, recordings, images
@@ -91,6 +91,8 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Quiz auto-rating: no self-reporting; `correct ? 3 : 1` posted to `/rate`. Correct = `selected.ebird_code === card.ebird_code`.
 - R2 ingest workflow: ingest locally (writes to R2 bucket) → dump DB → restore in prod. All environments share the same R2 bucket. No per-environment media copies needed.
 - Natural PKs on species tables mean re-ingesting into a fresh DB produces identical IDs -- cards/group memberships stay valid across resets.
+- TanStack Query v6 (`@tanstack/svelte-query`): use `createQuery(() => ({...}))` -- options wrapped in a function so Svelte 5 rune reads are tracked reactively. Returns a reactive object directly (not a store); access `.data`, `.isPending`, `.isError` without `$` prefix. Mutations use `createMutation(() => ({...}))` same pattern.
+- `GET /api/v1/species` pagination: `next`/`previous` are absolute URL strings (or null), constructed server-side from `r.Host` + `X-Forwarded-Proto` header. `count` comes from `COUNT(*) OVER()` window function -- no second query needed.
 
 ## Local setup on a new machine
 ```
