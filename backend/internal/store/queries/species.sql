@@ -11,7 +11,8 @@ SELECT
     ebird_code,
     common_name,
     scientific_name,
-    COUNT(*) OVER() AS total_count
+    COUNT(*) OVER() AS total_count,
+    (SELECT file_path FROM species_images WHERE species_code = species.ebird_code LIMIT 1) AS image_url
 FROM species
 ORDER BY common_name
 LIMIT $1 OFFSET $2;

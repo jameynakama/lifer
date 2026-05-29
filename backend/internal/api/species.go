@@ -26,9 +26,10 @@ type PaginatedSpecies struct {
 
 // SpeciesItem is a single species in a list response.
 type SpeciesItem struct {
-	EbirdCode      string `json:"ebird_code"`
-	CommonName     string `json:"common_name"`
-	ScientificName string `json:"scientific_name"`
+	EbirdCode      string  `json:"ebird_code"`
+	CommonName     string  `json:"common_name"`
+	ScientificName string  `json:"scientific_name"`
+	ImageURL       *string `json:"image_url"`
 }
 
 // SpeciesDetail is the response for GET /api/v1/species/:ebird_code.
@@ -122,10 +123,15 @@ func (h *Handler) listSpecies(w http.ResponseWriter, r *http.Request) {
 	results := make([]SpeciesItem, len(rows))
 	var totalCount int64
 	for i, row := range rows {
+		var imageURL *string
+		if row.ImageUrl != "" {
+			imageURL = &row.ImageUrl
+		}
 		results[i] = SpeciesItem{
 			EbirdCode:      row.EbirdCode,
 			CommonName:     row.CommonName,
 			ScientificName: row.ScientificName,
+			ImageURL:       imageURL,
 		}
 		totalCount = row.TotalCount
 	}

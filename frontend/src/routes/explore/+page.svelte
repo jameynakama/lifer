@@ -50,7 +50,7 @@
             ebird_code={s.ebird_code}
             common_name={s.common_name}
             scientific_name={s.scientific_name}
-            image_url={null}
+            image_url={s.image_url ?? null}
           />
         </li>
       {/each}

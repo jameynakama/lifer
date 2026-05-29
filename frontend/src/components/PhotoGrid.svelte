@@ -9,12 +9,14 @@
 {#if images.length > 0}
   <div class="photo-grid">
     {#each images as img (img.macaulay_id)}
-      <img
-        src={img.file_path}
-        alt={img.credit || 'Species photo'}
-        title={img.credit}
-        loading="lazy"
-      />
+      <a href={img.file_path} target="_blank" rel="noopener noreferrer" aria-label="View full resolution photo{img.credit ? ` by ${img.credit}` : ''}">
+        <img
+          src={img.file_path}
+          alt={img.credit || 'Species photo'}
+          title={img.credit}
+          loading="lazy"
+        />
+      </a>
     {/each}
   </div>
 {:else}
@@ -26,6 +28,12 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.375rem;
+  }
+
+  .photo-grid a {
+    display: block;
+    border-radius: 6px;
+    overflow: hidden;
   }
 
   .photo-grid img {

@@ -138,7 +138,8 @@ SELECT
     ebird_code,
     common_name,
     scientific_name,
-    COUNT(*) OVER() AS total_count
+    COUNT(*) OVER() AS total_count,
+    (SELECT file_path FROM species_images WHERE species_code = species.ebird_code LIMIT 1) AS image_url
 FROM species
 ORDER BY common_name
 LIMIT $1 OFFSET $2
@@ -154,6 +155,7 @@ type ListSpeciesRow struct {
 	CommonName     string `db:"common_name" json:"common_name"`
 	ScientificName string `db:"scientific_name" json:"scientific_name"`
 	TotalCount     int64  `db:"total_count" json:"total_count"`
+	ImageUrl       string `db:"image_url" json:"image_url"`
 }
 
 func (q *Queries) ListSpecies(ctx context.Context, arg ListSpeciesParams) ([]ListSpeciesRow, error) {
@@ -170,6 +172,7 @@ func (q *Queries) ListSpecies(ctx context.Context, arg ListSpeciesParams) ([]Lis
 			&i.CommonName,
 			&i.ScientificName,
 			&i.TotalCount,
+			&i.ImageUrl,
 		); err != nil {
 			return nil, err
 		}

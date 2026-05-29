@@ -71,8 +71,16 @@
     <ul class="group-list">
       {#each groups as group (group.id)}
         <li class="group-row">
-          <a href="/groups/{group.id}">{group.name}</a>
-          <button class="btn-delete" onclick={() => deleteGroup(group.id)}>Delete</button>
+          <a href="/groups/{group.id}" class="group-name">{group.name}</a>
+          <div class="group-meta">
+            {#if group.audio_due > 0}
+              <span class="due-badge">🔊 {group.audio_due}</span>
+            {/if}
+            {#if group.image_due > 0}
+              <span class="due-badge">👁 {group.image_due}</span>
+            {/if}
+            <button class="btn-delete" onclick={() => deleteGroup(group.id)}>Delete</button>
+          </div>
         </li>
       {/each}
     </ul>
@@ -134,15 +142,30 @@
     border-radius: 10px;
     padding: 0.875rem 1rem;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 0.75rem;
     box-shadow: var(--shadow);
   }
-  .group-row a {
+  .group-name {
     color: var(--text);
     font-weight: 600;
     text-decoration: none;
     font-size: 0.9375rem;
+    flex: 1;
+  }
+  .group-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-shrink: 0;
+  }
+  .due-badge {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    background: var(--border);
+    border-radius: 6px;
+    padding: 0.1875rem 0.5rem;
   }
   .btn-delete {
     background: transparent;

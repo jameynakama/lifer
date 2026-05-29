@@ -13,7 +13,7 @@
     {#each recordings as rec (rec.xeno_canto_id)}
       <div class="recording-row">
         <div class="recording-meta">{rec.type} · {rec.quality}</div>
-        <WavePlayer src={rec.file_path} />
+        <WavePlayer url={rec.file_path} />
       </div>
     {/each}
   </div>
