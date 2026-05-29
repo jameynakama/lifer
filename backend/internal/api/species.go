@@ -95,10 +95,15 @@ func (h *Handler) listSpecies(w http.ResponseWriter, r *http.Request) {
 		}
 		results := make([]SpeciesItem, len(rows))
 		for i, row := range rows {
+			var imageURL *string
+			if row.ImageUrl != "" {
+				imageURL = &row.ImageUrl
+			}
 			results[i] = SpeciesItem{
 				EbirdCode:      row.EbirdCode,
 				CommonName:     row.CommonName,
 				ScientificName: row.ScientificName,
+				ImageURL:       imageURL,
 			}
 		}
 		writeJSON(w, http.StatusOK, PaginatedSpecies{

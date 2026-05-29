@@ -1,5 +1,9 @@
 -- name: SearchSpecies :many
-SELECT ebird_code, common_name, scientific_name
+SELECT
+    ebird_code,
+    common_name,
+    scientific_name,
+    (SELECT file_path FROM species_images WHERE species_code = species.ebird_code LIMIT 1) AS image_url
 FROM species
 WHERE common_name ILIKE '%' || $1 || '%'
    OR scientific_name ILIKE '%' || $1 || '%'

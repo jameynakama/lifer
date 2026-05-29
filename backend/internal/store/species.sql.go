@@ -185,7 +185,11 @@ func (q *Queries) ListSpecies(ctx context.Context, arg ListSpeciesParams) ([]Lis
 }
 
 const searchSpecies = `-- name: SearchSpecies :many
-SELECT ebird_code, common_name, scientific_name
+SELECT
+    ebird_code,
+    common_name,
+    scientific_name,
+    (SELECT file_path FROM species_images WHERE species_code = species.ebird_code LIMIT 1) AS image_url
 FROM species
 WHERE common_name ILIKE '%' || $1 || '%'
    OR scientific_name ILIKE '%' || $1 || '%'
@@ -197,6 +201,7 @@ type SearchSpeciesRow struct {
 	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
 	CommonName     string `db:"common_name" json:"common_name"`
 	ScientificName string `db:"scientific_name" json:"scientific_name"`
+	ImageUrl       string `db:"image_url" json:"image_url"`
 }
 
 func (q *Queries) SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]SearchSpeciesRow, error) {
@@ -208,7 +213,12 @@ func (q *Queries) SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]Se
 	var items []SearchSpeciesRow
 	for rows.Next() {
 		var i SearchSpeciesRow
-		if err := rows.Scan(&i.EbirdCode, &i.CommonName, &i.ScientificName); err != nil {
+		if err := rows.Scan(
+			&i.EbirdCode,
+			&i.CommonName,
+			&i.ScientificName,
+			&i.ImageUrl,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
