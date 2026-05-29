@@ -13,7 +13,6 @@
         <img
           src={img.file_path}
           alt={img.credit || 'Species photo'}
-          title={img.credit}
           loading="lazy"
         />
         {#if img.credit}
