@@ -18,7 +18,7 @@
     </div>
     <p class="prompt">What bird is this?</p>
   </div>
-  <SpeciesTypeahead {species} onSelect={(s) => { selected = s }} />
+  <SpeciesTypeahead {species} onSelect={(s) => { selected = s }} onSubmit={() => { if (selected) onReveal(selected) }} />
   <div class="actions">
     <button
       class="btn-reveal"

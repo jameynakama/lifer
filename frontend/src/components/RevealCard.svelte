@@ -7,7 +7,13 @@
     guessed: Species | null
     onNext: () => void
   } = $props()
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') onNext()
+  }
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <div class="reveal-card">
   <div class="result-banner" class:correct class:incorrect={!correct}>

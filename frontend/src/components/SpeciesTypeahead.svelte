@@ -1,9 +1,10 @@
 <script lang="ts">
   import type { Species } from '../types'
 
-  let { species, onSelect }: {
+  let { species, onSelect, onSubmit }: {
     species: Species[]
     onSelect: (s: Species | null) => void
+    onSubmit?: () => void
   } = $props()
 
   let query = $state('')
@@ -49,6 +50,7 @@
     } else if (e.key === 'Enter') {
       e.preventDefault()
       if (open && filtered[highlighted]) selectSpecies(filtered[highlighted])
+      else if (!open) onSubmit?.()
     } else if (e.key === 'Escape') {
       open = false
     }
@@ -72,7 +74,7 @@
   />
   {#if open && filtered.length > 0}
     <ul class="dropdown" role="listbox" id="typeahead-dropdown">
-      {#each filtered as s, i (s.id)}
+      {#each filtered as s, i (s.ebird_code)}
         <li
           class="dropdown-item"
           class:highlighted={i === highlighted}

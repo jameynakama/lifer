@@ -16,7 +16,7 @@ vi.mock('wavesurfer.js', () => ({
 }))
 
 const card = {
-  species_id: 99,
+  ebird_code: 'sonspa',
   common_name: 'Song Sparrow',
   scientific_name: 'Melospiza melodia',
   media_url: '/recordings/song-sparrow.mp3',
@@ -25,8 +25,8 @@ const card = {
 }
 
 const species = [
-  { id: 99, common_name: 'Song Sparrow', scientific_name: 'Melospiza melodia', ebird_code: 'sonspa' },
-  { id: 88, common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', ebird_code: 'foxspa' },
+  { ebird_code: 'sonspa', common_name: 'Song Sparrow', scientific_name: 'Melospiza melodia' },
+  { ebird_code: 'foxspa', common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca' },
 ]
 
 function makeFetch(opts: { card?: object | null; status?: number } = {}) {
