@@ -1,4 +1,6 @@
 <script lang="ts">
+  import GroupDropdown from './GroupDropdown.svelte'
+
   let {
     ebird_code,
     common_name,
@@ -43,8 +45,7 @@
       + Group
     </button>
     {#if dropdownOpen}
-      <!-- GroupDropdown added in Task 10 -->
-      <div class="dropdown-placeholder"></div>
+      <GroupDropdown {ebird_code} onClose={closeDropdown} />
     {/if}
   </div>
 </div>
@@ -132,9 +133,5 @@
 
   .group-btn:hover {
     color: var(--accent);
-  }
-
-  .dropdown-placeholder {
-    display: none;
   }
 </style>
