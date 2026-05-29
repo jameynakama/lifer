@@ -1,10 +1,12 @@
 <script lang="ts">
+  import { goto } from '$app/navigation'
   import type { Group } from '../../types'
 
   let groups: Group[] = $state([])
   let loading = $state(true)
   let newName = $state('')
   let creating = $state(false)
+  let practiceMode = $state(false)
 
   async function loadGroups() {
     try {
@@ -51,7 +53,22 @@
 </script>
 
 <div class="groups-page">
-  <h1>Groups</h1>
+  <div class="page-header">
+    <h1>Groups</h1>
+    <button
+      class="btn-toggle"
+      class:active={practiceMode}
+      onclick={() => (practiceMode = !practiceMode)}
+    >
+      Free Practice
+    </button>
+  </div>
+
+  {#if practiceMode}
+    <p class="practice-banner">
+      Free practice mode -- answers won't affect your spaced repetition schedule
+    </p>
+  {/if}
 
   <form class="create-form" onsubmit={(e) => { e.preventDefault(); createGroup() }}>
     <input
@@ -73,11 +90,22 @@
         <li class="group-row">
           <a href="/groups/{group.id}" class="group-name">{group.name}</a>
           <div class="group-meta">
-            {#if group.audio_due > 0}
-              <span class="due-badge">🔊 {group.audio_due}</span>
-            {/if}
-            {#if group.image_due > 0}
-              <span class="due-badge">👁 {group.image_due}</span>
+            {#if practiceMode}
+              <button
+                class="btn-practice-quick"
+                onclick={() => goto(`/groups/${group.id}/practice?lane=audio`)}
+              >▶ Audio</button>
+              <button
+                class="btn-practice-quick"
+                onclick={() => goto(`/groups/${group.id}/practice?lane=image`)}
+              >◉ Image</button>
+            {:else}
+              {#if group.audio_due > 0}
+                <span class="due-badge">🔊 {group.audio_due}</span>
+              {/if}
+              {#if group.image_due > 0}
+                <span class="due-badge">👁 {group.image_due}</span>
+              {/if}
             {/if}
             <button class="btn-delete" onclick={() => deleteGroup(group.id)}>Delete</button>
           </div>
@@ -93,9 +121,39 @@
     flex-direction: column;
     gap: 1.25rem;
   }
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
   h1 {
     font-size: 1.25rem;
     font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+  .btn-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 8px;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-toggle.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .practice-banner {
+    background: color-mix(in srgb, var(--accent) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+    border-radius: 8px;
+    padding: 0.625rem 0.875rem;
+    font-size: 0.8125rem;
     color: var(--text);
     margin: 0;
   }
@@ -166,6 +224,17 @@
     background: var(--border);
     border-radius: 6px;
     padding: 0.1875rem 0.5rem;
+  }
+  .btn-practice-quick {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 6px;
+    padding: 0.25rem 0.625rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
   }
   .btn-delete {
     background: transparent;

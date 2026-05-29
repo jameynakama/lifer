@@ -74,4 +74,65 @@ describe('Groups page', () => {
       expect(screen.queryByText(/my warblers/i)).toBeNull()
     })
   })
+
+  it('shows Free Practice toggle button', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: () => Promise.resolve(groups),
+    }))
+    render(GroupsPage)
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /free practice/i })).toBeInTheDocument()
+    })
+  })
+
+  it('shows practice banner when Free Practice toggled on', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: () => Promise.resolve(groups),
+    }))
+    render(GroupsPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /free practice/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /free practice/i }))
+    await vi.waitFor(() => {
+      expect(screen.getByText(/answers won't affect/i)).toBeInTheDocument()
+    })
+  })
+
+  it('shows practice audio quick button in practice mode', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: () => Promise.resolve(groups),
+    }))
+    render(GroupsPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /free practice/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /free practice/i }))
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /▶ audio/i })).toBeInTheDocument()
+    })
+  })
+
+  it('quick audio button navigates to practice page', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: () => Promise.resolve(groups),
+    }))
+    render(GroupsPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /free practice/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /free practice/i }))
+    await vi.waitFor(() => screen.getByRole('button', { name: /▶ audio/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /▶ audio/i }))
+    expect(goto).toHaveBeenCalledWith('/groups/1/practice?lane=audio')
+  })
+
+  it('hides due badges in practice mode', async () => {
+    const groupWithDue = [{ id: 1, name: 'My Warblers', is_preset: false, audio_due: 2, image_due: 1 }]
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: () => Promise.resolve(groupWithDue),
+    }))
+    render(GroupsPage)
+    // Due badges visible normally
+    await vi.waitFor(() => screen.getByText(/🔊 2/))
+    // Toggle practice mode
+    await fireEvent.click(screen.getByRole('button', { name: /free practice/i }))
+    await vi.waitFor(() => {
+      expect(screen.queryByText(/🔊 2/)).toBeNull()
+    })
+  })
 })
