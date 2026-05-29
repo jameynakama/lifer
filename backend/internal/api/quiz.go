@@ -96,6 +96,8 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+
 	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
 		http.Error(w, "invalid group id", http.StatusBadRequest)
@@ -105,6 +107,21 @@ func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
 	lane := r.URL.Query().Get("lane")
 	if lane != "audio" && lane != "image" {
 		http.Error(w, "lane must be audio or image", http.StatusBadRequest)
+		return
+	}
+
+	group, err := h.queries.GetGroup(r.Context(), groupID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("GetGroup error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	if group.OwnerID.Valid && group.OwnerID.Int64 != userID {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 

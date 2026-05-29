@@ -28,6 +28,7 @@ type stubQuerier struct {
 	getCard               func(ctx context.Context, arg store.GetCardParams) (store.Card, error)
 	updateCardSchedule    func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
 	getGroupPracticeCards func(ctx context.Context, groupID int64) ([]store.GetGroupPracticeCardsRow, error)
+	getGroup              func(ctx context.Context, id int64) (store.Group, error)
 }
 
 func (s *stubQuerier) GetNextDueCard(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
@@ -47,6 +48,9 @@ func (s *stubQuerier) UpdateCardSchedule(ctx context.Context, arg store.UpdateCa
 }
 func (s *stubQuerier) GetGroupPracticeCards(ctx context.Context, groupID int64) ([]store.GetGroupPracticeCardsRow, error) {
 	return s.getGroupPracticeCards(ctx, groupID)
+}
+func (s *stubQuerier) GetGroup(ctx context.Context, id int64) (store.Group, error) {
+	return s.getGroup(ctx, id)
 }
 
 func makeHandler(q store.Querier) *Handler {
@@ -253,6 +257,12 @@ func TestGetNextCard_NoMedia_Returns500(t *testing.T) {
 
 func TestGetPracticeCards_Audio_ReturnsAllSpecies(t *testing.T) {
 	q := &stubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{
+				ID:      id,
+				OwnerID: pgtype.Int8{Int64: 1, Valid: true}, // user 1 owns this group
+			}, nil
+		},
 		getGroupPracticeCards: func(_ context.Context, groupID int64) ([]store.GetGroupPracticeCardsRow, error) {
 			assert.Equal(t, int64(42), groupID)
 			return []store.GetGroupPracticeCardsRow{
@@ -287,6 +297,12 @@ func TestGetPracticeCards_Audio_ReturnsAllSpecies(t *testing.T) {
 
 func TestGetPracticeCards_Image_UsesImageAsMediaURL(t *testing.T) {
 	q := &stubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{
+				ID:      id,
+				OwnerID: pgtype.Int8{Int64: 1, Valid: true}, // user 1 owns this group
+			}, nil
+		},
 		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
 			return []store.GetGroupPracticeCardsRow{
 				{
@@ -319,6 +335,12 @@ func TestGetPracticeCards_Image_UsesImageAsMediaURL(t *testing.T) {
 
 func TestGetPracticeCards_FiltersSpeciesWithNoMedia(t *testing.T) {
 	q := &stubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{
+				ID:      id,
+				OwnerID: pgtype.Int8{Int64: 1, Valid: true}, // user 1 owns this group
+			}, nil
+		},
 		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
 			return []store.GetGroupPracticeCardsRow{
 				// has audio
@@ -346,6 +368,12 @@ func TestGetPracticeCards_FiltersSpeciesWithNoMedia(t *testing.T) {
 
 func TestGetPracticeCards_EmptyGroup_ReturnsEmptyArray(t *testing.T) {
 	q := &stubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{
+				ID:      id,
+				OwnerID: pgtype.Int8{Int64: 1, Valid: true}, // user 1 owns this group
+			}, nil
+		},
 		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
 			return []store.GetGroupPracticeCardsRow{}, nil
 		},
@@ -391,6 +419,12 @@ func TestGetPracticeCards_InvalidGroupID_Returns400(t *testing.T) {
 
 func TestGetPracticeCards_DBError_Returns500(t *testing.T) {
 	q := &stubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{
+				ID:      id,
+				OwnerID: pgtype.Int8{Int64: 1, Valid: true}, // user 1 owns this group
+			}, nil
+		},
 		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
 			return nil, errors.New("db error")
 		},
@@ -405,4 +439,49 @@ func TestGetPracticeCards_DBError_Returns500(t *testing.T) {
 	h.getPracticeCards(w, r)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestGetPracticeCards_ForbiddenGroup_Returns403(t *testing.T) {
+	q := &stubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{
+				ID:      id,
+				OwnerID: pgtype.Int8{Int64: 999, Valid: true}, // owned by user 999
+			}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r = injectUserID(r, 1) // user 1 is not owner
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestGetPracticeCards_PresetGroup_AllowsAccess(t *testing.T) {
+	q := &stubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{
+				ID:      id,
+				OwnerID: pgtype.Int8{Valid: false}, // preset: no owner
+			}, nil
+		},
+		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
+			return []store.GetGroupPracticeCardsRow{}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
 }
