@@ -21,11 +21,12 @@ import (
 // stubQuerier embeds store.Querier (nil) so unimplemented methods panic if called.
 type stubQuerier struct {
 	store.Querier
-	getNextDueCard     func(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error)
-	getRandomRecording func(ctx context.Context, speciesCode string) (string, error)
-	getRandomImage     func(ctx context.Context, speciesCode string) (string, error)
-	getCard            func(ctx context.Context, arg store.GetCardParams) (store.Card, error)
-	updateCardSchedule func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
+	getNextDueCard        func(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error)
+	getRandomRecording    func(ctx context.Context, speciesCode string) (string, error)
+	getRandomImage        func(ctx context.Context, speciesCode string) (string, error)
+	getCard               func(ctx context.Context, arg store.GetCardParams) (store.Card, error)
+	updateCardSchedule    func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
+	getGroupPracticeCards func(ctx context.Context, groupID int64) ([]store.GetGroupPracticeCardsRow, error)
 }
 
 func (s *stubQuerier) GetNextDueCard(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
@@ -42,6 +43,9 @@ func (s *stubQuerier) GetCard(ctx context.Context, arg store.GetCardParams) (sto
 }
 func (s *stubQuerier) UpdateCardSchedule(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error) {
 	return s.updateCardSchedule(ctx, arg)
+}
+func (s *stubQuerier) GetGroupPracticeCards(ctx context.Context, groupID int64) ([]store.GetGroupPracticeCardsRow, error) {
+	return s.getGroupPracticeCards(ctx, groupID)
 }
 
 func makeHandler(q store.Querier) *Handler {
@@ -244,4 +248,142 @@ func TestGetNextCard_NoMedia_Returns500(t *testing.T) {
 	h.getNextCard(w, r)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestGetPracticeCards_Audio_ReturnsAllSpecies(t *testing.T) {
+	q := &stubQuerier{
+		getGroupPracticeCards: func(_ context.Context, groupID int64) ([]store.GetGroupPracticeCardsRow, error) {
+			assert.Equal(t, int64(42), groupID)
+			return []store.GetGroupPracticeCardsRow{
+				{
+					EbirdCode:      "spotto",
+					CommonName:     "Spotted Towhee",
+					ScientificName: "Pipilo maculatus",
+					AudioUrl:       "https://r2.example.com/rec.mp3",
+					ImageUrl:       "https://r2.example.com/img.jpg",
+				},
+			}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []nextCardResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	require.Len(t, body, 1)
+	assert.Equal(t, "spotto", body[0].EbirdCode)
+	assert.Equal(t, "https://r2.example.com/rec.mp3", body[0].MediaURL)
+	assert.Equal(t, "https://r2.example.com/img.jpg", body[0].PhotoURL)
+	assert.Equal(t, "audio", body[0].Lane)
+}
+
+func TestGetPracticeCards_Image_UsesImageAsMediaURL(t *testing.T) {
+	q := &stubQuerier{
+		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
+			return []store.GetGroupPracticeCardsRow{
+				{
+					EbirdCode:      "spotto",
+					CommonName:     "Spotted Towhee",
+					ScientificName: "Pipilo maculatus",
+					AudioUrl:       "",
+					ImageUrl:       "https://r2.example.com/img.jpg",
+				},
+			}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=image", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []nextCardResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	require.Len(t, body, 1)
+	assert.Equal(t, "https://r2.example.com/img.jpg", body[0].MediaURL)
+	assert.Equal(t, "https://r2.example.com/img.jpg", body[0].PhotoURL)
+	assert.Equal(t, "image", body[0].Lane)
+}
+
+func TestGetPracticeCards_FiltersSpeciesWithNoMedia(t *testing.T) {
+	q := &stubQuerier{
+		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
+			return []store.GetGroupPracticeCardsRow{
+				// has audio
+				{EbirdCode: "spotto", AudioUrl: "https://r2.example.com/rec.mp3", ImageUrl: ""},
+				// no audio
+				{EbirdCode: "foxspa", AudioUrl: "", ImageUrl: ""},
+			}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []nextCardResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Len(t, body, 1)
+	assert.Equal(t, "spotto", body[0].EbirdCode)
+}
+
+func TestGetPracticeCards_EmptyGroup_ReturnsEmptyArray(t *testing.T) {
+	q := &stubQuerier{
+		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
+			return []store.GetGroupPracticeCardsRow{}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []nextCardResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Empty(t, body)
+}
+
+func TestGetPracticeCards_InvalidLane_Returns400(t *testing.T) {
+	h := makeHandler(&stubQuerier{})
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=video", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestGetPracticeCards_InvalidGroupID_Returns400(t *testing.T) {
+	h := makeHandler(&stubQuerier{})
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/notanumber/practice?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "notanumber")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }

@@ -95,6 +95,55 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
+	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	lane := r.URL.Query().Get("lane")
+	if lane != "audio" && lane != "image" {
+		http.Error(w, "lane must be audio or image", http.StatusBadRequest)
+		return
+	}
+
+	rows, err := h.queries.GetGroupPracticeCards(r.Context(), groupID)
+	if err != nil {
+		log.Printf("GetGroupPracticeCards error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	cards := make([]nextCardResponse, 0, len(rows))
+	for _, row := range rows {
+		var mediaURL, photoURL string
+		if lane == "audio" {
+			if row.AudioUrl == "" {
+				continue
+			}
+			mediaURL = row.AudioUrl
+			photoURL = row.ImageUrl
+		} else {
+			if row.ImageUrl == "" {
+				continue
+			}
+			mediaURL = row.ImageUrl
+			photoURL = row.ImageUrl
+		}
+		cards = append(cards, nextCardResponse{
+			EbirdCode:      row.EbirdCode,
+			CommonName:     row.CommonName,
+			ScientificName: row.ScientificName,
+			MediaURL:       mediaURL,
+			PhotoURL:       photoURL,
+			Lane:           lane,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, cards)
+}
+
 type rateCardRequest struct {
 	EbirdCode string `json:"ebird_code"`
 	Lane      string `json:"lane"`

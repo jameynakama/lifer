@@ -60,13 +60,13 @@ SELECT s.ebird_code, s.common_name, s.scientific_name,
             WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
             ORDER BY random() LIMIT 1),
            ''
-       ) AS audio_url,
+       )::text AS audio_url,
        COALESCE(
            (SELECT file_path FROM species_images
             WHERE species_code = s.ebird_code
             ORDER BY random() LIMIT 1),
            ''
-       ) AS image_url
+       )::text AS image_url
 FROM species s
 JOIN group_species gs ON gs.species_code = s.ebird_code
 WHERE gs.group_id = $1
