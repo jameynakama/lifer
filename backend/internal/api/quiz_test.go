@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -386,4 +387,22 @@ func TestGetPracticeCards_InvalidGroupID_Returns400(t *testing.T) {
 	h.getPracticeCards(w, r)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestGetPracticeCards_DBError_Returns500(t *testing.T) {
+	q := &stubQuerier{
+		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
+			return nil, errors.New("db error")
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
