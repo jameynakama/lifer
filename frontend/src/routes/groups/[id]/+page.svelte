@@ -74,10 +74,18 @@
 
 <div class="group-detail">
   <div class="actions">
-    <button class="btn-practice" onclick={() => goto(`/groups/${groupId}/quiz?lane=audio`)}>
+    <button class="btn-study" onclick={() => goto(`/groups/${groupId}/quiz?lane=audio`)}>
+      Study Audio
+    </button>
+    <button class="btn-study" onclick={() => goto(`/groups/${groupId}/quiz?lane=image`)}>
+      Study Image
+    </button>
+  </div>
+  <div class="actions">
+    <button class="btn-practice-outline" onclick={() => goto(`/groups/${groupId}/practice?lane=audio`)}>
       Practice Audio
     </button>
-    <button class="btn-practice" onclick={() => goto(`/groups/${groupId}/quiz?lane=image`)}>
+    <button class="btn-practice-outline" onclick={() => goto(`/groups/${groupId}/practice?lane=image`)}>
       Practice Image
     </button>
   </div>
@@ -133,10 +141,21 @@
     display: flex;
     gap: 0.75rem;
   }
-  .btn-practice {
+  .btn-study {
     background: var(--accent);
     color: #fff;
     border: none;
+    border-radius: 10px;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-practice-outline {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
     border-radius: 10px;
     padding: 0.625rem 1.25rem;
     font-size: 0.875rem;

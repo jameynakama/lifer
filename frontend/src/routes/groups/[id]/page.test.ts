@@ -29,14 +29,44 @@ describe('Group detail page', () => {
     })
   })
 
-  it('navigates to audio quiz on Practice Audio click', async () => {
+  it('navigates to audio quiz on Study Audio click', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: () => Promise.resolve(species),
     }))
     render(GroupDetailPage)
-    await vi.waitFor(() => screen.getByRole('button', { name: /practice audio/i }))
-    await fireEvent.click(screen.getByRole('button', { name: /practice audio/i }))
+    await vi.waitFor(() => screen.getByRole('button', { name: /study audio/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /study audio/i }))
     expect(goto).toHaveBeenCalledWith('/groups/42/quiz?lane=audio')
+  })
+
+  it('navigates to image quiz on Study Image click', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: () => Promise.resolve(species),
+    }))
+    render(GroupDetailPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /study image/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /study image/i }))
+    expect(goto).toHaveBeenCalledWith('/groups/42/quiz?lane=image')
+  })
+
+  it('navigates to practice page on Practice Audio click', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: () => Promise.resolve(species),
+    }))
+    render(GroupDetailPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /^practice audio$/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /^practice audio$/i }))
+    expect(goto).toHaveBeenCalledWith('/groups/42/practice?lane=audio')
+  })
+
+  it('navigates to practice page on Practice Image click', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: () => Promise.resolve(species),
+    }))
+    render(GroupDetailPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /^practice image$/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /^practice image$/i }))
+    expect(goto).toHaveBeenCalledWith('/groups/42/practice?lane=image')
   })
 
   it('searches species and shows results', async () => {
