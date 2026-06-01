@@ -11,6 +11,7 @@ import (
 
 	"github.com/jameynakama/lifer/internal/ebird"
 	"github.com/jameynakama/lifer/internal/r2"
+	"github.com/jameynakama/lifer/internal/xenocanto"
 )
 
 func nopSend(any) {}
@@ -137,6 +138,38 @@ yellbutt
 		if _, ok := res[k]; !ok {
 			t.Errorf("loadManualSkips()[%s] not found", k)
 		}
+	}
+}
+
+func TestInterleaveRecordings(t *testing.T) {
+	rec := func(id string) xenocanto.Recording { return xenocanto.Recording{ID: id} }
+	songs := []xenocanto.Recording{rec("s1"), rec("s2"), rec("s3")}
+	calls := []xenocanto.Recording{rec("c1"), rec("c2"), rec("c3")}
+
+	tests := []struct {
+		name         string
+		songs, calls []xenocanto.Recording
+		n            int
+		wantIDs      []string
+	}{
+		{"only calls fills budget", nil, calls, 4, []string{"c1", "c2", "c3"}},
+		{"only songs fills budget", songs, nil, 4, []string{"s1", "s2", "s3"}},
+		{"interleaves when both available", songs, calls, 4, []string{"s1", "c1", "s2", "c2"}},
+		{"cap respected", songs, calls, 2, []string{"s1", "c1"}},
+		{"call-heavy fills remaining from calls", []xenocanto.Recording{rec("s1")}, calls, 4, []string{"s1", "c1", "c2", "c3"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := interleaveRecordings(tt.songs, tt.calls, tt.n)
+			if len(got) != len(tt.wantIDs) {
+				t.Fatalf("len = %d, want %d: %v", len(got), len(tt.wantIDs), got)
+			}
+			for i, id := range tt.wantIDs {
+				if got[i].ID != id {
+					t.Errorf("[%d] = %q, want %q", i, got[i].ID, id)
+				}
+			}
+		})
 	}
 }
 

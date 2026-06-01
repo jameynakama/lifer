@@ -65,7 +65,6 @@ func ingestSpecies(
 	}
 
 	xcGenus, xcSpecies := xcGenSp(entry.SpeciesCode, entry.SciName, xcOverrides)
-	perType := maxRec / 2
 
 	type searchResult struct {
 		recType string
@@ -93,42 +92,48 @@ func ingestSpecies(
 		statsMu.Unlock()
 	}
 
+	// Collect both search results before uploading so we can fill the budget
+	// from whichever type has more recordings (e.g. waterfowl have calls but no songs).
+	var songs, calls []xenocanto.Recording
 	for range 2 {
 		result := <-searchCh
 		if result.err != nil {
 			recordFailure(fmt.Sprintf("xeno-canto search %s %s: %v", entry.SpeciesCode, result.recType, result.err))
 			continue
 		}
-		recs := result.recs
-		if len(recs) > perType {
-			recs = recs[:perType]
+		if result.recType == "song" {
+			songs = result.recs
+		} else {
+			calls = result.recs
 		}
-		for _, rec := range recs {
-			recWg.Add(1)
-			go func(rec xenocanto.Recording) {
-				defer recWg.Done()
-				dlSem <- struct{}{}
-				defer func() { <-dlSem }()
-				key := "recordings/" + sp.EbirdCode + "/" + rec.ID + ".mp3"
-				filePath, err := fetchAndUpload(ctx, r2c, rec.FileURL, key, "audio/mpeg", workerID, send)
-				if err != nil {
-					recordFailure(fmt.Sprintf("recording %s: %v", rec.ID, err))
-					return
-				}
-				if _, err := q.UpsertRecording(ctx, store.UpsertRecordingParams{
-					XenoCantoID: rec.ID,
-					SpeciesCode: sp.EbirdCode,
-					FilePath:    filePath,
-					Quality:     rec.Quality,
-					Type:        rec.Type,
-				}); err != nil {
-					return
-				}
-				statsMu.Lock()
-				stats.recordings++
-				statsMu.Unlock()
-			}(rec)
-		}
+	}
+	toUpload := interleaveRecordings(songs, calls, maxRec)
+
+	for _, rec := range toUpload {
+		recWg.Add(1)
+		go func(rec xenocanto.Recording) {
+			defer recWg.Done()
+			dlSem <- struct{}{}
+			defer func() { <-dlSem }()
+			key := "recordings/" + sp.EbirdCode + "/" + rec.ID + ".mp3"
+			filePath, err := fetchAndUpload(ctx, r2c, rec.FileURL, key, "audio/mpeg", workerID, send)
+			if err != nil {
+				recordFailure(fmt.Sprintf("recording %s: %v", rec.ID, err))
+				return
+			}
+			if _, err := q.UpsertRecording(ctx, store.UpsertRecordingParams{
+				XenoCantoID: rec.ID,
+				SpeciesCode: sp.EbirdCode,
+				FilePath:    filePath,
+				Quality:     rec.Quality,
+				Type:        rec.Type,
+			}); err != nil {
+				return
+			}
+			statsMu.Lock()
+			stats.recordings++
+			statsMu.Unlock()
+		}(rec)
 	}
 	recWg.Wait()
 
@@ -283,6 +288,21 @@ func filterArbitrary(codes []string, toSkip map[string]struct{}) []string {
 	for _, c := range codes {
 		if _, ok := toSkip[c]; !ok {
 			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// interleaveRecordings picks up to n recordings from songs and calls alternately,
+// so species with only one type still fill their full quota.
+func interleaveRecordings(songs, calls []xenocanto.Recording, n int) []xenocanto.Recording {
+	out := make([]xenocanto.Recording, 0, n)
+	for i := 0; len(out) < n && (i < len(songs) || i < len(calls)); i++ {
+		if i < len(songs) && len(out) < n {
+			out = append(out, songs[i])
+		}
+		if i < len(calls) && len(out) < n {
+			out = append(out, calls[i])
 		}
 	}
 	return out
