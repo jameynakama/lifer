@@ -12,6 +12,8 @@ import (
 	"github.com/jameynakama/lifer/internal/r2"
 )
 
+func nopSend(any) {}
+
 func TestFilterBySpecies(t *testing.T) {
 	taxMap := map[string]ebird.TaxonomyEntry{
 		"busti": {SpeciesCode: "busti", CommonName: "Bushtit"},
@@ -118,7 +120,7 @@ func TestFetchAndUpload_Success(t *testing.T) {
 		t.Fatalf("Should create r2 client: %v", err)
 	}
 
-	url, err := fetchAndUpload(context.Background(), r2c, src.URL, "recordings/busti/123.mp3", "audio/mpeg")
+	url, err := fetchAndUpload(context.Background(), r2c, src.URL, "recordings/busti/123.mp3", "audio/mpeg", 0, nopSend)
 	if err != nil {
 		t.Fatalf("Should fetch and upload without error: %v", err)
 	}
@@ -137,7 +139,7 @@ func TestFetchAndUpload_SourceNonOK_ReturnsError(t *testing.T) {
 	defer src.Close()
 
 	r2c, _ := r2.NewWithEndpoint("http://localhost:1", "k", "s", "bucket", "https://pub.example.com")
-	_, err := fetchAndUpload(context.Background(), r2c, src.URL, "key", "audio/mpeg")
+	_, err := fetchAndUpload(context.Background(), r2c, src.URL, "key", "audio/mpeg", 0, nopSend)
 	if err == nil {
 		t.Error("Should return error for non-200 source response")
 	}
@@ -166,11 +168,54 @@ func TestFetchAndUpload_Retries429(t *testing.T) {
 	defer r2s.Close()
 
 	r2c, _ := r2.NewWithEndpoint(r2s.URL, "k", "s", "bucket", "https://pub.example.com")
-	_, err := fetchAndUpload(context.Background(), r2c, src.URL, "key", "audio/mpeg")
+	_, err := fetchAndUpload(context.Background(), r2c, src.URL, "key", "audio/mpeg", 0, nopSend)
 	if err != nil {
 		t.Fatalf("Should succeed after retries: %v", err)
 	}
 	if attempts != 3 {
 		t.Errorf("Should take 3 attempts, got %d", attempts)
+	}
+}
+
+func TestFetchAndUpload_SendsMessageSequence(t *testing.T) {
+	src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("data"))
+	}))
+	defer src.Close()
+
+	r2s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"x"`)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer r2s.Close()
+
+	r2c, _ := r2.NewWithEndpoint(r2s.URL, "k", "s", "bucket", "https://pub.example.com")
+
+	var msgs []any
+	send := func(msg any) { msgs = append(msgs, msg) }
+
+	_, err := fetchAndUpload(context.Background(), r2c, src.URL, "recordings/amro/XC1.mp3", "audio/mpeg", 2, send)
+	if err != nil {
+		t.Fatalf("Should succeed: %v", err)
+	}
+
+	if len(msgs) != 3 {
+		t.Fatalf("Should send 3 messages (fetch, upload, done), got %d: %v", len(msgs), msgs)
+	}
+	if _, ok := msgs[0].(fetchStartedMsg); !ok {
+		t.Errorf("msg[0] should be fetchStartedMsg, got %T", msgs[0])
+	}
+	if _, ok := msgs[1].(uploadStartedMsg); !ok {
+		t.Errorf("msg[1] should be uploadStartedMsg, got %T", msgs[1])
+	}
+	done, ok := msgs[2].(uploadDoneMsg)
+	if !ok {
+		t.Errorf("msg[2] should be uploadDoneMsg, got %T", msgs[2])
+	}
+	if done.err != nil {
+		t.Errorf("uploadDoneMsg should have nil err, got %v", done.err)
+	}
+	if done.workerID != 2 {
+		t.Errorf("Should carry workerID 2, got %d", done.workerID)
 	}
 }

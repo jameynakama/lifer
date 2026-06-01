@@ -94,6 +94,7 @@ func ingestSpecies(
 	for range 2 {
 		result := <-searchCh
 		if result.err != nil {
+			recordFailure(fmt.Sprintf("xeno-canto search %s %s: %v", entry.SpeciesCode, result.recType, result.err))
 			continue
 		}
 		recs := result.recs
