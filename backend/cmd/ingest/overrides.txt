@@ -6,3 +6,7 @@
 # with 0 recordings -- those usually need an entry here.
 # The --xc-override flag overrides entries in this file.
 
+categr1=Bubulcus:ibis
+coohaw=Accipiter:cooperii
+norgos=Accipiter:gentilis
+pelcor=Urile:pelagicus
