@@ -4,13 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
-	"net/http"
 	"os"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jameynakama/lifer/internal/ebird"
@@ -25,8 +22,8 @@ func main() {
 	maxImages := flag.Int("max-images", 3, "max images per species")
 	workers := flag.Int("workers", 5, "concurrent worker count")
 	skipComplete := flag.Bool("skip-complete", false, "skip species that already have ≥1 recording and ≥1 image in the DB")
-	speciesFilter := flag.String("species", "", "comma-separated ebird codes or common names to process (e.g. busti or \"Bushtit,American Robin\")")
-	xcOverrideFlag := flag.String("xc-override", "", "comma-separated xeno-canto taxonomy overrides, e.g. \"comrav=Corvus:corax,calsja=Aphelocoma:californica\"")
+	speciesFilter := flag.String("species", "", "comma-separated ebird codes or common names to process")
+	xcOverrideFlag := flag.String("xc-override", "", "comma-separated xeno-canto taxonomy overrides, e.g. \"comrav=Corvus:corax\"")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: ingest [flags] <region-code> [region-code...]\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
@@ -39,12 +36,14 @@ func main() {
 
 	regions := flag.Args()
 	if len(regions) == 0 {
-		log.Fatal("usage: ingest [flags] <region-code> [region-code...]")
+		fmt.Fprintln(os.Stderr, "usage: ingest [flags] <region-code> [region-code...]")
+		os.Exit(1)
 	}
 
 	xcOverrides, err := parseXCOverrides(*xcOverrideFlag)
 	if err != nil {
-		log.Fatalf("--xc-override: %v", err)
+		fmt.Fprintf(os.Stderr, "--xc-override: %v\n", err)
+		os.Exit(1)
 	}
 
 	ebirdKey := mustEnv("EBIRD_API_KEY")
@@ -59,13 +58,15 @@ func main() {
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
-		log.Fatalf("db connect: %v", err)
+		fmt.Fprintf(os.Stderr, "db connect: %v\n", err)
+		os.Exit(1)
 	}
 	defer pool.Close()
 
 	r2c, err := r2.New(r2AccountID, r2AccessKey, r2SecretKey, r2Bucket, r2PubURL)
 	if err != nil {
-		log.Fatalf("r2 client: %v", err)
+		fmt.Fprintf(os.Stderr, "r2 client: %v\n", err)
+		os.Exit(1)
 	}
 
 	q := store.New(pool)
@@ -73,23 +74,24 @@ func main() {
 	xcClient := xenocanto.New(xcKey)
 	macaulayClient := macaulay.New(ebirdKey)
 
-	log.Println("fetching eBird taxonomy...")
+	fmt.Fprintln(os.Stderr, "fetching eBird taxonomy...")
 	taxonomy, err := ebirdClient.Taxonomy(ctx)
 	if err != nil {
-		log.Fatalf("fetch taxonomy: %v", err)
+		fmt.Fprintf(os.Stderr, "fetch taxonomy: %v\n", err)
+		os.Exit(1)
 	}
 	taxMap := make(map[string]ebird.TaxonomyEntry, len(taxonomy))
 	for _, t := range taxonomy {
 		taxMap[t.SpeciesCode] = t
 	}
-	log.Printf("taxonomy loaded: %d entries", len(taxMap))
+	fmt.Fprintf(os.Stderr, "taxonomy loaded: %d entries\n", len(taxMap))
 
 	seen := make(map[string]struct{})
 	var codes []string
 	for _, region := range regions {
 		list, err := ebirdClient.SpeciesList(ctx, region)
 		if err != nil {
-			log.Printf("warn: region %s: %v", region, err)
+			fmt.Fprintf(os.Stderr, "warn: region %s: %v\n", region, err)
 			continue
 		}
 		for _, code := range list {
@@ -98,21 +100,21 @@ func main() {
 				codes = append(codes, code)
 			}
 		}
-		log.Printf("region %s: %d species", region, len(list))
+		fmt.Fprintf(os.Stderr, "region %s: %d species\n", region, len(list))
 	}
-	log.Printf("total unique species: %d", len(codes))
 
 	if *speciesFilter != "" {
 		want := strings.Split(*speciesFilter, ",")
 		before := len(codes)
 		codes = filterBySpecies(codes, taxMap, want)
-		log.Printf("--species: filtered to %d/%d species", len(codes), before)
+		fmt.Fprintf(os.Stderr, "--species: filtered to %d/%d species\n", len(codes), before)
 	}
 
 	if *skipComplete {
 		completeCodes, err := q.ListCompleteSpeciesEbirdCodes(ctx)
 		if err != nil {
-			log.Fatalf("skip-complete: query complete species: %v", err)
+			fmt.Fprintf(os.Stderr, "skip-complete: query complete species: %v\n", err)
+			os.Exit(1)
 		}
 		complete := make(map[string]struct{}, len(completeCodes))
 		for _, c := range completeCodes {
@@ -120,79 +122,86 @@ func main() {
 		}
 		before := len(codes)
 		codes = filterComplete(codes, complete)
-		log.Printf("--skip-complete: skipping %d already-complete species, processing %d remaining", before-len(codes), len(codes))
+		fmt.Fprintf(os.Stderr, "--skip-complete: skipping %d already-complete species, processing %d remaining\n", before-len(codes), len(codes))
 	}
 
-	sem := make(chan struct{}, *workers)
+	// Pre-filter to codes with taxonomy entries; warn for missing ones.
+	type codeEntry struct {
+		code  string
+		entry ebird.TaxonomyEntry
+	}
+	var processable []codeEntry
+	for _, code := range codes {
+		if entry, ok := taxMap[code]; ok {
+			processable = append(processable, codeEntry{code, entry})
+		} else {
+			fmt.Fprintf(os.Stderr, "warn: no taxonomy entry for %s, skipping\n", code)
+		}
+	}
+	total := len(processable)
+	fmt.Fprintf(os.Stderr, "total unique species to process: %d\n", total)
+
+	// --- TUI placeholder: replaced in Task 6 ---
+	failedSpecies := map[string][]string{}
+	missingMedia := map[string]ingestStats{}
+
+	slots := make(chan int, *workers)
+	for i := range *workers {
+		slots <- i
+	}
+
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	started, done := 0, 0
-	total := len(codes)
-	failedSpecies := map[string][]string{}   // ebird_code → upload failure reasons
-	missingMedia := map[string]ingestStats{} // ebird_code → stats for species with 0 recordings or 0 images
 
-	for _, code := range codes {
-		entry, ok := taxMap[code]
-		if !ok {
-			log.Printf("warn: no taxonomy entry for %s, skipping", code)
-			continue
-		}
+	noop := func(any) {}
+
+	for _, ce := range processable {
+		workerID := <-slots
 		wg.Add(1)
-		sem <- struct{}{}
-		mu.Lock()
-		started++
-		n := started
-		mu.Unlock()
-		log.Printf("starting %d/%d: %s", n, total, entry.CommonName)
-		go func(code string, entry ebird.TaxonomyEntry) {
+		go func(ce codeEntry, workerID int) {
 			defer wg.Done()
-			defer func() { <-sem }()
-			stats, err := ingestSpecies(ctx, q, xcClient, macaulayClient, entry, *maxRecordings, *maxImages, r2c, xcOverrides)
+			defer func() { slots <- workerID }()
+			stats, err := ingestSpecies(ctx, q, xcClient, macaulayClient, ce.entry, *maxRecordings, *maxImages, r2c, xcOverrides, workerID, noop)
 			if err != nil {
-				log.Printf("error %s (%s): %v", entry.CommonName, code, err)
+				fmt.Fprintf(os.Stderr, "error %s (%s): %v\n", ce.entry.CommonName, ce.code, err)
 			}
 			mu.Lock()
 			if len(stats.failures) > 0 {
-				failedSpecies[code] = stats.failures
+				failedSpecies[ce.code] = stats.failures
 			} else if err == nil && (stats.recordings == 0 || stats.images == 0) {
-				missingMedia[code] = stats
+				missingMedia[ce.code] = stats
 			}
-			done++
-			n := done
 			mu.Unlock()
-			log.Printf("done %d/%d: %s", n, total, entry.CommonName)
-		}(code, entry)
+		}(ce, workerID)
 	}
 	wg.Wait()
-	skipped := total - done
-	if skipped > 0 {
-		log.Printf("ingestion complete: %d/%d species (%d skipped -- no taxonomy entry)", done, total, skipped)
-	} else {
-		log.Printf("ingestion complete: %d/%d species", done, total)
-	}
 
-	log.Println("cleaning up species missing recordings or images...")
+	fmt.Fprintf(os.Stderr, "ingestion complete: %d/%d species\n", total, total)
+
+	// --- post-run cleanup and reports ---
+	fmt.Fprintln(os.Stderr, "cleaning up species missing recordings or images...")
 	incomplete, err := q.ListIncompleteSpecies(ctx)
 	if err != nil {
-		log.Fatalf("cleanup: %v", err)
+		fmt.Fprintf(os.Stderr, "cleanup: %v\n", err)
+		os.Exit(1)
 	}
 	for _, code := range incomplete {
 		for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
 			if err := r2c.DeletePrefix(ctx, prefix); err != nil {
-				log.Printf("  warn: cleanup R2 %s: %v", prefix, err)
+				fmt.Fprintf(os.Stderr, "  warn: cleanup R2 %s: %v\n", prefix, err)
 			}
 		}
 		if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {
-			log.Printf("  warn: cleanup recordings %s: %v", code, err)
+			fmt.Fprintf(os.Stderr, "  warn: cleanup recordings %s: %v\n", code, err)
 		}
 		if err := q.DeleteSpeciesImagesBySpeciesCode(ctx, code); err != nil {
-			log.Printf("  warn: cleanup images %s: %v", code, err)
+			fmt.Fprintf(os.Stderr, "  warn: cleanup images %s: %v\n", code, err)
 		}
 		if err := q.DeleteSpeciesByCode(ctx, code); err != nil {
-			log.Printf("  warn: cleanup species %s: %v", code, err)
+			fmt.Fprintf(os.Stderr, "  warn: cleanup species %s: %v\n", code, err)
 		}
 	}
-	log.Printf("cleanup: removed %d incomplete species", len(incomplete))
+	fmt.Fprintf(os.Stderr, "cleanup: removed %d incomplete species\n", len(incomplete))
 
 	if len(failedSpecies) > 0 {
 		failedCodes := make([]string, 0, len(failedSpecies))
@@ -200,34 +209,33 @@ func main() {
 			failedCodes = append(failedCodes, code)
 		}
 		sort.Strings(failedCodes)
-
-		log.Printf("\n=== PARTIAL UPLOAD FAILURES (%d species) ===", len(failedSpecies))
+		fmt.Printf("\n=== PARTIAL UPLOAD FAILURES (%d species) ===\n", len(failedSpecies))
 		for _, code := range failedCodes {
 			name := taxMap[code].CommonName
-			log.Printf("  %s (%s):", name, code)
+			fmt.Printf("  %s (%s):\n", name, code)
 			for _, reason := range failedSpecies[code] {
-				log.Printf("    - %s", reason)
+				fmt.Printf("    - %s\n", reason)
 			}
 		}
-		log.Printf("cleaning up partial R2 uploads and DB entries for failed species...")
+		fmt.Println("cleaning up partial R2 uploads and DB entries for failed species...")
 		for _, code := range failedCodes {
 			for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
 				if err := r2c.DeletePrefix(ctx, prefix); err != nil {
-					log.Printf("  warn: R2 delete %s: %v", prefix, err)
+					fmt.Fprintf(os.Stderr, "  warn: R2 delete %s: %v\n", prefix, err)
 				}
 			}
 			if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {
-				log.Printf("  warn: DB delete recordings %s: %v", code, err)
+				fmt.Fprintf(os.Stderr, "  warn: DB delete recordings %s: %v\n", code, err)
 			}
 			if err := q.DeleteSpeciesImagesBySpeciesCode(ctx, code); err != nil {
-				log.Printf("  warn: DB delete images %s: %v", code, err)
+				fmt.Fprintf(os.Stderr, "  warn: DB delete images %s: %v\n", code, err)
 			}
 			if err := q.DeleteSpeciesByCode(ctx, code); err != nil {
-				log.Printf("  warn: DB delete species %s: %v", code, err)
+				fmt.Fprintf(os.Stderr, "  warn: DB delete species %s: %v\n", code, err)
 			}
 		}
-		log.Printf("re-run failed species with:")
-		log.Printf("  just ingest --species %s <region>", strings.Join(failedCodes, ","))
+		fmt.Printf("re-run failed species with:\n")
+		fmt.Printf("  just ingest --species %s <region>\n", strings.Join(failedCodes, ","))
 	}
 
 	if len(missingMedia) > 0 {
@@ -236,280 +244,26 @@ func main() {
 			missingCodes = append(missingCodes, code)
 		}
 		sort.Strings(missingCodes)
-
-		log.Printf("\n=== MISSING MEDIA (%d species) ===", len(missingMedia))
+		fmt.Printf("\n=== MISSING MEDIA (%d species) ===\n", len(missingMedia))
 		var xcMisses []string
 		for _, code := range missingCodes {
 			stats := missingMedia[code]
 			name := taxMap[code].CommonName
 			switch {
 			case stats.recordings == 0 && stats.images == 0:
-				log.Printf("  %s (%s): no recordings, no images", name, code)
+				fmt.Printf("  %s (%s): no recordings, no images\n", name, code)
 				xcMisses = append(xcMisses, code)
 			case stats.recordings == 0:
-				log.Printf("  %s (%s): no recordings (xeno-canto miss -- check taxonomy)", name, code)
+				fmt.Printf("  %s (%s): no recordings (xeno-canto miss -- check taxonomy)\n", name, code)
 				xcMisses = append(xcMisses, code)
 			case stats.images == 0:
-				log.Printf("  %s (%s): no images (macaulay miss)", name, code)
+				fmt.Printf("  %s (%s): no images (macaulay miss)\n", name, code)
 			}
 		}
 		if len(xcMisses) > 0 {
-			log.Printf("for xeno-canto misses, research the species on xeno-canto.org then re-run:")
-			log.Printf("  just ingest --xc-override \"<code>=Genus:species,...\" --skip-complete <region>")
-			log.Printf("  missing codes: %s", strings.Join(xcMisses, ","))
+			fmt.Println("for xeno-canto misses, research the species on xeno-canto.org then re-run:")
+			fmt.Printf("  just ingest --xc-override \"<code>=Genus:species,...\" --skip-complete <region>\n")
+			fmt.Printf("  missing codes: %s\n", strings.Join(xcMisses, ","))
 		}
 	}
-}
-
-func filterBySpecies(codes []string, taxMap map[string]ebird.TaxonomyEntry, want []string) []string {
-	if len(want) == 0 {
-		return []string{}
-	}
-	match := make(map[string]struct{}, len(want))
-	for _, w := range want {
-		lower := strings.ToLower(w)
-		if _, ok := taxMap[lower]; ok {
-			match[lower] = struct{}{}
-			continue
-		}
-		for code, entry := range taxMap {
-			if strings.ToLower(entry.CommonName) == lower {
-				match[code] = struct{}{}
-				break
-			}
-		}
-	}
-	out := make([]string, 0, len(match))
-	for _, c := range codes {
-		if _, ok := match[c]; ok {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
-func filterComplete(codes []string, complete map[string]struct{}) []string {
-	out := make([]string, 0, len(codes))
-	for _, c := range codes {
-		if _, ok := complete[c]; !ok {
-			out = append(out, c)
-		}
-	}
-	return out
-}
-
-type ingestStats struct {
-	failures   []string
-	recordings int
-	images     int
-}
-
-// ingestSpecies fetches and uploads media for one species.
-// xcOverrides maps ebird codes to [genus, species] pairs for species where
-// xeno-canto uses different taxonomy than eBird.
-func ingestSpecies(
-	ctx context.Context,
-	q *store.Queries,
-	xc *xenocanto.Client,
-	mac *macaulay.Client,
-	entry ebird.TaxonomyEntry,
-	maxRec, maxImg int,
-	r2c *r2.Client,
-	xcOverrides map[string][2]string,
-) (ingestStats, error) {
-	sp, err := q.UpsertSpecies(ctx, store.UpsertSpeciesParams{
-		EbirdCode:      entry.SpeciesCode,
-		CommonName:     entry.CommonName,
-		ScientificName: entry.SciName,
-	})
-	if err != nil {
-		return ingestStats{}, fmt.Errorf("upsert species: %w", err)
-	}
-
-	xcGenus, xcSpecies := xcGenSp(entry.SpeciesCode, entry.SciName, xcOverrides)
-	perType := maxRec / 2
-
-	type searchResult struct {
-		recType string
-		recs    []xenocanto.Recording
-		err     error
-	}
-	searchCh := make(chan searchResult, 2)
-	for _, recType := range []string{"song", "call"} {
-		go func(rt string) {
-			recs, err := xc.Search(ctx, xcGenus, xcSpecies, rt)
-			searchCh <- searchResult{rt, recs, err}
-		}(recType)
-	}
-
-	var (
-		recWg   sync.WaitGroup
-		statsMu sync.Mutex
-		stats   ingestStats
-	)
-
-	recordFailure := func(reason string) {
-		statsMu.Lock()
-		stats.failures = append(stats.failures, reason)
-		statsMu.Unlock()
-	}
-
-	for range 2 {
-		result := <-searchCh
-		if result.err != nil {
-			log.Printf("  warn: xeno-canto %s %s: %v", entry.SpeciesCode, result.recType, result.err)
-			continue
-		}
-		recs := result.recs
-		if len(recs) > perType {
-			recs = recs[:perType]
-		}
-		for _, rec := range recs {
-			recWg.Add(1)
-			go func(rec xenocanto.Recording) {
-				defer recWg.Done()
-				key := "recordings/" + sp.EbirdCode + "/" + rec.ID + ".mp3"
-				filePath, err := fetchAndUpload(ctx, r2c, rec.FileURL, key, "audio/mpeg")
-				if err != nil {
-					log.Printf("  warn: upload recording %s: %v", rec.ID, err)
-					recordFailure(fmt.Sprintf("recording %s: %v", rec.ID, err))
-					return
-				}
-				if _, err := q.UpsertRecording(ctx, store.UpsertRecordingParams{
-					XenoCantoID: rec.ID,
-					SpeciesCode: sp.EbirdCode,
-					FilePath:    filePath,
-					Quality:     rec.Quality,
-					Type:        rec.Type,
-				}); err != nil {
-					log.Printf("  warn: upsert recording %s: %v", rec.ID, err)
-					return
-				}
-				statsMu.Lock()
-				stats.recordings++
-				statsMu.Unlock()
-			}(rec)
-		}
-	}
-	recWg.Wait()
-
-	photos, err := mac.Photos(ctx, entry.SpeciesCode, maxImg)
-	if err != nil {
-		log.Printf("  warn: macaulay %s: %v", entry.SpeciesCode, err)
-		return stats, nil
-	}
-
-	var imgWg sync.WaitGroup
-	for _, photo := range photos {
-		imgWg.Add(1)
-		go func(photo macaulay.Photo) {
-			defer imgWg.Done()
-			key := "images/" + sp.EbirdCode + "/" + photo.AssetID + ".jpg"
-			filePath, err := fetchAndUpload(ctx, r2c, mac.PhotoURL(photo.AssetID), key, "image/jpeg")
-			if err != nil {
-				log.Printf("  warn: upload image %s: %v", photo.AssetID, err)
-				recordFailure(fmt.Sprintf("image %s: %v", photo.AssetID, err))
-				return
-			}
-			if _, err := q.UpsertSpeciesImage(ctx, store.UpsertSpeciesImageParams{
-				MacaulayID:  photo.AssetID,
-				SpeciesCode: sp.EbirdCode,
-				FilePath:    filePath,
-				Credit:      photo.UserDisplayName,
-			}); err != nil {
-				log.Printf("  warn: upsert image %s: %v", photo.AssetID, err)
-				return
-			}
-			statsMu.Lock()
-			stats.images++
-			statsMu.Unlock()
-		}(photo)
-	}
-	imgWg.Wait()
-	return stats, nil
-}
-
-// xcGenSp returns the genus and species to use for a xeno-canto query.
-// Checks xcOverrides first; falls back to parsing the eBird scientific name.
-func xcGenSp(ebirdCode, sciName string, xcOverrides map[string][2]string) (genus, species string) {
-	if override, ok := xcOverrides[ebirdCode]; ok {
-		return override[0], override[1]
-	}
-	parts := strings.Fields(sciName)
-	if len(parts) >= 2 {
-		return parts[0], parts[1]
-	}
-	return sciName, ""
-}
-
-// parseXCOverrides parses "--xc-override comrav=Corvus:corax,calsja=Aphelocoma:californica"
-// into a map of ebird code → [genus, species].
-func parseXCOverrides(s string) (map[string][2]string, error) {
-	out := make(map[string][2]string)
-	if s == "" {
-		return out, nil
-	}
-	for _, entry := range strings.Split(s, ",") {
-		kv := strings.SplitN(entry, "=", 2)
-		if len(kv) != 2 {
-			return nil, fmt.Errorf("expected code=Genus:species, got %q", entry)
-		}
-		genSp := strings.SplitN(kv[1], ":", 2)
-		if len(genSp) != 2 {
-			return nil, fmt.Errorf("expected Genus:species after =, got %q", kv[1])
-		}
-		out[kv[0]] = [2]string{genSp[0], genSp[1]}
-	}
-	return out, nil
-}
-
-// retryDelays controls the wait between attempts on a 429 response from the source CDN.
-// Overridable in tests.
-var retryDelays = []time.Duration{2 * time.Second, 4 * time.Second, 8 * time.Second}
-
-// fetchAndUpload GETs from sourceURL and uploads the body to R2 at key.
-// Retries on 429 from the source. Returns the full public R2 URL.
-func fetchAndUpload(ctx context.Context, r2c *r2.Client, sourceURL, key, contentType string) (string, error) {
-	var lastErr error
-	for attempt := range len(retryDelays) + 1 {
-		if attempt > 0 {
-			select {
-			case <-time.After(retryDelays[attempt-1]):
-			case <-ctx.Done():
-				return "", ctx.Err()
-			}
-		}
-		req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
-		if err != nil {
-			return "", err
-		}
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			return "", err
-		}
-		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
-			lastErr = fmt.Errorf("fetch %s: status 429", sourceURL)
-			continue
-		}
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			return "", fmt.Errorf("fetch %s: status %d", sourceURL, resp.StatusCode)
-		}
-		url, err := r2c.Upload(ctx, key, contentType, resp.Body)
-		resp.Body.Close()
-		if err != nil {
-			return "", err
-		}
-		return url, nil
-	}
-	return "", lastErr
-}
-
-func mustEnv(key string) string {
-	v := os.Getenv(key)
-	if v == "" {
-		log.Fatalf("required env var %s is not set", key)
-	}
-	return v
 }
