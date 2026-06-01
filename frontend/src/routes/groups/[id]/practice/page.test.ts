@@ -9,6 +9,7 @@ vi.mock('wavesurfer.js', () => ({
     create: vi.fn(() => ({
       on: vi.fn((event: string, cb: () => void) => { if (event === 'ready') cb() }),
       playPause: vi.fn(),
+      pause: vi.fn(),
       destroy: vi.fn(),
     })),
   },

@@ -6,6 +6,7 @@
 
   let container: HTMLDivElement
   let ws: WaveSurfer
+  let audio: HTMLAudioElement
   let playing = $state(false)
   let ready = $state(false)
 
@@ -27,7 +28,7 @@
     const waveColor = style.getPropertyValue('--text-secondary').trim() || '#94a3b8'
     const progressColor = style.getPropertyValue('--accent').trim() || '#2563eb'
 
-    const audio = document.createElement('audio')
+    audio = document.createElement('audio')
     audio.src = url
     audio.preload = 'auto'
 
@@ -49,8 +50,16 @@
     ws.on('pause', () => { playing = false })
     ws.on('finish', () => { playing = false })
 
-    return () => ws.destroy()
+    return () => {
+      audio?.pause()
+      ws.destroy()
+    }
   })
+
+  export function stop() {
+    audio?.pause()
+    ws?.pause()
+  }
 
   function togglePlay() {
     ws?.playPause()

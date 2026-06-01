@@ -63,6 +63,7 @@
     bind:value={query}
     oninput={handleInput}
     onkeydown={handleKeydown}
+    autofocus
     placeholder="Type species name..."
     class="typeahead-input"
     autocomplete="off"

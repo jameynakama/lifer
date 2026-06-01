@@ -46,6 +46,32 @@ func (h *Handler) groupOwnerCheck(w http.ResponseWriter, r *http.Request, groupI
 	return true
 }
 
+func (h *Handler) getGroupDetail(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+
+	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid group id", http.StatusBadRequest)
+		return
+	}
+
+	group, err := h.queries.GetGroupWithDue(r.Context(), store.GetGroupWithDueParams{
+		ID:     groupID,
+		UserID: userID,
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("GetGroupWithDue error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, group)
+}
+
 func (h *Handler) listGroups(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 	groups, err := h.queries.ListUserGroups(r.Context(), userID)

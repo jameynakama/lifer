@@ -4,17 +4,19 @@ import ImageQuizCard from './ImageQuizCard.svelte'
 import type { BirdCard, Species } from '../types'
 
 const card: BirdCard = {
-  species_id: 1,
+  ebird_code: 'sonspa',
   common_name: 'Song Sparrow',
   scientific_name: 'Melospiza melodia',
   media_url: '/photos/song-sparrow.jpg',
   photo_url: '/photos/song-sparrow.jpg',
   lane: 'image' as const,
+  recording_type: '',
+  due_remaining: 5,
 }
 
 const species: Species[] = [
-  { id: 1, common_name: 'Song Sparrow', scientific_name: 'Melospiza melodia', ebird_code: 'sonspa' },
-  { id: 2, common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', ebird_code: 'foxspa' },
+  { common_name: 'Song Sparrow', scientific_name: 'Melospiza melodia', ebird_code: 'sonspa' },
+  { common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', ebird_code: 'foxspa' },
 ]
 
 describe('ImageQuizCard', () => {

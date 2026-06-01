@@ -24,6 +24,8 @@ type nextCardResponse struct {
 	MediaURL       string `json:"media_url"`
 	PhotoURL       string `json:"photo_url"`
 	Lane           string `json:"lane"`
+	RecordingType  string `json:"recording_type"`
+	DueRemaining   int64  `json:"due_remaining"`
 }
 
 func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
@@ -56,21 +58,44 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var mediaURL string
-	if lane == "audio" {
-		mediaURL, err = h.queries.GetRandomRecording(r.Context(), card.SpeciesCode)
-	} else {
-		mediaURL, err = h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
-	}
-	if errors.Is(err, pgx.ErrNoRows) {
-		log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
-		http.Error(w, "no media available", http.StatusInternalServerError)
-		return
-	}
+	dueRemaining, err := h.queries.CountDueCards(r.Context(), store.CountDueCardsParams{
+		UserID:  userID,
+		GroupID: groupID,
+		Lane:    lane,
+	})
 	if err != nil {
-		log.Printf("GetRandom media error: %v", err)
+		log.Printf("CountDueCards error: %v", err)
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
+	}
+
+	var mediaURL, recordingType string
+	if lane == "audio" {
+		rec, recErr := h.queries.GetRandomRecording(r.Context(), card.SpeciesCode)
+		if errors.Is(recErr, pgx.ErrNoRows) {
+			log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
+			http.Error(w, "no media available", http.StatusInternalServerError)
+			return
+		}
+		if recErr != nil {
+			log.Printf("GetRandom media error: %v", recErr)
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
+		mediaURL = rec.FilePath
+		recordingType = rec.Type
+	} else {
+		mediaURL, err = h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
+		if errors.Is(err, pgx.ErrNoRows) {
+			log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
+			http.Error(w, "no media available", http.StatusInternalServerError)
+			return
+		}
+		if err != nil {
+			log.Printf("GetRandom media error: %v", err)
+			http.Error(w, "server error", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	photoURL := mediaURL
@@ -92,6 +117,8 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		MediaURL:       mediaURL,
 		PhotoURL:       photoURL,
 		Lane:           lane,
+		RecordingType:  recordingType,
+		DueRemaining:   dueRemaining,
 	})
 }
 

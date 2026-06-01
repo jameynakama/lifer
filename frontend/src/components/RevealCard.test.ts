@@ -3,20 +3,32 @@ import { render, screen, fireEvent } from '@testing-library/svelte'
 import RevealCard from './RevealCard.svelte'
 import type { BirdCard, Species } from '../types'
 
+vi.mock('wavesurfer.js', () => ({
+  default: {
+    create: vi.fn(() => ({
+      on: vi.fn((event: string, cb: () => void) => { if (event === 'ready') cb() }),
+      pause: vi.fn(),
+      destroy: vi.fn(),
+    })),
+  },
+}))
+
 const card: BirdCard = {
-  species_id: 1,
+  ebird_code: 'sonspa',
   common_name: 'Song Sparrow',
   scientific_name: 'Melospiza melodia',
   media_url: '/recordings/song-sparrow.mp3',
   photo_url: '/photos/song-sparrow.jpg',
   lane: 'audio' as const,
+  recording_type: 'song',
+  due_remaining: 5,
 }
 
 const songSparrow: Species = {
-  id: 1, common_name: 'Song Sparrow', scientific_name: 'Melospiza melodia', ebird_code: 'sonspa',
+  common_name: 'Song Sparrow', scientific_name: 'Melospiza melodia', ebird_code: 'sonspa',
 }
 const foxSparrow: Species = {
-  id: 2, common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', ebird_code: 'foxspa',
+  common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', ebird_code: 'foxspa',
 }
 
 describe('RevealCard', () => {

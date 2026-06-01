@@ -7,6 +7,28 @@ spoowl  # Spotted Owl
 cocboo1  # Cocos Booby
 wewvir2  # Now eastern and western species; XC only has the old generic one
 
+# No recordings
+tufpuf
+xanmur1
+xanmur2
+bulshe
+horpuf
+motpet
+murpet
+rhiauk
+shtalb
+stepet
+
 # Erroneous eBird reports for this region
 zebfin2  # Zebra Finch (captive/escaped birds only)
 sibpip1  # Siberian pipit (not sure...)
+bkspet
+coopet
+eurdot
+grekno
+jufpet
+lessap2
+lobmur
+mouplo
+strshe
+wilplo

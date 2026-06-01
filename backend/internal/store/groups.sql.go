@@ -81,6 +81,49 @@ func (q *Queries) GetGroup(ctx context.Context, id int64) (Group, error) {
 	return i, err
 }
 
+const getGroupWithDue = `-- name: GetGroupWithDue :one
+SELECT g.id, g.name, g.description, g.is_preset, g.owner_id, g.created_at,
+    COUNT(CASE WHEN c.lane = 'audio' AND c.due <= NOW() THEN 1 END) AS audio_due,
+    COUNT(CASE WHEN c.lane = 'image' AND c.due <= NOW() THEN 1 END) AS image_due
+FROM groups g
+LEFT JOIN group_species gs ON gs.group_id = g.id
+LEFT JOIN cards c ON c.species_code = gs.species_code AND c.user_id = $2
+WHERE g.id = $1
+GROUP BY g.id
+`
+
+type GetGroupWithDueParams struct {
+	ID     int64 `db:"id" json:"id"`
+	UserID int64 `db:"user_id" json:"user_id"`
+}
+
+type GetGroupWithDueRow struct {
+	ID          int64              `db:"id" json:"id"`
+	Name        string             `db:"name" json:"name"`
+	Description string             `db:"description" json:"description"`
+	IsPreset    bool               `db:"is_preset" json:"is_preset"`
+	OwnerID     pgtype.Int8        `db:"owner_id" json:"owner_id"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	AudioDue    int64              `db:"audio_due" json:"audio_due"`
+	ImageDue    int64              `db:"image_due" json:"image_due"`
+}
+
+func (q *Queries) GetGroupWithDue(ctx context.Context, arg GetGroupWithDueParams) (GetGroupWithDueRow, error) {
+	row := q.db.QueryRow(ctx, getGroupWithDue, arg.ID, arg.UserID)
+	var i GetGroupWithDueRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.IsPreset,
+		&i.OwnerID,
+		&i.CreatedAt,
+		&i.AudioDue,
+		&i.ImageDue,
+	)
+	return i, err
+}
+
 const listGroupSpecies = `-- name: ListGroupSpecies :many
 SELECT s.ebird_code, s.common_name, s.scientific_name
 FROM species s

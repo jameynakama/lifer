@@ -10,17 +10,27 @@
 
   let groupId = $derived(page.params.id)
   let groupSpecies: Species[] = $state([])
+  let audioDue = $state(0)
+  let imageDue = $state(0)
   let searchQuery = $state('')
   let searchResults: Species[] = $state([])
   let loading = $state(true)
   let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-  async function loadSpecies() {
+  async function loadGroup() {
     try {
-      const res = await fetch(`/api/v1/groups/${groupId}/species`)
-      if (res.ok) groupSpecies = await res.json()
+      const [groupRes, speciesRes] = await Promise.all([
+        fetch(`/api/v1/groups/${groupId}`),
+        fetch(`/api/v1/groups/${groupId}/species`),
+      ])
+      if (groupRes.ok) {
+        const g = await groupRes.json()
+        audioDue = g.audio_due ?? 0
+        imageDue = g.image_due ?? 0
+      }
+      if (speciesRes.ok) groupSpecies = await speciesRes.json()
     } catch {
-      // network error, leave groupSpecies empty
+      // network error
     } finally {
       loading = false
     }
@@ -62,7 +72,7 @@
   }
 
   $effect(() => {
-    if (groupId) loadSpecies()
+    if (groupId) loadGroup()
   })
 
   $effect(() => {
@@ -74,11 +84,19 @@
 
 <div class="group-detail">
   <div class="actions">
-    <button class="btn-study" onclick={() => goto(`/groups/${groupId}/quiz?lane=audio`)}>
-      Study Audio
+    <button
+      class="btn-study"
+      onclick={() => goto(`/groups/${groupId}/quiz?lane=audio`)}
+      disabled={audioDue === 0}
+    >
+      Study Audio{#if audioDue > 0}<span class="due-badge">{audioDue}</span>{/if}
     </button>
-    <button class="btn-study" onclick={() => goto(`/groups/${groupId}/quiz?lane=image`)}>
-      Study Image
+    <button
+      class="btn-study"
+      onclick={() => goto(`/groups/${groupId}/quiz?lane=image`)}
+      disabled={imageDue === 0}
+    >
+      Study Image{#if imageDue > 0}<span class="due-badge">{imageDue}</span>{/if}
     </button>
   </div>
   <div class="actions">
@@ -151,6 +169,21 @@
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .btn-study:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  .due-badge {
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    padding: 0.1rem 0.45rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    line-height: 1.4;
   }
   .btn-practice-outline {
     background: transparent;

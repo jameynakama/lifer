@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { BirdCard, Species } from '../types'
+  import WavePlayer from './WavePlayer.svelte'
 
   let { card, correct, guessed, onNext }: {
     card: BirdCard
@@ -25,6 +26,15 @@
       <span>✗ You didn't know</span>
     {/if}
   </div>
+
+  {#if card.lane === 'audio'}
+    <div class="audio-card">
+      {#if card.recording_type}
+        <span class="recording-type">{card.recording_type}</span>
+      {/if}
+      <WavePlayer url={card.media_url} />
+    </div>
+  {/if}
 
   <div class="photo-card">
     <div class="photo-wrapper">
@@ -70,6 +80,27 @@
     background: rgba(127, 29, 29, 0.25);
     color: #f87171;
     border-color: rgba(127, 29, 29, 0.6);
+  }
+  .audio-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    box-shadow: var(--shadow);
+    position: relative;
+  }
+  .recording-type {
+    display: inline-block;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.125rem 0.375rem;
+    margin-bottom: 0.5rem;
   }
   .photo-card {
     background: var(--surface);

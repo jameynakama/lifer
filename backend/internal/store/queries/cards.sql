@@ -14,10 +14,19 @@ ORDER BY c.due
 LIMIT 1;
 
 -- name: GetRandomRecording :one
-SELECT file_path FROM species_recordings
+SELECT file_path, type FROM species_recordings
 WHERE species_code = $1 AND quality IN ('A', 'B')
 ORDER BY random()
 LIMIT 1;
+
+-- name: CountDueCards :one
+SELECT COUNT(*)
+FROM cards c
+JOIN group_species gs ON gs.species_code = c.species_code
+WHERE c.user_id = $1
+  AND gs.group_id = $2
+  AND c.lane = $3
+  AND c.due <= NOW();
 
 -- name: GetRandomImage :one
 SELECT file_path FROM species_images

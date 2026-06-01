@@ -11,6 +11,29 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countDueCards = `-- name: CountDueCards :one
+SELECT COUNT(*)
+FROM cards c
+JOIN group_species gs ON gs.species_code = c.species_code
+WHERE c.user_id = $1
+  AND gs.group_id = $2
+  AND c.lane = $3
+  AND c.due <= NOW()
+`
+
+type CountDueCardsParams struct {
+	UserID  int64  `db:"user_id" json:"user_id"`
+	GroupID int64  `db:"group_id" json:"group_id"`
+	Lane    string `db:"lane" json:"lane"`
+}
+
+func (q *Queries) CountDueCards(ctx context.Context, arg CountDueCardsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countDueCards, arg.UserID, arg.GroupID, arg.Lane)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deleteCard = `-- name: DeleteCard :exec
 DELETE FROM cards
 WHERE user_id = $1 AND species_code = $2 AND lane = $3
@@ -190,17 +213,22 @@ func (q *Queries) GetRandomImage(ctx context.Context, speciesCode string) (strin
 }
 
 const getRandomRecording = `-- name: GetRandomRecording :one
-SELECT file_path FROM species_recordings
+SELECT file_path, type FROM species_recordings
 WHERE species_code = $1 AND quality IN ('A', 'B')
 ORDER BY random()
 LIMIT 1
 `
 
-func (q *Queries) GetRandomRecording(ctx context.Context, speciesCode string) (string, error) {
+type GetRandomRecordingRow struct {
+	FilePath string `db:"file_path" json:"file_path"`
+	Type     string `db:"type" json:"type"`
+}
+
+func (q *Queries) GetRandomRecording(ctx context.Context, speciesCode string) (GetRandomRecordingRow, error) {
 	row := q.db.QueryRow(ctx, getRandomRecording, speciesCode)
-	var file_path string
-	err := row.Scan(&file_path)
-	return file_path, err
+	var i GetRandomRecordingRow
+	err := row.Scan(&i.FilePath, &i.Type)
+	return i, err
 }
 
 const updateCardSchedule = `-- name: UpdateCardSchedule :one

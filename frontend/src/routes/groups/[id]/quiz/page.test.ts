@@ -10,6 +10,7 @@ vi.mock('wavesurfer.js', () => ({
     create: vi.fn(() => ({
       on: vi.fn((event: string, cb: () => void) => { if (event === 'ready') cb() }),
       playPause: vi.fn(),
+      pause: vi.fn(),
       destroy: vi.fn(),
     })),
   },
@@ -22,6 +23,8 @@ const card = {
   media_url: '/recordings/song-sparrow.mp3',
   photo_url: '/photos/song-sparrow.jpg',
   lane: 'audio',
+  recording_type: 'song',
+  due_remaining: 5,
 }
 
 const species = [

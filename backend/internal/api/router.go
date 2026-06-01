@@ -50,6 +50,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 
 			r.Get("/groups", h.listGroups)
 			r.Post("/groups", h.createGroup)
+			r.Get("/groups/{id}", h.getGroupDetail)
 			r.Patch("/groups/{id}", h.updateGroup)
 			r.Delete("/groups/{id}", h.deleteGroup)
 

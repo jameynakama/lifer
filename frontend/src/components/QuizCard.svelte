@@ -10,22 +10,28 @@
   } = $props()
 
   let selected: Species | null = $state(null)
+  let player: WavePlayer
+
+  function reveal(s: Species | null) {
+    player?.stop()
+    onReveal(s)
+  }
 </script>
 
 <div class="quiz-card">
   <div class="audio-card">
-    <WavePlayer url={card.media_url} />
+    <WavePlayer url={card.media_url} bind:this={player} />
   </div>
-  <SpeciesTypeahead {species} onSelect={(s) => { selected = s }} onSubmit={() => { if (selected) onReveal(selected) }} />
+  <SpeciesTypeahead {species} onSelect={(s) => { selected = s }} onSubmit={() => { if (selected) reveal(selected) }} />
   <div class="actions">
     <button
       class="btn-reveal"
-      onclick={() => onReveal(selected)}
+      onclick={() => reveal(selected)}
       disabled={selected === null}
     >
       Reveal answer
     </button>
-    <button class="btn-skip" onclick={() => onReveal(null)}>
+    <button class="btn-skip" onclick={() => reveal(null)}>
       I don't know
     </button>
   </div>

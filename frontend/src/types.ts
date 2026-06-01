@@ -10,6 +10,8 @@ export interface BirdCard {
     media_url: string;
     photo_url: string;
     lane: 'audio' | 'image';
+    recording_type: string;
+    due_remaining: number;
 }
 
 export interface Group {

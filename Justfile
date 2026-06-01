@@ -2,13 +2,21 @@ set dotenv-load
 
 default: test
 
-# Run all backend tests
+# Run tests with nicer output
 test args='':
-    cd backend && go test {{ args }} ./...
+    cd backend && gotestsum ./... -- {{ args }}
 
-# Start the backend server
+# Run regular tests with certain args that gotestsum seems to ignore
+gotest args='':
+    cd backend && go test ./... {{ args }}
+
+# Run tests with coverage report
+cover:
+    cd backend && gotestsum -- -coverprofile=coverage.out ./... && go tool cover -func=coverage.out
+
+# Start the backend server (hot-reload via air)
 run:
-    cd backend && go run ./cmd/server
+    cd backend && air
 
 # Build the backend binary
 build:
@@ -42,3 +50,5 @@ ingest *args:
 install-tools:
     brew install sqlc
     go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+    go install github.com/air-verse/air@latest
+    go install gotest.tools/gotestsum@latest

@@ -75,8 +75,9 @@
     await fetchNext()
   }
 
+  const total = $derived(reviewed + (card?.due_remaining ?? 0))
   const stats = $derived([
-    { label: 'Reviewed', value: reviewed },
+    { label: 'Reviewed', value: total > 0 ? `${reviewed}/${total}` : reviewed },
     { label: 'Lane', value: lane === 'audio' ? '🔊 Audio' : '👁 Image' },
   ])
 

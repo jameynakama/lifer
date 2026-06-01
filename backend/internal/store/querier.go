@@ -12,6 +12,7 @@ import (
 
 type Querier interface {
 	AddSpeciesToGroup(ctx context.Context, arg AddSpeciesToGroupParams) error
+	CountDueCards(ctx context.Context, arg CountDueCardsParams) (int64, error)
 	CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error)
 	DeleteCard(ctx context.Context, arg DeleteCardParams) error
 	DeleteGroup(ctx context.Context, id int64) error
@@ -21,11 +22,12 @@ type Querier interface {
 	GetCard(ctx context.Context, arg GetCardParams) (Card, error)
 	GetGroup(ctx context.Context, id int64) (Group, error)
 	GetGroupPracticeCards(ctx context.Context, groupID int64) ([]GetGroupPracticeCardsRow, error)
+	GetGroupWithDue(ctx context.Context, arg GetGroupWithDueParams) (GetGroupWithDueRow, error)
 	GetGroupsForSpecies(ctx context.Context, arg GetGroupsForSpeciesParams) ([]int64, error)
 	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
 	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)
 	GetRandomImage(ctx context.Context, speciesCode string) (string, error)
-	GetRandomRecording(ctx context.Context, speciesCode string) (string, error)
+	GetRandomRecording(ctx context.Context, speciesCode string) (GetRandomRecordingRow, error)
 	GetSpeciesByCode(ctx context.Context, ebirdCode string) (GetSpeciesByCodeRow, error)
 	GetSpeciesImages(ctx context.Context, speciesCode string) ([]GetSpeciesImagesRow, error)
 	GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]GetSpeciesRecordingsRow, error)

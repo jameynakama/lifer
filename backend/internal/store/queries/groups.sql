@@ -14,6 +14,16 @@ SELECT id, name, description, is_preset, owner_id, created_at
 FROM groups
 WHERE id = $1;
 
+-- name: GetGroupWithDue :one
+SELECT g.id, g.name, g.description, g.is_preset, g.owner_id, g.created_at,
+    COUNT(CASE WHEN c.lane = 'audio' AND c.due <= NOW() THEN 1 END) AS audio_due,
+    COUNT(CASE WHEN c.lane = 'image' AND c.due <= NOW() THEN 1 END) AS image_due
+FROM groups g
+LEFT JOIN group_species gs ON gs.group_id = g.id
+LEFT JOIN cards c ON c.species_code = gs.species_code AND c.user_id = $2
+WHERE g.id = $1
+GROUP BY g.id;
+
 -- name: CreateGroup :one
 INSERT INTO groups (name, owner_id)
 VALUES ($1, $2)
