@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jameynakama/lifer/internal/ebird"
 	"github.com/jameynakama/lifer/internal/macaulay"
@@ -141,7 +142,6 @@ func main() {
 	total := len(processable)
 	fmt.Fprintf(os.Stderr, "total unique species to process: %d\n", total)
 
-	// --- TUI placeholder: replaced in Task 6 ---
 	failedSpecies := map[string][]string{}
 	missingMedia := map[string]ingestStats{}
 
@@ -153,30 +153,38 @@ func main() {
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
-	noop := func(any) {}
+	m := newModel(total, *workers)
+	p := tea.NewProgram(m)
+	send := func(msg any) { p.Send(msg) }
 
-	for _, ce := range processable {
-		workerID := <-slots
-		wg.Add(1)
-		go func(ce codeEntry, workerID int) {
-			defer wg.Done()
-			defer func() { slots <- workerID }()
-			stats, err := ingestSpecies(ctx, q, xcClient, macaulayClient, ce.entry, *maxRecordings, *maxImages, r2c, xcOverrides, workerID, noop)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "error %s (%s): %v\n", ce.entry.CommonName, ce.code, err)
-			}
-			mu.Lock()
-			if len(stats.failures) > 0 {
-				failedSpecies[ce.code] = stats.failures
-			} else if err == nil && (stats.recordings == 0 || stats.images == 0) {
-				missingMedia[ce.code] = stats
-			}
-			mu.Unlock()
-		}(ce, workerID)
+	go func() {
+		for _, ce := range processable {
+			workerID := <-slots
+			wg.Add(1)
+			go func(ce codeEntry, workerID int) {
+				defer wg.Done()
+				defer func() { slots <- workerID }()
+				stats, err := ingestSpecies(ctx, q, xcClient, macaulayClient, ce.entry, *maxRecordings, *maxImages, r2c, xcOverrides, workerID, send)
+				if err != nil {
+					_ = err
+				}
+				mu.Lock()
+				if len(stats.failures) > 0 {
+					failedSpecies[ce.code] = stats.failures
+				} else if stats.recordings == 0 || stats.images == 0 {
+					missingMedia[ce.code] = stats
+				}
+				mu.Unlock()
+			}(ce, workerID)
+		}
+		wg.Wait()
+		p.Send(allDoneMsg{})
+	}()
+
+	if _, err := p.Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "tui: %v\n", err)
+		os.Exit(1)
 	}
-	wg.Wait()
-
-	fmt.Fprintf(os.Stderr, "ingestion complete: %d/%d species\n", total, total)
 
 	// --- post-run cleanup and reports ---
 	fmt.Fprintln(os.Stderr, "cleaning up species missing recordings or images...")
