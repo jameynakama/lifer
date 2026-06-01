@@ -36,10 +36,14 @@ RETURNING id, name, description, is_preset, owner_id, created_at;
 -- name: DeleteGroup :exec
 DELETE FROM groups WHERE id = $1;
 
--- name: ListGroupSpecies :many
-SELECT s.ebird_code, s.common_name, s.scientific_name
+-- name: ListGroupSpeciesWithPrefs :many
+SELECT s.ebird_code, s.common_name, s.scientific_name,
+       COALESCE(p.audio_enabled, true) AS audio_enabled,
+       COALESCE(p.image_enabled, true) AS image_enabled
 FROM species s
 JOIN group_species gs ON gs.species_code = s.ebird_code
+LEFT JOIN user_species_preferences p
+       ON p.species_code = s.ebird_code AND p.user_id = $2
 WHERE gs.group_id = $1
 ORDER BY s.common_name;
 

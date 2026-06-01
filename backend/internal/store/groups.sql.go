@@ -124,30 +124,47 @@ func (q *Queries) GetGroupWithDue(ctx context.Context, arg GetGroupWithDueParams
 	return i, err
 }
 
-const listGroupSpecies = `-- name: ListGroupSpecies :many
-SELECT s.ebird_code, s.common_name, s.scientific_name
+const listGroupSpeciesWithPrefs = `-- name: ListGroupSpeciesWithPrefs :many
+SELECT s.ebird_code, s.common_name, s.scientific_name,
+       COALESCE(p.audio_enabled, true) AS audio_enabled,
+       COALESCE(p.image_enabled, true) AS image_enabled
 FROM species s
 JOIN group_species gs ON gs.species_code = s.ebird_code
+LEFT JOIN user_species_preferences p
+       ON p.species_code = s.ebird_code AND p.user_id = $2
 WHERE gs.group_id = $1
 ORDER BY s.common_name
 `
 
-type ListGroupSpeciesRow struct {
+type ListGroupSpeciesWithPrefsParams struct {
+	GroupID int64 `db:"group_id" json:"group_id"`
+	UserID  int64 `db:"user_id" json:"user_id"`
+}
+
+type ListGroupSpeciesWithPrefsRow struct {
 	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
 	CommonName     string `db:"common_name" json:"common_name"`
 	ScientificName string `db:"scientific_name" json:"scientific_name"`
+	AudioEnabled   bool   `db:"audio_enabled" json:"audio_enabled"`
+	ImageEnabled   bool   `db:"image_enabled" json:"image_enabled"`
 }
 
-func (q *Queries) ListGroupSpecies(ctx context.Context, groupID int64) ([]ListGroupSpeciesRow, error) {
-	rows, err := q.db.Query(ctx, listGroupSpecies, groupID)
+func (q *Queries) ListGroupSpeciesWithPrefs(ctx context.Context, arg ListGroupSpeciesWithPrefsParams) ([]ListGroupSpeciesWithPrefsRow, error) {
+	rows, err := q.db.Query(ctx, listGroupSpeciesWithPrefs, arg.GroupID, arg.UserID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListGroupSpeciesRow
+	var items []ListGroupSpeciesWithPrefsRow
 	for rows.Next() {
-		var i ListGroupSpeciesRow
-		if err := rows.Scan(&i.EbirdCode, &i.CommonName, &i.ScientificName); err != nil {
+		var i ListGroupSpeciesWithPrefsRow
+		if err := rows.Scan(
+			&i.EbirdCode,
+			&i.CommonName,
+			&i.ScientificName,
+			&i.AudioEnabled,
+			&i.ImageEnabled,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)

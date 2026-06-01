@@ -23,7 +23,7 @@ type groupStubQuerier struct {
 	getGroup               func(ctx context.Context, id int64) (store.Group, error)
 	updateGroupName        func(ctx context.Context, arg store.UpdateGroupNameParams) (store.Group, error)
 	deleteGroup            func(ctx context.Context, id int64) error
-	listGroupSpecies       func(ctx context.Context, groupID int64) ([]store.ListGroupSpeciesRow, error)
+	listGroupSpeciesWithPrefs func(ctx context.Context, arg store.ListGroupSpeciesWithPrefsParams) ([]store.ListGroupSpeciesWithPrefsRow, error)
 	addSpeciesToGroup      func(ctx context.Context, arg store.AddSpeciesToGroupParams) error
 	removeSpeciesFromGroup func(ctx context.Context, arg store.RemoveSpeciesFromGroupParams) error
 	upsertCard             func(ctx context.Context, arg store.UpsertCardParams) error
@@ -44,8 +44,8 @@ func (s *groupStubQuerier) UpdateGroupName(ctx context.Context, arg store.Update
 func (s *groupStubQuerier) DeleteGroup(ctx context.Context, id int64) error {
 	return s.deleteGroup(ctx, id)
 }
-func (s *groupStubQuerier) ListGroupSpecies(ctx context.Context, groupID int64) ([]store.ListGroupSpeciesRow, error) {
-	return s.listGroupSpecies(ctx, groupID)
+func (s *groupStubQuerier) ListGroupSpeciesWithPrefs(ctx context.Context, arg store.ListGroupSpeciesWithPrefsParams) ([]store.ListGroupSpeciesWithPrefsRow, error) {
+	return s.listGroupSpeciesWithPrefs(ctx, arg)
 }
 func (s *groupStubQuerier) AddSpeciesToGroup(ctx context.Context, arg store.AddSpeciesToGroupParams) error {
 	return s.addSpeciesToGroup(ctx, arg)
@@ -265,10 +265,11 @@ func TestListGroupSpecies_ReturnsList(t *testing.T) {
 		getGroup: func(_ context.Context, id int64) (store.Group, error) {
 			return store.Group{ID: id, OwnerID: ownerID(1)}, nil
 		},
-		listGroupSpecies: func(_ context.Context, groupID int64) ([]store.ListGroupSpeciesRow, error) {
-			assert.Equal(t, int64(42), groupID)
-			return []store.ListGroupSpeciesRow{
-				{EbirdCode: "sonspa", CommonName: "Song Sparrow", ScientificName: "Melospiza melodia"},
+		listGroupSpeciesWithPrefs: func(_ context.Context, arg store.ListGroupSpeciesWithPrefsParams) ([]store.ListGroupSpeciesWithPrefsRow, error) {
+			assert.Equal(t, int64(42), arg.GroupID)
+			assert.Equal(t, int64(1), arg.UserID)
+			return []store.ListGroupSpeciesWithPrefsRow{
+				{EbirdCode: "sonspa", CommonName: "Song Sparrow", ScientificName: "Melospiza melodia", AudioEnabled: true, ImageEnabled: true},
 			}, nil
 		},
 	}
@@ -281,10 +282,40 @@ func TestListGroupSpecies_ReturnsList(t *testing.T) {
 	h.listGroupSpecies(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var body []store.ListGroupSpeciesRow
+	var body []store.ListGroupSpeciesWithPrefsRow
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
 	assert.Len(t, body, 1)
 	assert.Equal(t, "Song Sparrow", body[0].CommonName)
+	assert.True(t, body[0].AudioEnabled)
+	assert.True(t, body[0].ImageEnabled)
+}
+
+func TestListGroupSpecies_PassesThroughDisabledLanes(t *testing.T) {
+	q := &groupStubQuerier{
+		getGroup: func(_ context.Context, id int64) (store.Group, error) {
+			return store.Group{ID: id, OwnerID: ownerID(1)}, nil
+		},
+		listGroupSpeciesWithPrefs: func(_ context.Context, arg store.ListGroupSpeciesWithPrefsParams) ([]store.ListGroupSpeciesWithPrefsRow, error) {
+			assert.Equal(t, int64(1), arg.UserID)
+			return []store.ListGroupSpeciesWithPrefsRow{
+				{EbirdCode: "amcro", CommonName: "American Crow", ScientificName: "Corvus brachyrhynchos", AudioEnabled: false, ImageEnabled: true},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/species", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.listGroupSpecies(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []store.ListGroupSpeciesWithPrefsRow
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Len(t, body, 1)
+	assert.False(t, body[0].AudioEnabled)
+	assert.True(t, body[0].ImageEnabled)
 }
 
 func TestAddSpeciesToGroup_InsertsAndUpsertsBothCards(t *testing.T) {

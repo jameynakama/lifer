@@ -183,14 +183,17 @@ func (h *Handler) listGroupSpecies(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	species, err := h.queries.ListGroupSpecies(r.Context(), groupID)
+	species, err := h.queries.ListGroupSpeciesWithPrefs(r.Context(), store.ListGroupSpeciesWithPrefsParams{
+		GroupID: groupID,
+		UserID:  userID,
+	})
 	if err != nil {
-		log.Printf("ListGroupSpecies error: %v", err)
+		log.Printf("ListGroupSpeciesWithPrefs error: %v", err)
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}
 	if species == nil {
-		species = []store.ListGroupSpeciesRow{}
+		species = []store.ListGroupSpeciesWithPrefsRow{}
 	}
 	writeJSON(w, http.StatusOK, species)
 }

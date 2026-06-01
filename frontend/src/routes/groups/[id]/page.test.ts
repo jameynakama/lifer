@@ -4,9 +4,41 @@ import { goto } from '$app/navigation'
 import { page } from '$app/state'
 import GroupDetailPage from './+page.svelte'
 
-const species = [
-  { id: 7, common_name: 'Song Sparrow', scientific_name: 'Melospiza melodia', ebird_code: 'sonspa' },
+const speciesWithPrefs = [
+  {
+    ebird_code: 'sonspa',
+    common_name: 'Song Sparrow',
+    scientific_name: 'Melospiza melodia',
+    audio_enabled: true,
+    image_enabled: true,
+  },
 ]
+
+function makeFetch(overrides: Record<string, unknown> = {}) {
+  return vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+    if (opts?.method === 'DELETE') {
+      return Promise.resolve({ ok: true })
+    }
+    if (opts?.method === 'POST') {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+    }
+    if (opts?.method === 'PUT' && (overrides.putHandler as (url: string, opts: RequestInit) => unknown)) {
+      return (overrides.putHandler as (url: string, opts: RequestInit) => unknown)(url, opts!)
+    }
+    if (url.includes('/api/v1/species')) {
+      const searchResults = (overrides.searchResults as unknown[]) ?? []
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ count: searchResults.length, next: null, previous: null, results: searchResults }),
+      })
+    }
+    if (url.match(/\/api\/v1\/groups\/\d+\/species/)) {
+      return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
+    }
+    // group detail (audio_due / image_due)
+    return Promise.resolve({ ok: true, json: () => Promise.resolve({ audio_due: 0, image_due: 0 }) })
+  })
+}
 
 beforeEach(() => {
   page.params = { id: '42' }
@@ -20,9 +52,7 @@ afterEach(() => {
 
 describe('Group detail page', () => {
   it('renders species list for the group', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(species),
-    }))
+    vi.stubGlobal('fetch', makeFetch())
     render(GroupDetailPage)
     await vi.waitFor(() => {
       expect(screen.getAllByText(/song sparrow/i).length).toBeGreaterThan(0)
@@ -30,9 +60,7 @@ describe('Group detail page', () => {
   })
 
   it('navigates to audio quiz on Study Audio click', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(species),
-    }))
+    vi.stubGlobal('fetch', makeFetch())
     render(GroupDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /study audio/i }))
     await fireEvent.click(screen.getByRole('button', { name: /study audio/i }))
@@ -40,9 +68,7 @@ describe('Group detail page', () => {
   })
 
   it('navigates to image quiz on Study Image click', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(species),
-    }))
+    vi.stubGlobal('fetch', makeFetch())
     render(GroupDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /study image/i }))
     await fireEvent.click(screen.getByRole('button', { name: /study image/i }))
@@ -50,9 +76,7 @@ describe('Group detail page', () => {
   })
 
   it('navigates to practice page on Practice Audio click', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(species),
-    }))
+    vi.stubGlobal('fetch', makeFetch())
     render(GroupDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /^practice audio$/i }))
     await fireEvent.click(screen.getByRole('button', { name: /^practice audio$/i }))
@@ -60,9 +84,7 @@ describe('Group detail page', () => {
   })
 
   it('navigates to practice page on Practice Image click', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(species),
-    }))
+    vi.stubGlobal('fetch', makeFetch())
     render(GroupDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /^practice image$/i }))
     await fireEvent.click(screen.getByRole('button', { name: /^practice image$/i }))
@@ -70,22 +92,14 @@ describe('Group detail page', () => {
   })
 
   it('searches species and shows results', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
-      if (url.includes('/api/v1/species')) {
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({
-            count: 1,
-            next: null,
-            previous: null,
-            results: [
-              { id: 8, common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', ebird_code: 'foxspa' },
-            ],
-          }),
-        })
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(species) })
-    }))
+    const foxSparrow = {
+      ebird_code: 'foxspa',
+      common_name: 'Fox Sparrow',
+      scientific_name: 'Passerella iliaca',
+      audio_enabled: true,
+      image_enabled: true,
+    }
+    vi.stubGlobal('fetch', makeFetch({ searchResults: [foxSparrow] }))
     render(GroupDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
     await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
@@ -103,7 +117,10 @@ describe('Group detail page', () => {
         deleteCalled = true
         return Promise.resolve({ ok: true })
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(species) })
+      if (url.match(/\/api\/v1\/groups\/\d+\/species/)) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ audio_due: 0, image_due: 0 }) })
     }))
     render(GroupDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /remove/i }))
@@ -111,6 +128,123 @@ describe('Group detail page', () => {
     await vi.waitFor(() => { expect(deleteCalled).toBe(true) })
     await vi.waitFor(() => {
       expect(screen.queryByText(/song sparrow/i)).toBeNull()
+    })
+  })
+
+  it('keeps search results and input value after adding a species', async () => {
+    const foxSparrow = {
+      ebird_code: 'foxspa',
+      common_name: 'Fox Sparrow',
+      scientific_name: 'Passerella iliaca',
+      audio_enabled: true,
+      image_enabled: true,
+    }
+    vi.stubGlobal('fetch', makeFetch({ searchResults: [foxSparrow] }))
+    render(GroupDetailPage)
+    await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
+    await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
+      target: { value: 'fox' },
+    })
+    await vi.waitFor(() => screen.getByRole('button', { name: /^add$/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    await vi.waitFor(() => {
+      expect(screen.getByDisplayValue('fox')).toBeInTheDocument()
+      expect(screen.getAllByText(/fox sparrow/i).length).toBeGreaterThan(0)
+    })
+  })
+
+  it('shows Added indicator for species already in the group', async () => {
+    vi.stubGlobal('fetch', makeFetch({ searchResults: speciesWithPrefs }))
+    render(GroupDetailPage)
+    await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
+    await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
+      target: { value: 'song' },
+    })
+    await vi.waitFor(() => screen.getByText(/added/i))
+    expect(screen.queryByRole('button', { name: /^add$/i })).toBeNull()
+  })
+
+  it('clicking Audio toggle fires PUT /preferences with audio_enabled flipped', async () => {
+    let putUrl = ''
+    let putBody: Record<string, boolean> | null = null
+
+    vi.stubGlobal('fetch', makeFetch({
+      putHandler: (url: string, opts: RequestInit) => {
+        putUrl = url
+        putBody = JSON.parse(opts.body as string)
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ audio_enabled: false, image_enabled: true }),
+        })
+      },
+    }))
+    render(GroupDetailPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /toggle audio/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /toggle audio/i }))
+    await vi.waitFor(() => {
+      expect(putUrl).toContain('/api/v1/species/sonspa/preferences')
+      expect(putBody).toEqual({ audio_enabled: false, image_enabled: true })
+    })
+  })
+
+  it('clicking Image toggle fires PUT /preferences with image_enabled flipped', async () => {
+    let putBody: Record<string, boolean> | null = null
+
+    vi.stubGlobal('fetch', makeFetch({
+      putHandler: (_url: string, opts: RequestInit) => {
+        putBody = JSON.parse(opts.body as string)
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ audio_enabled: true, image_enabled: false }),
+        })
+      },
+    }))
+    render(GroupDetailPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /toggle image/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /toggle image/i }))
+    await vi.waitFor(() => {
+      expect(putBody).toEqual({ audio_enabled: true, image_enabled: false })
+    })
+  })
+
+  it('reverts toggle state on PUT failure', async () => {
+    vi.stubGlobal('fetch', makeFetch({
+      putHandler: () => Promise.resolve({ ok: false, json: () => Promise.resolve({}) }),
+    }))
+    render(GroupDetailPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /toggle audio/i }))
+
+    // audio starts enabled; click to disable (optimistic), then server fails → reverts
+    const toggleBtn = screen.getByRole('button', { name: /toggle audio/i })
+    expect(toggleBtn.classList.contains('active')).toBe(true)
+    await fireEvent.click(toggleBtn)
+    await vi.waitFor(() => {
+      // reverted: still active
+      expect(screen.getByRole('button', { name: /toggle audio/i }).classList.contains('active')).toBe(true)
+    })
+  })
+
+  it('disables toggle buttons while PUT is in flight', async () => {
+    let resolvePut!: () => void
+    vi.stubGlobal('fetch', makeFetch({
+      putHandler: () => new Promise<{ ok: boolean; json: () => Promise<unknown> }>((resolve) => {
+        resolvePut = () => resolve({ ok: true, json: () => Promise.resolve({ audio_enabled: false, image_enabled: true }) })
+      }),
+    }))
+    render(GroupDetailPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /toggle audio/i }))
+
+    await fireEvent.click(screen.getByRole('button', { name: /toggle audio/i }))
+    // while PUT is pending both toggles are disabled
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /toggle audio/i })).toBeDisabled()
+      expect(screen.getByRole('button', { name: /toggle image/i })).toBeDisabled()
+    })
+
+    resolvePut()
+    // after PUT resolves buttons are re-enabled
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /toggle audio/i })).not.toBeDisabled()
     })
   })
 })

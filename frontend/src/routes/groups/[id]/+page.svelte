@@ -6,6 +6,8 @@
     ebird_code: string
     common_name: string
     scientific_name: string
+    audio_enabled: boolean
+    image_enabled: boolean
   }
 
   let groupId = $derived(page.params.id)
@@ -16,6 +18,9 @@
   let searchResults: Species[] = $state([])
   let loading = $state(true)
   let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+  let addedCodes = $derived(new Set(groupSpecies.map((s) => s.ebird_code)))
+  let togglingCodes: Set<string> = $state(new Set())
 
   async function loadGroup() {
     try {
@@ -56,9 +61,7 @@
     })
     if (res.ok) {
       const added = searchResults.find((s) => s.ebird_code === ebirdCode)
-      if (added) groupSpecies = [...groupSpecies, added]
-      searchQuery = ''
-      searchResults = []
+      if (added) groupSpecies = [...groupSpecies, { ...added, audio_enabled: true, image_enabled: true }]
     }
   }
 
@@ -68,6 +71,44 @@
     })
     if (res.ok) {
       groupSpecies = groupSpecies.filter((s) => s.ebird_code !== ebirdCode)
+    }
+  }
+
+  async function toggleLane(species: Species, lane: 'audio' | 'image') {
+    if (togglingCodes.has(species.ebird_code)) return
+    togglingCodes = new Set([...togglingCodes, species.ebird_code])
+
+    const prev = { audio_enabled: species.audio_enabled, image_enabled: species.image_enabled }
+    const next =
+      lane === 'audio'
+        ? { ...prev, audio_enabled: !prev.audio_enabled }
+        : { ...prev, image_enabled: !prev.image_enabled }
+
+    groupSpecies = groupSpecies.map((s) =>
+      s.ebird_code === species.ebird_code ? { ...s, ...next } : s
+    )
+
+    try {
+      const res = await fetch(`/api/v1/species/${species.ebird_code}/preferences`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(next),
+      })
+
+      if (res.ok) {
+        const updated = await res.json()
+        groupSpecies = groupSpecies.map((s) =>
+          s.ebird_code === species.ebird_code
+            ? { ...s, audio_enabled: updated.audio_enabled, image_enabled: updated.image_enabled }
+            : s
+        )
+      } else {
+        groupSpecies = groupSpecies.map((s) =>
+          s.ebird_code === species.ebird_code ? { ...s, ...prev } : s
+        )
+      }
+    } finally {
+      togglingCodes = new Set([...togglingCodes].filter((c) => c !== species.ebird_code))
     }
   }
 
@@ -116,11 +157,29 @@
     <ul class="species-list">
       {#each groupSpecies as s (s.ebird_code)}
         <li class="species-row">
-          <span>
+          <span class="species-names">
             <strong>{s.common_name}</strong>
             <em>{s.scientific_name}</em>
           </span>
-          <button class="btn-remove" onclick={() => removeSpecies(s.ebird_code)}>Remove</button>
+          <div class="row-actions">
+            <div class="lane-toggles">
+              <button
+                class="lane-toggle"
+                class:active={s.audio_enabled}
+                aria-label="Toggle audio"
+                disabled={togglingCodes.has(s.ebird_code)}
+                onclick={() => toggleLane(s, 'audio')}
+              >♪</button>
+              <button
+                class="lane-toggle"
+                class:active={s.image_enabled}
+                aria-label="Toggle image"
+                disabled={togglingCodes.has(s.ebird_code)}
+                onclick={() => toggleLane(s, 'image')}
+              >◉</button>
+            </div>
+            <button class="btn-remove" onclick={() => removeSpecies(s.ebird_code)}>Remove</button>
+          </div>
         </li>
       {/each}
     </ul>
@@ -141,7 +200,11 @@
               <strong>{s.common_name}</strong>
               <em>{s.scientific_name}</em>
             </span>
-            <button class="btn-add" onclick={() => addSpecies(s.ebird_code)}>Add</button>
+            {#if addedCodes.has(s.ebird_code)}
+              <span class="added-indicator">Added</span>
+            {:else}
+              <button class="btn-add" onclick={() => addSpecies(s.ebird_code)}>Add</button>
+            {/if}
           </li>
         {/each}
       </ul>
@@ -214,7 +277,12 @@
     align-items: center;
     box-shadow: var(--shadow);
   }
-  .species-row span, .search-row span {
+  .species-names {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+  }
+  .search-row span {
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
@@ -227,6 +295,35 @@
     font-size: 0.8125rem;
     color: var(--text-muted);
     font-style: italic;
+  }
+  .row-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .lane-toggles {
+    display: flex;
+    gap: 0.25rem;
+  }
+  .lane-toggle {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 6px;
+    padding: 0.25rem 0.4rem;
+    font-size: 0.875rem;
+    cursor: pointer;
+    font-family: inherit;
+    line-height: 1;
+  }
+  .lane-toggle.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .lane-toggle:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
   .btn-remove {
     background: transparent;
@@ -248,6 +345,11 @@
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
+  }
+  .added-indicator {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    padding: 0.25rem 0.5rem;
   }
   .search-section {
     display: flex;
