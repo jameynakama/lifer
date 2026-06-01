@@ -206,7 +206,7 @@ func (m model) View() string {
 	elapsedStr := fmt.Sprintf("%d:%02d:%02d", h, min, sec)
 	counter := styleCounter.Render(fmt.Sprintf("%d/%d", m.done, m.total))
 	bar := m.progress.View()
-	b.WriteString(fmt.Sprintf("  %s  %s  %s\n\n", counter, bar, styleElapsed.Render(elapsedStr)))
+	fmt.Fprintf(&b, "  %s  %s  %s\n\n", counter, bar, styleElapsed.Render(elapsedStr))
 
 	// Completed species -- show last N that fit above the divider + workers
 	workerH := 0
@@ -218,10 +218,7 @@ func (m model) View() string {
 	headerLines := 2
 	dividerLine := 1
 	bottomPad := 1
-	availableForCompleted := m.height - headerLines - dividerLine - workerH - bottomPad
-	if availableForCompleted < 0 {
-		availableForCompleted = 0
-	}
+	availableForCompleted := max(m.height-headerLines-dividerLine-workerH-bottomPad, 0)
 	start := 0
 	if len(m.completed) > availableForCompleted {
 		start = len(m.completed) - availableForCompleted
@@ -235,26 +232,26 @@ func (m model) View() string {
 			nameStr = styleFailed.Render(c.name)
 			detail = styleFailed.Render(detail)
 		}
-		b.WriteString(fmt.Sprintf("  %s %-30s  %s\n", icon, nameStr, detail))
+		fmt.Fprintf(&b, "  %s %-30s  %s\n", icon, nameStr, detail)
 	}
 
 	// Divider
 	divider := styleDivider.Render(strings.Repeat("─", max(m.width-2, 40)))
-	b.WriteString(fmt.Sprintf("  %s\n", divider))
+	fmt.Fprintf(&b, "  %s\n", divider)
 
 	// Active workers
 	for i, w := range m.workers {
 		if w.name == "" {
 			continue
 		}
-		b.WriteString(fmt.Sprintf("  [%d] %s\n", i+1, styleBold.Render(w.name)))
+		fmt.Fprintf(&b, "  [%d] %s\n", i+1, styleBold.Render(w.name))
 		for _, u := range w.uploads {
 			symbol, style := uploadSymbol(u.status)
-			b.WriteString(fmt.Sprintf("      %s %-45s  %s\n",
+			fmt.Fprintf(&b, "      %s %-45s  %s\n",
 				styleSubItem.Render("·"),
 				styleSubItem.Render(shortKey(u.key)),
 				style.Render(symbol),
-			))
+			)
 		}
 	}
 
