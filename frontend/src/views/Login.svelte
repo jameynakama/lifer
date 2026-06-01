@@ -1,5 +1,5 @@
 <div class="login">
-  <div class="bird" aria-hidden="true">🦅</div>
+  <div class="bird" aria-hidden="true">🐦‍🔥</div>
   <div class="content">
     <h1>Lifer</h1>
     <p class="tagline">Learn bird songs by ear</p>
@@ -32,7 +32,7 @@
     align-items: center;
     justify-content: center;
     font-size: 16rem;
-    opacity: 0.05;
+    opacity: 0.15;
     pointer-events: none;
     user-select: none;
   }
