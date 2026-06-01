@@ -50,6 +50,20 @@ func main() {
 		os.Exit(1)
 	}
 
+	fileOverrides, err := loadOverrides("cmd/ingest/overrides.txt")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "overrides.txt: %v\n", err)
+		os.Exit(1)
+	}
+	// Merge: file is baseline, flag wins on conflict.
+	for k, v := range xcOverrides {
+		fileOverrides[k] = v
+	}
+	xcOverrides = fileOverrides
+	if len(xcOverrides) > 0 {
+		fmt.Fprintf(os.Stderr, "loaded %d XC overrides\n", len(xcOverrides))
+	}
+
 	ebirdKey := mustEnv("EBIRD_API_KEY")
 	xcKey := mustEnv("XENO_CANTO_API_KEY")
 	dbURL := mustEnv("DATABASE_URL")
@@ -284,6 +298,42 @@ func main() {
 			fmt.Printf("  missing codes: %s\n", strings.Join(xcMisses, ","))
 		}
 	}
+}
+
+func loadOverrides(path string) (map[string][2]string, error) {
+	out := map[string][2]string{}
+	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return out, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("loadOverrides: %w", err)
+	}
+	defer f.Close()
+
+	sc := bufio.NewScanner(f)
+	lineNum := 0
+	for sc.Scan() {
+		lineNum++
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		line = strings.Fields(line)[0] // strip inline comment
+		kv := strings.SplitN(line, "=", 2)
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("line %d: expected code=Genus:species, got %q", lineNum, line)
+		}
+		genSp := strings.SplitN(kv[1], ":", 2)
+		if len(genSp) != 2 {
+			return nil, fmt.Errorf("line %d: expected Genus:species after =, got %q", lineNum, kv[1])
+		}
+		out[kv[0]] = [2]string{genSp[0], genSp[1]}
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("loadOverrides: %w", err)
+	}
+	return out, nil
 }
 
 func loadManualSkips(path string) map[string]struct{} {

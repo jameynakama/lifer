@@ -100,6 +100,74 @@ func TestFilterArbitrary(t *testing.T) {
 	}
 }
 
+func TestLoadOverrides(t *testing.T) {
+	t.Run("valid file with entries and comments", func(t *testing.T) {
+		f, err := os.CreateTemp(t.TempDir(), "overrides*.txt")
+		if err != nil {
+			t.Fatalf("create temp file: %v", err)
+		}
+		defer f.Close()
+		f.WriteString(`
+# XC overrides
+
+comrav=Corvus:corax  # Common Raven -- eBird/XC genus mismatch
+norgos=Accipiter:atricapillus
+`)
+		got, err := loadOverrides(f.Name())
+		if err != nil {
+			t.Fatalf("loadOverrides() error = %v", err)
+		}
+		want := map[string][2]string{
+			"comrav": {"Corvus", "corax"},
+			"norgos": {"Accipiter", "atricapillus"},
+		}
+		if len(got) != len(want) {
+			t.Fatalf("len = %d, want %d: %v", len(got), len(want), got)
+		}
+		for k, v := range want {
+			if got[k] != v {
+				t.Errorf("[%s] = %v, want %v", k, got[k], v)
+			}
+		}
+	})
+
+	t.Run("missing file returns empty map", func(t *testing.T) {
+		got, err := loadOverrides(t.TempDir() + "/nonexistent.txt")
+		if err != nil {
+			t.Fatalf("Should return nil error for missing file, got %v", err)
+		}
+		if len(got) != 0 {
+			t.Errorf("Should return empty map, got %v", got)
+		}
+	})
+
+	t.Run("malformed entry returns error", func(t *testing.T) {
+		f, err := os.CreateTemp(t.TempDir(), "overrides*.txt")
+		if err != nil {
+			t.Fatalf("create temp file: %v", err)
+		}
+		defer f.Close()
+		f.WriteString("badentry\n")
+		_, err = loadOverrides(f.Name())
+		if err == nil {
+			t.Error("Should return error for malformed entry")
+		}
+	})
+
+	t.Run("missing colon in genus:species returns error", func(t *testing.T) {
+		f, err := os.CreateTemp(t.TempDir(), "overrides*.txt")
+		if err != nil {
+			t.Fatalf("create temp file: %v", err)
+		}
+		defer f.Close()
+		f.WriteString("comrav=Corvuscorax\n")
+		_, err = loadOverrides(f.Name())
+		if err == nil {
+			t.Error("Should return error for missing colon")
+		}
+	})
+}
+
 func TestLoadManualSkips(t *testing.T) {
 	f, err := os.CreateTemp(t.TempDir(), "skip*.txt")
 	if err != nil {

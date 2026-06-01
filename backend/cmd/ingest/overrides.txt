@@ -1,0 +1,8 @@
+# XC taxonomy overrides -- loaded automatically every run.
+# Format: ebirdcode=Genus:species  # optional comment
+#
+# Use when eBird and xeno-canto disagree on genus/species name.
+# Run a full ingest, then check the MISSING MEDIA report for species
+# with 0 recordings -- those usually need an entry here.
+# The --xc-override flag overrides entries in this file.
+

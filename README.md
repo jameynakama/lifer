@@ -43,6 +43,20 @@ just generate          # regenerate sqlc types after schema changes
 just migration name=X  # create new migration files
 ```
 
+## Pushing catalog data to prod
+
+After a local ingest run, transfer only the species/recordings/images tables (leave users, cards, groups untouched):
+
+```bash
+pg_dump --clean \
+  --table=species \
+  --table=species_recordings \
+  --table=species_images \
+  $DATABASE_URL > catalog.sql
+
+psql $PROD_DATABASE_URL < catalog.sql
+```
+
 ## Data sources
 
 - **eBird API** -- regional species checklists (preset groups)
