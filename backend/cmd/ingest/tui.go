@@ -107,10 +107,77 @@ func appendOrUpdateUpload(items []uploadItem, key string, status uploadStatus, e
 	return append(items, uploadItem{key: key, status: status, err: err})
 }
 
-// Stub Init/Update/View so the package compiles; replaced in Task 3 and Task 7.
+func (m model) Init() tea.Cmd {
+	return tea.Batch(
+		tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) }),
+	)
+}
 
-func (m model) Init() tea.Cmd { return nil }
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case speciesStartedMsg:
+		m.workers[msg.workerID].name = msg.name
+		m.workers[msg.workerID].uploads = nil
+		return m, nil
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) { return m, nil }
+	case fetchStartedMsg:
+		m.workers[msg.workerID].uploads = appendOrUpdateUpload(
+			m.workers[msg.workerID].uploads, msg.key, statusFetching, nil)
+		return m, nil
+
+	case uploadStartedMsg:
+		m.workers[msg.workerID].uploads = appendOrUpdateUpload(
+			m.workers[msg.workerID].uploads, msg.key, statusUploading, nil)
+		return m, nil
+
+	case uploadDoneMsg:
+		status := statusDone
+		if msg.err != nil {
+			status = statusFailed
+		}
+		m.workers[msg.workerID].uploads = appendOrUpdateUpload(
+			m.workers[msg.workerID].uploads, msg.key, status, msg.err)
+		return m, nil
+
+	case speciesDoneMsg:
+		m.done++
+		m.workers[msg.workerID] = workerState{}
+		failed := len(msg.failures) > 0 || msg.recordings == 0 || msg.images == 0
+		m.completed = append(m.completed, completedItem{
+			name:       msg.name,
+			recordings: msg.recordings,
+			images:     msg.images,
+			failed:     failed,
+		})
+		cmd := m.progress.SetPercent(float64(m.done) / float64(m.total))
+		return m, cmd
+
+	case allDoneMsg:
+		return m, tea.Quit
+
+	case tickMsg:
+		return m, tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) })
+
+	case progress.FrameMsg:
+		pm, cmd := m.progress.Update(msg)
+		if newPM, ok := pm.(progress.Model); ok {
+			m.progress = newPM
+		}
+		return m, cmd
+
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		m.progress.Width = msg.Width - 20
+		return m, nil
+
+	case tea.KeyMsg:
+		if msg.String() == "ctrl+c" {
+			return m, tea.Quit
+		}
+		return m, nil
+	}
+	return m, nil
+}
 
 func (m model) View() string { return "" }

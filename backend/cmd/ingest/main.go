@@ -128,8 +128,8 @@ func main() {
 	var mu sync.Mutex
 	started, done := 0, 0
 	total := len(codes)
-	failedSpecies := map[string][]string{}    // ebird_code → upload failure reasons
-	missingMedia := map[string]ingestStats{}  // ebird_code → stats for species with 0 recordings or 0 images
+	failedSpecies := map[string][]string{}   // ebird_code → upload failure reasons
+	missingMedia := map[string]ingestStats{} // ebird_code → stats for species with 0 recordings or 0 images
 
 	for _, code := range codes {
 		entry, ok := taxMap[code]
@@ -343,9 +343,9 @@ func ingestSpecies(
 	}
 
 	var (
-		recWg    sync.WaitGroup
-		statsMu  sync.Mutex
-		stats    ingestStats
+		recWg   sync.WaitGroup
+		statsMu sync.Mutex
+		stats   ingestStats
 	)
 
 	recordFailure := func(reason string) {
