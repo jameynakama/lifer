@@ -129,9 +129,10 @@ format in the code).
 
 After `p.Run()` returns, `main.go` runs the existing summary blocks unchanged:
 
-- `=== PARTIAL UPLOAD FAILURES ===` -- species where uploads errored
+- `=== PARTIAL UPLOAD FAILURES ===` -- species where uploads errored, with a re-run
+  hint: `just ingest --species <codes> <region>`
 - `=== MISSING MEDIA ===` -- species with 0 recordings or 0 images (likely XC taxonomy
-  mismatches), with the re-run hint
+  mismatches), with a re-run hint: `just ingest --xc-override "..." --skip-complete <region>`
 
 These are populated from `speciesDoneMsg.failures` and the post-cleanup DB query,
 exactly as today.
