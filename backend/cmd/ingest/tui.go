@@ -276,7 +276,7 @@ func uploadSymbol(s uploadStatus) (string, lipgloss.Style) {
 // shortKey abbreviates "recordings/code/file.mp3" → "rec/code/file.mp3" for display.
 func shortKey(key string) string {
 	parts := strings.Split(key, "/")
-	if len(parts) == 3 {
+	if len(parts) == 3 && len(parts[0]) >= 3 {
 		return parts[0][:3] + "/" + parts[1] + "/" + parts[2]
 	}
 	return key
