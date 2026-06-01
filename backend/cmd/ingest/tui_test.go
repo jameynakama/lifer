@@ -13,6 +13,14 @@ func baseModel(t *testing.T) model {
 	return newModel(10, 3)
 }
 
+func TestInit_StartsTickCmd(t *testing.T) {
+	m := baseModel(t)
+	cmd := m.Init()
+	if cmd == nil {
+		t.Fatal("Should return a tick command")
+	}
+}
+
 func TestUpdate_SpeciesStarted(t *testing.T) {
 	m := baseModel(t)
 	next, _ := m.Update(speciesStartedMsg{workerID: 1, code: "amro", name: "American Robin"})
@@ -109,7 +117,7 @@ func TestUpdate_SpeciesDone_WithFailures(t *testing.T) {
 	m := baseModel(t)
 	next, _ := m.Update(speciesDoneMsg{
 		workerID: 0, code: "busti", name: "Bushtit",
-		recordings: 0, images: 3, failures: []string{"upload error"},
+		recordings: 2, images: 3, failures: []string{"upload error"},
 	})
 	got := next.(model)
 	if !got.completed[0].failed {
@@ -126,6 +134,18 @@ func TestUpdate_SpeciesDone_MissingMedia(t *testing.T) {
 	got := next.(model)
 	if !got.completed[0].failed {
 		t.Errorf("Should mark as failed when recordings == 0")
+	}
+}
+
+func TestUpdate_SpeciesDone_MissingImages(t *testing.T) {
+	m := baseModel(t)
+	next, _ := m.Update(speciesDoneMsg{
+		workerID: 0, code: "busti", name: "Bushtit",
+		recordings: 2, images: 0, failures: nil,
+	})
+	got := next.(model)
+	if !got.completed[0].failed {
+		t.Errorf("Should mark as failed when images == 0")
 	}
 }
 

@@ -108,9 +108,7 @@ func appendOrUpdateUpload(items []uploadItem, key string, status uploadStatus, e
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(
-		tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) }),
-	)
+	return tea.Tick(100*time.Millisecond, func(t time.Time) tea.Msg { return tickMsg(t) })
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
