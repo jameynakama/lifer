@@ -140,7 +140,7 @@ func main() {
 		}
 	}
 	total := len(processable)
-	fmt.Fprintf(os.Stderr, "total unique species to process: %d\n", total)
+	fmt.Fprintf(os.Stderr, "total unique species to process: %d\n\n", total)
 
 	failedSpecies := map[string][]string{}
 	missingMedia := map[string]ingestStats{}

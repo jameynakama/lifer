@@ -177,6 +177,38 @@ func TestFetchAndUpload_Retries429(t *testing.T) {
 	}
 }
 
+func TestFetchAndUpload_Retries503(t *testing.T) {
+	origDelays := retryDelays
+	retryDelays = []time.Duration{0, 0, 0}
+	t.Cleanup(func() { retryDelays = origDelays })
+
+	attempts := 0
+	src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts < 3 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		w.Write([]byte("ok"))
+	}))
+	defer src.Close()
+
+	r2s := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("ETag", `"x"`)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer r2s.Close()
+
+	r2c, _ := r2.NewWithEndpoint(r2s.URL, "k", "s", "bucket", "https://pub.example.com")
+	_, err := fetchAndUpload(context.Background(), r2c, src.URL, "key", "audio/mpeg", 0, nopSend)
+	if err != nil {
+		t.Fatalf("Should succeed after 503 retries: %v", err)
+	}
+	if attempts != 3 {
+		t.Errorf("Should take 3 attempts, got %d", attempts)
+	}
+}
+
 func TestFetchAndUpload_SendsMessageSequence(t *testing.T) {
 	src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("data"))

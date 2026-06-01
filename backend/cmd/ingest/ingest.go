@@ -84,6 +84,8 @@ func ingestSpecies(
 		recWg   sync.WaitGroup
 		statsMu sync.Mutex
 	)
+	// Limit concurrent downloads per species to avoid 503s from xeno-canto CDN.
+	dlSem := make(chan struct{}, 2)
 
 	recordFailure := func(reason string) {
 		statsMu.Lock()
@@ -105,6 +107,8 @@ func ingestSpecies(
 			recWg.Add(1)
 			go func(rec xenocanto.Recording) {
 				defer recWg.Done()
+				dlSem <- struct{}{}
+				defer func() { <-dlSem }()
 				key := "recordings/" + sp.EbirdCode + "/" + rec.ID + ".mp3"
 				filePath, err := fetchAndUpload(ctx, r2c, rec.FileURL, key, "audio/mpeg", workerID, send)
 				if err != nil {
@@ -139,6 +143,8 @@ func ingestSpecies(
 		imgWg.Add(1)
 		go func(photo macaulay.Photo) {
 			defer imgWg.Done()
+			dlSem <- struct{}{}
+			defer func() { <-dlSem }()
 			key := "images/" + sp.EbirdCode + "/" + photo.AssetID + ".jpg"
 			filePath, err := fetchAndUpload(ctx, r2c, mac.PhotoURL(photo.AssetID), key, "image/jpeg", workerID, send)
 			if err != nil {
@@ -196,7 +202,7 @@ func parseXCOverrides(s string) (map[string][2]string, error) {
 
 // fetchAndUpload GETs from sourceURL and uploads the body to R2 at key.
 // Sends fetchStartedMsg, uploadStartedMsg, and uploadDoneMsg via send.
-// Retries on 429 from the source. Returns the full public R2 URL.
+// Retries on 429 and 503 from the source. Returns the full public R2 URL.
 func fetchAndUpload(ctx context.Context, r2c *r2.Client, sourceURL, key, contentType string, workerID int, send func(any)) (string, error) {
 	send(fetchStartedMsg{workerID: workerID, key: key})
 	var lastErr error
@@ -220,9 +226,9 @@ func fetchAndUpload(ctx context.Context, r2c *r2.Client, sourceURL, key, content
 			send(uploadDoneMsg{workerID: workerID, key: key, err: err})
 			return "", err
 		}
-		if resp.StatusCode == http.StatusTooManyRequests {
+		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
 			resp.Body.Close()
-			lastErr = fmt.Errorf("fetch %s: status 429", sourceURL)
+			lastErr = fmt.Errorf("fetch %s: status %d", sourceURL, resp.StatusCode)
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
