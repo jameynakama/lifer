@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -50,7 +51,7 @@ func TestFilterBySpecies(t *testing.T) {
 	}
 }
 
-func TestFilterComplete(t *testing.T) {
+func TestFilterArbitrary(t *testing.T) {
 	tests := []struct {
 		name     string
 		codes    []string
@@ -85,7 +86,7 @@ func TestFilterComplete(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := filterComplete(tt.codes, tt.complete)
+			got := filterArbitrary(tt.codes, tt.complete)
 			if len(got) != len(tt.want) {
 				t.Fatalf("filterComplete() len = %d, want %d (got %v, want %v)", len(got), len(tt.want), got, tt.want)
 			}
@@ -95,6 +96,47 @@ func TestFilterComplete(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestLoadManualSkips(t *testing.T) {
+	f, err := os.CreateTemp(t.TempDir(), "skip*.txt")
+	if err != nil {
+		t.Fatalf("create temp file: %v", err)
+	}
+	defer f.Close()
+
+	f.WriteString(`
+# Species skipped during ingest
+
+# Protected -- XC redacts download URLs
+spoowl  # Spotted Owl
+
+# No XC coverage / recent split with no separate records
+cocboo1  # Cocos Booby
+
+# Erroneous eBird reports for this region
+zebfin2  # Zebra Finch (captive/escaped birds only)
+
+# Other
+yellbutt
+`)
+	res := loadManualSkips(f.Name())
+
+	want := 4
+	if len(res) != want {
+		t.Errorf("loadManualSkips() len == %d; want %d", len(res), want)
+	}
+
+	for k := range map[string]struct{}{
+		"spoowl":   {},
+		"cocboo1":  {},
+		"zebfin2":  {},
+		"yellbutt": {},
+	} {
+		if _, ok := res[k]; !ok {
+			t.Errorf("loadManualSkips()[%s] not found", k)
+		}
 	}
 }
 

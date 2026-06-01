@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"sort"
 	"strings"
@@ -21,6 +23,7 @@ import (
 func main() {
 	maxRecordings := flag.Int("max-recordings", 4, "max recordings per species (split evenly between song and call)")
 	maxImages := flag.Int("max-images", 3, "max images per species")
+	maxRecordingSecs := flag.Int("max-recording-secs", 180, "max recording length in seconds (0 = no cap)")
 	workers := flag.Int("workers", 5, "concurrent worker count")
 	skipComplete := flag.Bool("skip-complete", false, "skip species that already have ≥1 recording and ≥1 image in the DB")
 	speciesFilter := flag.String("species", "", "comma-separated ebird codes or common names to process")
@@ -122,8 +125,15 @@ func main() {
 			complete[c] = struct{}{}
 		}
 		before := len(codes)
-		codes = filterComplete(codes, complete)
+		codes = filterArbitrary(codes, complete)
 		fmt.Fprintf(os.Stderr, "--skip-complete: skipping %d already-complete species, processing %d remaining\n", before-len(codes), len(codes))
+	}
+
+	alwaysSkip := loadManualSkips("cmd/ingest/skip.txt")
+	if len(alwaysSkip) > 0 {
+		before := len(codes)
+		codes = filterArbitrary(codes, alwaysSkip)
+		fmt.Fprintf(os.Stderr, "skipping %d species per skip.txt, processing %d remaining\n", before-len(codes), len(codes))
 	}
 
 	// Pre-filter to codes with taxonomy entries; warn for missing ones.
@@ -164,7 +174,7 @@ func main() {
 			go func(ce codeEntry, workerID int) {
 				defer wg.Done()
 				defer func() { slots <- workerID }()
-				stats, err := ingestSpecies(ctx, q, xcClient, macaulayClient, ce.entry, *maxRecordings, *maxImages, r2c, xcOverrides, workerID, send)
+				stats, err := ingestSpecies(ctx, q, xcClient, macaulayClient, ce.entry, *maxRecordings, *maxImages, *maxRecordingSecs, r2c, xcOverrides, workerID, send)
 				if err != nil {
 					_ = err
 				}
@@ -274,4 +284,32 @@ func main() {
 			fmt.Printf("  missing codes: %s\n", strings.Join(xcMisses, ","))
 		}
 	}
+}
+
+func loadManualSkips(path string) map[string]struct{} {
+	skip := map[string]struct{}{}
+
+	f, err := os.Open(path)
+	if os.IsNotExist(err) {
+		return skip
+	}
+	if err != nil {
+		log.Fatalf("getManualSkips: %v", err)
+	}
+	defer f.Close()
+
+	sc := bufio.NewScanner(f)
+	for sc.Scan() {
+		line := strings.TrimSpace(sc.Text())
+		if line == "" || strings.HasPrefix(line, "#") {
+			continue
+		}
+		code := strings.Fields(line)[0]
+		skip[code] = struct{}{}
+	}
+	if err := sc.Err(); err != nil {
+		log.Fatalf("getManualSkips: %v", err)
+	}
+
+	return skip
 }

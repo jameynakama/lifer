@@ -1,0 +1,10 @@
+# Species skipped during ingest
+
+# Protected -- XC redacts download URLs
+spoowl  # Spotted Owl
+
+# No XC coverage / recent split with no separate records
+cocboo1  # Cocos Booby
+
+# Erroneous eBird reports for this region
+zebfin2  # Zebra Finch (captive/escaped birds only)

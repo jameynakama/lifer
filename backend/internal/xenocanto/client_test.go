@@ -29,7 +29,7 @@ func TestSearch(t *testing.T) {
 	defer srv.Close()
 
 	c := newWithBaseURL("", srv.URL)
-	recs, err := c.Search(context.Background(), "Melospiza", "melodia", "song")
+	recs, err := c.Search(context.Background(), "Melospiza", "melodia", "song", 0)
 	require.NoError(t, err)
 	// quality C is filtered out
 	assert.Len(t, recs, 2)
@@ -39,6 +39,36 @@ func TestSearch(t *testing.T) {
 	assert.Equal(t, "222", recs[1].ID)
 }
 
+func TestParseLengthSecs(t *testing.T) {
+	tests := []struct {
+		in   string
+		want int
+	}{
+		{"1:54", 114},
+		{"16:59", 1019},
+		{"0:30", 30},
+		{"", 0},
+		{"bad", 0},
+	}
+	for _, tt := range tests {
+		if got := parseLengthSecs(tt.in); got != tt.want {
+			t.Errorf("parseLengthSecs(%q) = %d, want %d", tt.in, got, tt.want)
+		}
+	}
+}
+
+func TestFilterAndNormalize_LengthCap(t *testing.T) {
+	recs := []Recording{
+		{ID: "short", Quality: "A", Length: "1:00", FileURL: "https://example.com/short.mp3"},
+		{ID: "long", Quality: "A", Length: "5:00", FileURL: "https://example.com/long.mp3"},
+		{ID: "exact", Quality: "A", Length: "3:00", FileURL: "https://example.com/exact.mp3"},
+	}
+	got := filterAndNormalize(recs, 180) // 3 min cap
+	assert.Len(t, got, 2)
+	assert.Equal(t, "short", got[0].ID)
+	assert.Equal(t, "exact", got[1].ID)
+}
+
 func TestSearchHTTPError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)
@@ -46,7 +76,7 @@ func TestSearchHTTPError(t *testing.T) {
 	defer srv.Close()
 
 	c := newWithBaseURL("", srv.URL)
-	_, err := c.Search(context.Background(), "Melospiza", "melodia", "song")
+	_, err := c.Search(context.Background(), "Melospiza", "melodia", "song", 0)
 	assert.ErrorContains(t, err, "429")
 }
 
@@ -58,7 +88,7 @@ func TestSearchIncludesAPIKey(t *testing.T) {
 	defer srv.Close()
 
 	c := newWithBaseURL("mykey", srv.URL)
-	recs, err := c.Search(context.Background(), "Melospiza", "melodia", "song")
+	recs, err := c.Search(context.Background(), "Melospiza", "melodia", "song", 0)
 	require.NoError(t, err)
 	assert.Empty(t, recs)
 }
@@ -107,7 +137,7 @@ func TestFilterAndNormalize(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			got := filterAndNormalize(tc.in)
+			got := filterAndNormalize(tc.in, 0)
 			assert.Equal(t, tc.want, got)
 		})
 	}

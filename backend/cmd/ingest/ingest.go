@@ -35,7 +35,7 @@ func ingestSpecies(
 	xc *xenocanto.Client,
 	mac *macaulay.Client,
 	entry ebird.TaxonomyEntry,
-	maxRec, maxImg int,
+	maxRec, maxImg, maxLenSecs int,
 	r2c *r2.Client,
 	xcOverrides map[string][2]string,
 	workerID int,
@@ -75,7 +75,7 @@ func ingestSpecies(
 	searchCh := make(chan searchResult, 2)
 	for _, recType := range []string{"song", "call"} {
 		go func(rt string) {
-			recs, err := xc.Search(ctx, xcGenus, xcSpecies, rt)
+			recs, err := xc.Search(ctx, xcGenus, xcSpecies, rt, maxLenSecs)
 			searchCh <- searchResult{rt, recs, err}
 		}(recType)
 	}
@@ -278,10 +278,10 @@ func filterBySpecies(codes []string, taxMap map[string]ebird.TaxonomyEntry, want
 	return out
 }
 
-func filterComplete(codes []string, complete map[string]struct{}) []string {
+func filterArbitrary(codes []string, toSkip map[string]struct{}) []string {
 	out := make([]string, 0, len(codes))
 	for _, c := range codes {
-		if _, ok := complete[c]; !ok {
+		if _, ok := toSkip[c]; !ok {
 			out = append(out, c)
 		}
 	}
