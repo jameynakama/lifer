@@ -249,3 +249,28 @@ func (h *Handler) getSpeciesGroups(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, SpeciesGroupsResponse{GroupIDs: groupIDs})
 }
+
+// listAllSpecies handles GET /api/v1/species/all.
+// Returns the full species catalog as a flat array with no pagination.
+func (h *Handler) listAllSpecies(w http.ResponseWriter, r *http.Request) {
+	rows, err := h.queries.ListAllSpecies(r.Context())
+	if err != nil {
+		log.Printf("ListAllSpecies error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	results := make([]SpeciesItem, len(rows))
+	for i, row := range rows {
+		var imageURL *string
+		if row.ImageUrl != "" {
+			imageURL = &row.ImageUrl
+		}
+		results[i] = SpeciesItem{
+			EbirdCode:      row.EbirdCode,
+			CommonName:     row.CommonName,
+			ScientificName: row.ScientificName,
+			ImageURL:       imageURL,
+		}
+	}
+	writeJSON(w, http.StatusOK, results)
+}

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -264,4 +265,77 @@ func TestGetSpeciesGroups_NoMembership_ReturnsEmptySlice(t *testing.T) {
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
 	assert.NotNil(t, body.GroupIDs)
 	assert.Empty(t, body.GroupIDs)
+}
+
+// allSpeciesStubQuerier stubs ListAllSpecies.
+type allSpeciesStubQuerier struct {
+	store.Querier
+	listAllSpecies func(ctx context.Context) ([]store.ListAllSpeciesRow, error)
+}
+
+func (s *allSpeciesStubQuerier) ListAllSpecies(ctx context.Context) ([]store.ListAllSpeciesRow, error) {
+	return s.listAllSpecies(ctx)
+}
+
+func TestListAllSpecies_ReturnsFullCatalog(t *testing.T) {
+	q := &allSpeciesStubQuerier{
+		listAllSpecies: func(_ context.Context) ([]store.ListAllSpeciesRow, error) {
+			return []store.ListAllSpeciesRow{
+				{EbirdCode: "amro", CommonName: "American Robin", ScientificName: "Turdus migratorius", ImageUrl: "https://r2.example.com/amro.jpg"},
+				{EbirdCode: "bcch", CommonName: "Black-capped Chickadee", ScientificName: "Poecile atricapillus", ImageUrl: ""},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/all", nil)
+	r = injectUserID(r, 1)
+	w := httptest.NewRecorder()
+
+	h.listAllSpecies(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []SpeciesItem
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	require.Len(t, body, 2)
+	assert.Equal(t, "American Robin", body[0].CommonName)
+	require.NotNil(t, body[0].ImageURL)
+	assert.Equal(t, "https://r2.example.com/amro.jpg", *body[0].ImageURL)
+	assert.Equal(t, "Black-capped Chickadee", body[1].CommonName)
+	assert.Nil(t, body[1].ImageURL)
+}
+
+func TestListAllSpecies_EmptyDB_ReturnsEmptyArray(t *testing.T) {
+	q := &allSpeciesStubQuerier{
+		listAllSpecies: func(_ context.Context) ([]store.ListAllSpeciesRow, error) {
+			return []store.ListAllSpeciesRow{}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/all", nil)
+	r = injectUserID(r, 1)
+	w := httptest.NewRecorder()
+
+	h.listAllSpecies(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []SpeciesItem
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.NotNil(t, body)
+	assert.Empty(t, body)
+}
+
+func TestListAllSpecies_DBError_Returns500(t *testing.T) {
+	q := &allSpeciesStubQuerier{
+		listAllSpecies: func(_ context.Context) ([]store.ListAllSpeciesRow, error) {
+			return nil, errors.New("db down")
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/all", nil)
+	r = injectUserID(r, 1)
+	w := httptest.NewRecorder()
+
+	h.listAllSpecies(w, r)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
