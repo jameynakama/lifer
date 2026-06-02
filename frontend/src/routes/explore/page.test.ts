@@ -86,6 +86,36 @@ describe('Explore page', () => {
     })
   })
 
+  it('resets to first page when search query changes', async () => {
+    const { createQuery } = await import('@tanstack/svelte-query')
+    const manySpecies = Array.from({ length: 25 }, (_, i) => ({
+      ebird_code: `sp${i}`,
+      common_name: i === 24 ? 'Unique Robin' : `Species ${i}`,
+      scientific_name: `Genus species${i}`,
+      image_url: null,
+    }))
+    vi.mocked(createQuery).mockReturnValue({
+      data: manySpecies,
+      isPending: false,
+      isError: false,
+    } as any)
+    render(ExplorePage)
+
+    // Navigate to page 2
+    const nextBtn = screen.getByRole('button', { name: /next page/i })
+    await fireEvent.click(nextBtn)
+    await vi.waitFor(() => {
+      expect(screen.getByText('Unique Robin')).toBeTruthy()
+    })
+
+    // Type a search -- offset should reset, showing from filtered start
+    const input = screen.getByPlaceholderText(/search species/i)
+    await fireEvent.input(input, { target: { value: 'species' } })
+    await vi.waitFor(() => {
+      expect(screen.getByText('Species 0')).toBeTruthy()
+    })
+  })
+
   it('shows loading state', async () => {
     const { createQuery } = await import('@tanstack/svelte-query')
     vi.mocked(createQuery).mockReturnValue({
