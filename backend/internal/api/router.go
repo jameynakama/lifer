@@ -63,6 +63,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			r.Get("/groups/{id}/practice", h.getPracticeCards)
 
 			r.Get("/species", h.listSpecies)
+			r.Get("/species/all", h.listAllSpecies)
 			r.Get("/species/{ebird_code}", h.getSpeciesDetail)
 			r.Get("/species/{ebird_code}/groups", h.getSpeciesGroups)
 			r.Put("/species/{ebird_code}/preferences", h.updatePreferences)
