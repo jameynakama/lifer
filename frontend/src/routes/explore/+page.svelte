@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createQuery } from '@tanstack/svelte-query'
+  import type { SpeciesListItem } from '../../types'
   import SpeciesRow from '$components/SpeciesRow.svelte'
   import PaginationBar from '$components/PaginationBar.svelte'
 
@@ -7,23 +8,29 @@
 
   let q = $state('')
   let offset = $state(0)
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null
 
-  function onSearchInput() {
-    if (debounceTimer) clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => {
-      offset = 0
-    }, 300)
-  }
-
-  const speciesQuery = createQuery(() => ({
-    queryKey: ['species', { q, limit: defaultLimit, offset }],
-    queryFn: () => {
-      const params = new URLSearchParams({ limit: String(defaultLimit), offset: String(offset) })
-      if (q) params.set('q', q)
-      return fetch(`/api/v1/species?${params}`).then((r) => r.json())
-    },
+  const allSpeciesQuery = createQuery(() => ({
+    queryKey: ['species', 'all'],
+    queryFn: (): Promise<SpeciesListItem[]> =>
+      fetch('/api/v1/species/all').then((r) => r.json()),
+    staleTime: Infinity,
   }))
+
+  const allSpecies = $derived(allSpeciesQuery.data ?? [])
+
+  const filtered = $derived(
+    q.length < 2
+      ? allSpecies
+      : allSpecies.filter((s) => {
+          const lq = q.toLowerCase()
+          return (
+            s.common_name.toLowerCase().includes(lq) ||
+            s.scientific_name.toLowerCase().includes(lq)
+          )
+        })
+  )
+
+  const displayed = $derived(filtered.slice(offset, offset + defaultLimit))
 
   function onPageChange(newOffset: number) {
     offset = newOffset
@@ -35,16 +42,16 @@
     type="text"
     placeholder="Search species…"
     bind:value={q}
-    oninput={onSearchInput}
+    oninput={() => { offset = 0 }}
   />
 
-  {#if speciesQuery.isPending}
+  {#if allSpeciesQuery.isPending}
     <p class="status">Loading…</p>
-  {:else if speciesQuery.isError}
+  {:else if allSpeciesQuery.isError}
     <p class="status error">Couldn't load species.</p>
   {:else}
     <ul class="species-list">
-      {#each (speciesQuery.data?.results ?? []) as s (s.ebird_code)}
+      {#each displayed as s (s.ebird_code)}
         <li>
           <SpeciesRow
             ebird_code={s.ebird_code}
@@ -56,14 +63,12 @@
       {/each}
     </ul>
 
-    {#if !q}
-      <PaginationBar
-        total={speciesQuery.data?.count ?? 0}
-        {offset}
-        limit={defaultLimit}
-        {onPageChange}
-      />
-    {/if}
+    <PaginationBar
+      total={filtered.length}
+      {offset}
+      limit={defaultLimit}
+      {onPageChange}
+    />
   {/if}
 </div>
 
