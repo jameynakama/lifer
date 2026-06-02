@@ -4,6 +4,14 @@ import { goto } from '$app/navigation'
 import { page } from '$app/state'
 import GroupDetailPage from './+page.svelte'
 
+vi.mock('@tanstack/svelte-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/svelte-query')>()
+  return {
+    ...actual,
+    createQuery: vi.fn(),
+  }
+})
+
 const speciesWithPrefs = [
   {
     ebird_code: 'sonspa',
@@ -25,13 +33,6 @@ function makeFetch(overrides: Record<string, unknown> = {}) {
     if (opts?.method === 'PUT' && (overrides.putHandler as (url: string, opts: RequestInit) => unknown)) {
       return (overrides.putHandler as (url: string, opts: RequestInit) => unknown)(url, opts!)
     }
-    if (url.includes('/api/v1/species')) {
-      const searchResults = (overrides.searchResults as unknown[]) ?? []
-      return Promise.resolve({
-        ok: true,
-        json: () => Promise.resolve({ count: searchResults.length, next: null, previous: null, results: searchResults }),
-      })
-    }
     if (url.match(/\/api\/v1\/groups\/\d+\/species/)) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
     }
@@ -40,9 +41,15 @@ function makeFetch(overrides: Record<string, unknown> = {}) {
   })
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   page.params = { id: '42' }
   vi.mocked(goto).mockClear()
+  const { createQuery } = await import('@tanstack/svelte-query')
+  vi.mocked(createQuery).mockReturnValue({
+    data: [],
+    isPending: false,
+    isError: false,
+  } as any)
 })
 
 afterEach(() => {
@@ -96,10 +103,15 @@ describe('Group detail page', () => {
       ebird_code: 'foxspa',
       common_name: 'Fox Sparrow',
       scientific_name: 'Passerella iliaca',
-      audio_enabled: true,
-      image_enabled: true,
+      image_url: null,
     }
-    vi.stubGlobal('fetch', makeFetch({ searchResults: [foxSparrow] }))
+    const { createQuery } = await import('@tanstack/svelte-query')
+    vi.mocked(createQuery).mockReturnValue({
+      data: [foxSparrow],
+      isPending: false,
+      isError: false,
+    } as any)
+    vi.stubGlobal('fetch', makeFetch())
     render(GroupDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
     await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
@@ -136,10 +148,15 @@ describe('Group detail page', () => {
       ebird_code: 'foxspa',
       common_name: 'Fox Sparrow',
       scientific_name: 'Passerella iliaca',
-      audio_enabled: true,
-      image_enabled: true,
+      image_url: null,
     }
-    vi.stubGlobal('fetch', makeFetch({ searchResults: [foxSparrow] }))
+    const { createQuery } = await import('@tanstack/svelte-query')
+    vi.mocked(createQuery).mockReturnValue({
+      data: [foxSparrow],
+      isPending: false,
+      isError: false,
+    } as any)
+    vi.stubGlobal('fetch', makeFetch())
     render(GroupDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
     await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
@@ -154,7 +171,13 @@ describe('Group detail page', () => {
   })
 
   it('shows Added indicator for species already in the group', async () => {
-    vi.stubGlobal('fetch', makeFetch({ searchResults: speciesWithPrefs }))
+    const { createQuery } = await import('@tanstack/svelte-query')
+    vi.mocked(createQuery).mockReturnValue({
+      data: speciesWithPrefs.map((s) => ({ ...s, image_url: null })),
+      isPending: false,
+      isError: false,
+    } as any)
+    vi.stubGlobal('fetch', makeFetch())
     render(GroupDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
     await fireEvent.input(screen.getByPlaceholderText(/search species/i), {

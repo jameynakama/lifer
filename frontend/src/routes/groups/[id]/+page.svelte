@@ -1,6 +1,8 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
   import { page } from '$app/state'
+  import { createQuery } from '@tanstack/svelte-query'
+  import type { SpeciesListItem } from '../../../types'
 
   interface Species {
     ebird_code: string
@@ -15,12 +17,29 @@
   let audioDue = $state(0)
   let imageDue = $state(0)
   let searchQuery = $state('')
-  let searchResults: Species[] = $state([])
   let loading = $state(true)
-  let searchTimer: ReturnType<typeof setTimeout> | null = null
 
   let addedCodes = $derived(new Set(groupSpecies.map((s) => s.ebird_code)))
   let togglingCodes: Set<string> = $state(new Set())
+
+  const allSpeciesQuery = createQuery(() => ({
+    queryKey: ['species', 'all'],
+    queryFn: (): Promise<SpeciesListItem[]> =>
+      fetch('/api/v1/species/all').then((r) => r.json()),
+    staleTime: Infinity,
+  }))
+
+  const searchResults = $derived(
+    searchQuery.length < 2
+      ? []
+      : (allSpeciesQuery.data ?? []).filter((s) => {
+          const lq = searchQuery.toLowerCase()
+          return (
+            s.common_name.toLowerCase().includes(lq) ||
+            s.scientific_name.toLowerCase().includes(lq)
+          )
+        })
+  )
 
   async function loadGroup() {
     try {
@@ -41,18 +60,6 @@
     }
   }
 
-  function onSearchInput() {
-    if (searchTimer) clearTimeout(searchTimer)
-    if (!searchQuery.trim()) { searchResults = []; return }
-    searchTimer = setTimeout(async () => {
-      const res = await fetch(`/api/v1/species?q=${encodeURIComponent(searchQuery)}`)
-      if (res.ok) {
-        const data = await res.json()
-        searchResults = data.results ?? []
-      }
-    }, 300)
-  }
-
   async function addSpecies(ebirdCode: string) {
     const res = await fetch(`/api/v1/groups/${groupId}/species`, {
       method: 'POST',
@@ -61,7 +68,13 @@
     })
     if (res.ok) {
       const added = searchResults.find((s) => s.ebird_code === ebirdCode)
-      if (added) groupSpecies = [...groupSpecies, { ...added, audio_enabled: true, image_enabled: true }]
+      if (added) groupSpecies = [...groupSpecies, {
+        ebird_code: added.ebird_code,
+        common_name: added.common_name,
+        scientific_name: added.scientific_name,
+        audio_enabled: true,
+        image_enabled: true,
+      }]
     }
   }
 
@@ -114,12 +127,6 @@
 
   $effect(() => {
     if (groupId) loadGroup()
-  })
-
-  $effect(() => {
-    return () => {
-      if (searchTimer) clearTimeout(searchTimer)
-    }
   })
 </script>
 
@@ -190,7 +197,6 @@
       type="text"
       placeholder="Search species to add..."
       bind:value={searchQuery}
-      oninput={onSearchInput}
     />
     {#if searchResults.length > 0}
       <ul class="search-results">
