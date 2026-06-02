@@ -42,3 +42,12 @@ SELECT group_id
 FROM group_species
 WHERE species_code = $1
   AND group_id IN (SELECT id FROM groups WHERE owner_id = $2);
+
+-- name: ListAllSpecies :many
+SELECT
+    ebird_code,
+    common_name,
+    scientific_name,
+    (SELECT file_path FROM species_images WHERE species_code = species.ebird_code LIMIT 1) AS image_url
+FROM species
+ORDER BY common_name;

@@ -133,6 +133,48 @@ func (q *Queries) GetSpeciesRecordings(ctx context.Context, speciesCode string) 
 	return items, nil
 }
 
+const listAllSpecies = `-- name: ListAllSpecies :many
+SELECT
+    ebird_code,
+    common_name,
+    scientific_name,
+    (SELECT file_path FROM species_images WHERE species_code = species.ebird_code LIMIT 1) AS image_url
+FROM species
+ORDER BY common_name
+`
+
+type ListAllSpeciesRow struct {
+	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
+	CommonName     string `db:"common_name" json:"common_name"`
+	ScientificName string `db:"scientific_name" json:"scientific_name"`
+	ImageUrl       string `db:"image_url" json:"image_url"`
+}
+
+func (q *Queries) ListAllSpecies(ctx context.Context) ([]ListAllSpeciesRow, error) {
+	rows, err := q.db.Query(ctx, listAllSpecies)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllSpeciesRow
+	for rows.Next() {
+		var i ListAllSpeciesRow
+		if err := rows.Scan(
+			&i.EbirdCode,
+			&i.CommonName,
+			&i.ScientificName,
+			&i.ImageUrl,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSpecies = `-- name: ListSpecies :many
 SELECT
     ebird_code,

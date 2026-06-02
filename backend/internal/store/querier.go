@@ -33,6 +33,7 @@ type Querier interface {
 	GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]GetSpeciesRecordingsRow, error)
 	GetUserByGoogleID(ctx context.Context, googleID string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
+	ListAllSpecies(ctx context.Context) ([]ListAllSpeciesRow, error)
 	ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, error)
 	ListGroupSpeciesWithPrefs(ctx context.Context, arg ListGroupSpeciesWithPrefsParams) ([]ListGroupSpeciesWithPrefsRow, error)
 	ListIncompleteSpecies(ctx context.Context) ([]string, error)
