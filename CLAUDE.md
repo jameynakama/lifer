@@ -55,12 +55,14 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
   - `GroupDropdown`: per-species dropdown with checkboxes for each user group (checked = member), inline "create new group" input; TanStack Query mutations for add/remove/create; clicks inside dropdown don't bubble to window close handler
   - `@tanstack/svelte-query` added; `QueryClientProvider` wraps the layout
   - Groups list page now shows `audio_due`/`image_due` badge counts per group
+  - `GET /api/v1/species/all` -- returns all species (no pagination) for client-side filtering; shared cache for Explore and group search typeahead
+  - Client-side filtering: Explore page and group species search both use the `/species/all` cache via TanStack Query (`staleTime: Infinity`); no per-keystroke API hits
 - [x] **Practice mode (free drill):**
   - `GET /api/v1/groups/:id/practice?lane=` -- returns all species in group with random media URLs; COALESCE-safe SQL, ordered by common_name; access check allows owner or preset groups, blocks other users' private groups
   - `/groups/[id]/practice` page: fetches all species upfront, Fisher-Yates shuffle, index cycling, no POST to `/rate`; "Practiced: X/Y" stat; done screen with "Practice Again" (reshuffle) + "Back to Group"
   - Groups list: "Free Practice" toggle -- shows banner + swaps due badges for quick "▶ Audio" / "◉ Image" launch buttons per group
   - Group detail: "Study Audio/Image" (filled, FSRS queue → `/quiz`) + "Practice Audio/Image" (outline, free drill → `/practice`)
-  - Per-species audio/image lane preferences (`PUT /api/v1/species/:ebird_code/preferences`, `user_species_preferences` table): backend complete, frontend UI not yet built
+  - Per-species audio/image lane preferences (`PUT /api/v1/species/:ebird_code/preferences`, `user_species_preferences` table): backend + frontend UI complete
 
 ## What's next
 
@@ -71,50 +73,10 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Must proxy through backend to keep the eBird API key server-side
 - `regionType` values: `country`, `subnational1` (states/provinces), `subnational2` (counties)
 
-### 2. Per-species quiz lane preferences (UI only -- backend done)
-- `PUT /api/v1/species/:ebird_code/preferences` with `{ audio_enabled, image_enabled }` already exists; upserts preferences and creates/deletes cards automatically
-- Needs: toggle UI on the Explore species detail page and/or the group detail species list
-- Useful for users already proficient at one modality for a given bird
-
-### 3. Group management (some is done)
-- Admin: create/edit preset groups (region-based)
-- Users: create custom groups, add/remove species
-- Shared UI surface with Explore view
-
-### 4. Admin UI
+### 2. Admin UI
 - Catalog management: add/edit species, recordings, images
 
-### 5. Caching -- reduce species API hits
 
-**Goal:** species catalog data is global/shared and changes rarely (only after an ingest run). No reason to hit the Go server on every keystroke or every user.
-
-**Approach (two parts, do together):**
-
-**A. TanStack Query -- `staleTime: Infinity` on species queries**
-- Set `staleTime: Infinity` on the `['species', ...]` query in the explore page
-- TanStack never refetches in the background; cache lives until page refresh/tab close
-- Zero code change to the backend; eliminates repeat hits within a session
-- If load-all-once is implemented later (see below), same setting applies there
-
-**B. Cache-Control headers on the backend**
-- Add `Cache-Control: public, max-age=3600` to `GET /api/v1/species` responses (list + search)
-- Do NOT add to auth-protected endpoints -- use `Cache-Control: private` or `no-store` there
-- With a CDN in front, edge nodes serve cached species responses to all users; Go server only sees cache misses
-- Header value should match the `staleTime` window (both 1 hour, or both longer)
-
-**C. Cloudflare CDN (free tier, ~5 min setup)**
-- Point domain nameservers at Cloudflare; it proxies all traffic automatically
-- Species list/search responses with `Cache-Control: public` get edge-cached globally
-- Auth-protected routes bypass cache automatically via `Cache-Control: private`
-- Also provides free TLS and basic DDoS protection -- worth doing before public launch anyway
-
-**Future: load-all-once (if catalog grows)**
-- If the catalog stays regional (< ~600 species), fetch all species once per session and filter client-side -- eliminates per-keystroke hits entirely
-- If it grows to multi-state scale, revert to server-side search (already built) -- just a one-file change in the explore page
-- Don't implement prematurely; A+B+C above cover most real-world usage at current scale
-
-## Bugs / fixes
-- **Enter to submit answer** -- pressing Enter in the SpeciesTypeahead should trigger "Reveal answer" (same as clicking the button) when a species is selected
 
 ## Key non-obvious choices
 - sqlc lives in `backend/` -- run `just generate` from repo root after any migration change
@@ -129,6 +91,7 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Natural PKs on species tables mean re-ingesting into a fresh DB produces identical IDs -- cards/group memberships stay valid across resets.
 - TanStack Query v6 (`@tanstack/svelte-query`): use `createQuery(() => ({...}))` -- options wrapped in a function so Svelte 5 rune reads are tracked reactively. Returns a reactive object directly (not a store); access `.data`, `.isPending`, `.isError` without `$` prefix. Mutations use `createMutation(() => ({...}))` same pattern.
 - `GET /api/v1/species` pagination: `next`/`previous` are absolute URL strings (or null), constructed server-side from `r.Host` + `X-Forwarded-Proto` header. `count` comes from `COUNT(*) OVER()` window function -- no second query needed.
+- `GET /api/v1/species/all` is a separate unpaginated endpoint used exclusively for client-side filtering. TanStack Query key `['species', 'all']` with `staleTime: Infinity` -- fetched once per session, shared across Explore and group species typeahead. If catalog grows beyond regional scale, revert to server-side search (the paginated endpoint is still in place).
 
 ## Local setup on a new machine
 ```
