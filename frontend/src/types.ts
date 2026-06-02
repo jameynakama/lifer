@@ -27,3 +27,10 @@ export interface Species {
     common_name: string;
     scientific_name: string;
 }
+
+export interface SpeciesListItem {
+    ebird_code: string;
+    common_name: string;
+    scientific_name: string;
+    image_url: string | null;
+}
