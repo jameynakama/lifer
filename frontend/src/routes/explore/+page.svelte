@@ -110,4 +110,8 @@
     color: var(--text-muted);
     padding: 2rem 0;
   }
+
+  .status.error {
+    color: var(--error, #f87171);
+  }
 </style>

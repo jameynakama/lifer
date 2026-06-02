@@ -339,3 +339,25 @@ func TestListAllSpecies_DBError_Returns500(t *testing.T) {
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }
+
+func TestListAllSpecies_Unauthenticated_Returns401(t *testing.T) {
+	h := makeHandler(&allSpeciesStubQuerier{
+		listAllSpecies: func(_ context.Context) ([]store.ListAllSpeciesRow, error) {
+			return nil, nil
+		},
+	})
+	// No injectUserID -- simulates a request without a valid JWT
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/all", nil)
+	w := httptest.NewRecorder()
+
+	// Route through the full router so RequireAuth middleware runs
+	router := NewRouter(RouterConfig{
+		Queries:     h.queries,
+		OAuthConfig: nil,
+		JWTSecret:   []byte("test-secret"),
+		FrontendURL: "http://localhost:5173",
+	})
+	router.ServeHTTP(w, r)
+
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+}
