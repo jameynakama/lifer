@@ -28,6 +28,8 @@ func main() {
 	skipComplete := flag.Bool("skip-complete", false, "skip species that already have ≥1 recording and ≥1 image in the DB")
 	speciesFilter := flag.String("species", "", "comma-separated ebird codes or common names to process")
 	xcOverrideFlag := flag.String("xc-override", "", "comma-separated xeno-canto taxonomy overrides, e.g. \"comrav=Corvus:corax\"")
+	noR2 := flag.Bool("no-r2", false, "skip R2 uploads; store placeholder:// URLs in DB (local dev/testing only -- never use in prod)")
+	noCleanup := flag.Bool("no-cleanup", false, "skip post-run cleanup of incomplete species from R2 and DB (safe for local dev)")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: ingest [flags] <region-code> [region-code...]\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
@@ -67,11 +69,6 @@ func main() {
 	ebirdKey := mustEnv("EBIRD_API_KEY")
 	xcKey := mustEnv("XENO_CANTO_API_KEY")
 	dbURL := mustEnv("DATABASE_URL")
-	r2AccountID := mustEnv("R2_ACCOUNT_ID")
-	r2AccessKey := mustEnv("R2_ACCESS_KEY_ID")
-	r2SecretKey := mustEnv("R2_SECRET_ACCESS_KEY")
-	r2Bucket := mustEnv("R2_BUCKET_NAME")
-	r2PubURL := mustEnv("R2_PUBLIC_URL")
 
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dbURL)
@@ -81,10 +78,20 @@ func main() {
 	}
 	defer pool.Close()
 
-	r2c, err := r2.New(r2AccountID, r2AccessKey, r2SecretKey, r2Bucket, r2PubURL)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "r2 client: %v\n", err)
-		os.Exit(1)
+	var r2c *r2.Client
+	if !*noR2 {
+		r2AccountID := mustEnv("R2_ACCOUNT_ID")
+		r2AccessKey := mustEnv("R2_ACCESS_KEY_ID")
+		r2SecretKey := mustEnv("R2_SECRET_ACCESS_KEY")
+		r2Bucket := mustEnv("R2_BUCKET_NAME")
+		r2PubURL := mustEnv("R2_PUBLIC_URL")
+		r2c, err = r2.New(r2AccountID, r2AccessKey, r2SecretKey, r2Bucket, r2PubURL)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "r2 client: %v\n", err)
+			os.Exit(1)
+		}
+	} else {
+		fmt.Fprintln(os.Stderr, "--no-r2: skipping R2 uploads, placeholder URLs will be stored in DB")
 	}
 
 	q := store.New(pool)
@@ -211,29 +218,35 @@ func main() {
 	}
 
 	// --- post-run cleanup and reports ---
-	fmt.Fprintln(os.Stderr, "cleaning up species missing recordings or images...")
-	incomplete, err := q.ListIncompleteSpecies(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cleanup: %v\n", err)
-		os.Exit(1)
-	}
-	for _, code := range incomplete {
-		for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
-			if err := r2c.DeletePrefix(ctx, prefix); err != nil {
-				fmt.Fprintf(os.Stderr, "  warn: cleanup R2 %s: %v\n", prefix, err)
+	if !*noCleanup {
+		fmt.Fprintln(os.Stderr, "cleaning up species missing recordings or images...")
+		incomplete, err := q.ListIncompleteSpecies(ctx)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "cleanup: %v\n", err)
+			os.Exit(1)
+		}
+		for _, code := range incomplete {
+			if r2c != nil {
+				for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
+					if err := r2c.DeletePrefix(ctx, prefix); err != nil {
+						fmt.Fprintf(os.Stderr, "  warn: cleanup R2 %s: %v\n", prefix, err)
+					}
+				}
+			}
+			if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {
+				fmt.Fprintf(os.Stderr, "  warn: cleanup recordings %s: %v\n", code, err)
+			}
+			if err := q.DeleteSpeciesImagesBySpeciesCode(ctx, code); err != nil {
+				fmt.Fprintf(os.Stderr, "  warn: cleanup images %s: %v\n", code, err)
+			}
+			if err := q.DeleteSpeciesByCode(ctx, code); err != nil {
+				fmt.Fprintf(os.Stderr, "  warn: cleanup species %s: %v\n", code, err)
 			}
 		}
-		if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {
-			fmt.Fprintf(os.Stderr, "  warn: cleanup recordings %s: %v\n", code, err)
-		}
-		if err := q.DeleteSpeciesImagesBySpeciesCode(ctx, code); err != nil {
-			fmt.Fprintf(os.Stderr, "  warn: cleanup images %s: %v\n", code, err)
-		}
-		if err := q.DeleteSpeciesByCode(ctx, code); err != nil {
-			fmt.Fprintf(os.Stderr, "  warn: cleanup species %s: %v\n", code, err)
-		}
+		fmt.Fprintf(os.Stderr, "cleanup: removed %d incomplete species\n", len(incomplete))
+	} else {
+		fmt.Fprintln(os.Stderr, "--no-cleanup: skipping post-run cleanup")
 	}
-	fmt.Fprintf(os.Stderr, "cleanup: removed %d incomplete species\n", len(incomplete))
 
 	if len(failedSpecies) > 0 {
 		failedCodes := make([]string, 0, len(failedSpecies))
@@ -251,9 +264,11 @@ func main() {
 		}
 		fmt.Println("cleaning up partial R2 uploads and DB entries for failed species...")
 		for _, code := range failedCodes {
-			for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
-				if err := r2c.DeletePrefix(ctx, prefix); err != nil {
-					fmt.Fprintf(os.Stderr, "  warn: R2 delete %s: %v\n", prefix, err)
+			if r2c != nil {
+				for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
+					if err := r2c.DeletePrefix(ctx, prefix); err != nil {
+						fmt.Fprintf(os.Stderr, "  warn: R2 delete %s: %v\n", prefix, err)
+					}
 				}
 			}
 			if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {

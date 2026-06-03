@@ -116,10 +116,16 @@ func ingestSpecies(
 			dlSem <- struct{}{}
 			defer func() { <-dlSem }()
 			key := "recordings/" + sp.EbirdCode + "/" + rec.ID + ".mp3"
-			filePath, err := fetchAndUpload(ctx, r2c, rec.FileURL, key, "audio/mpeg", workerID, send)
-			if err != nil {
-				recordFailure(fmt.Sprintf("recording %s: %v", rec.ID, err))
-				return
+			var filePath string
+			if r2c != nil {
+				var err error
+				filePath, err = fetchAndUpload(ctx, r2c, rec.FileURL, key, "audio/mpeg", workerID, send)
+				if err != nil {
+					recordFailure(fmt.Sprintf("recording %s: %v", rec.ID, err))
+					return
+				}
+			} else {
+				filePath = "placeholder://" + key
 			}
 			if _, err := q.UpsertRecording(ctx, store.UpsertRecordingParams{
 				XenoCantoID: rec.ID,
@@ -151,10 +157,16 @@ func ingestSpecies(
 			dlSem <- struct{}{}
 			defer func() { <-dlSem }()
 			key := "images/" + sp.EbirdCode + "/" + photo.AssetID + ".jpg"
-			filePath, err := fetchAndUpload(ctx, r2c, mac.PhotoURL(photo.AssetID), key, "image/jpeg", workerID, send)
-			if err != nil {
-				recordFailure(fmt.Sprintf("image %s: %v", photo.AssetID, err))
-				return
+			var filePath string
+			if r2c != nil {
+				var err error
+				filePath, err = fetchAndUpload(ctx, r2c, mac.PhotoURL(photo.AssetID), key, "image/jpeg", workerID, send)
+				if err != nil {
+					recordFailure(fmt.Sprintf("image %s: %v", photo.AssetID, err))
+					return
+				}
+			} else {
+				filePath = "placeholder://" + key
 			}
 			if _, err := q.UpsertSpeciesImage(ctx, store.UpsertSpeciesImageParams{
 				MacaulayID:  photo.AssetID,
