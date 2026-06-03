@@ -64,16 +64,36 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
   - Group detail: "Study Audio/Image" (filled, FSRS queue → `/quiz`) + "Practice Audio/Image" (outline, free drill → `/practice`)
   - Per-species audio/image lane preferences (`PUT /api/v1/species/:ebird_code/preferences`, `user_species_preferences` table): backend + frontend UI complete
 
+## What's built (deployment)
+- [x] DigitalOcean droplet: Go binary + nginx + systemd (`flockdeck.service`)
+- [x] nginx reverse proxies `/api/` and `/health` to Go on port 8082; serves `frontend/build` as SPA with `try_files` fallback
+- [x] Cloudflare DNS: `flockdeck.com` + `www` → droplet; `media.flockdeck.com` → R2 bucket (custom domain, production-grade)
+- [x] `R2_PUBLIC_URL=https://media.flockdeck.com` in prod `.env`
+- [x] Google OAuth redirect URI added for `https://flockdeck.com/api/v1/auth/google/callback`
+- [x] `.github/workflows/deploy.yml` written (test + SSH deploy pattern); **not yet active** -- needs GitHub secrets + prod DB populated
+
 ## What's next
 
-### 1. Explore -- region filter (separate from the Explore list/detail already built)
+### 1. Seed prod DB
+```bash
+pg_dump $DATABASE_URL | psql $PROD_DATABASE_URL
+```
+Species, recordings, images, and groups transfer. Cards are user-scoped and start fresh.
+
+### 2. GH Actions -- activate CI/CD
+Add three secrets to the GitHub repo (Settings → Secrets → Actions):
+- `SSH_PRIVATE_KEY` -- private key whose public half is in `~/.ssh/authorized_keys` on the droplet
+- `SSH_USER` -- deploy user on the droplet
+- `SSH_HOST` -- droplet IP or hostname
+
+### 3. Explore -- region filter (separate from the Explore list/detail already built)
 - eBird region codes are not stored in the DB -- no "which regions contain this species" endpoint exists
 - Instead: client requests subregions from eBird on demand, then intersects the species list with our catalog
 - Flow: user picks state → frontend hits backend proxy → backend calls `GET /v2/ref/region/list/subnational2/{stateCode}` → returns county list; user picks county → backend calls `GET /v2/product/spplist/{countyCode}` → returns species codes → backend intersects with our DB and returns matches
 - Must proxy through backend to keep the eBird API key server-side
 - `regionType` values: `country`, `subnational1` (states/provinces), `subnational2` (counties)
 
-### 2. Admin UI
+### 4. Admin UI
 - Catalog management: add/edit species, recordings, images
 
 
@@ -91,6 +111,7 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Natural PKs on species tables mean re-ingesting into a fresh DB produces identical IDs -- cards/group memberships stay valid across resets.
 - TanStack Query v6 (`@tanstack/svelte-query`): use `createQuery(() => ({...}))` -- options wrapped in a function so Svelte 5 rune reads are tracked reactively. Returns a reactive object directly (not a store); access `.data`, `.isPending`, `.isError` without `$` prefix. Mutations use `createMutation(() => ({...}))` same pattern.
 - `GET /api/v1/species` pagination: `next`/`previous` are absolute URL strings (or null), constructed server-side from `r.Host` + `X-Forwarded-Proto` header. `count` comes from `COUNT(*) OVER()` window function -- no second query needed.
+- Production static serving: Go does NOT serve the frontend. nginx serves `frontend/build` directly with `try_files $uri $uri/ /index.html` for SPA fallback, and proxies `/api/` + `/health` to Go on port 8082. Cloudflare sits in front (Flexible SSL mode -- origin is HTTP only).
 - `GET /api/v1/species/all` is a separate unpaginated endpoint used exclusively for client-side filtering. TanStack Query key `['species', 'all']` with `staleTime: Infinity` -- fetched once per session, shared across Explore and group species typeahead. If catalog grows beyond regional scale, revert to server-side search (the paginated endpoint is still in place).
 
 ## Local setup on a new machine
