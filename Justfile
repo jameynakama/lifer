@@ -14,10 +14,6 @@ gotest args='':
 cover:
     cd backend && gotestsum -- -coverprofile=coverage.out ./... && go tool cover -func=coverage.out
 
-# Start the backend server (hot-reload via air)
-run:
-    cd backend && air
-
 # Build the backend binary
 build:
     cd backend && go build -o bin/flockdeck ./cmd/server
@@ -38,13 +34,24 @@ generate:
 migration name:
     migrate create -ext sql -dir backend/migrations -seq {{ name }}
 
-# Start the frontend dev server
-frontend:
-    cd frontend && npm run dev
-
 # Run the ingestion script (usage: just ingest US-OR)
 ingest *args:
     cd backend && go run ./cmd/ingest {{ args }}
+
+# Start the backend server (hot-reload via air)
+be:
+    cd backend && air
+
+# Start the frontend dev server
+fe:
+    cd frontend && npm run dev -- --host
+
+# Start backend + frontend together (Ctrl+C stops both)
+run:
+    #!/usr/bin/env bash
+    just be &
+    trap "kill %1" EXIT
+    just fe
 
 # Install all the required tools
 install-tools:

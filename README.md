@@ -23,7 +23,7 @@ brew install just sqlc golang-migrate
 ```bash
 git clone https://github.com/jameynakama/flockdeck
 cd flockdeck
-cp .env.example .env   # fill in Google OAuth credentials and JWT secret
+cp .env.example .env   # fill in values
 just migrate-up
 just run               # backend on http://localhost:8080
 ```
@@ -34,7 +34,7 @@ just run               # backend on http://localhost:8080
 
 ```
 just            # run tests (default)
-just run        # start backend server
+just run        # start backend and frontend servers
 just build      # build binary to backend/bin/flockdeck
 just migrate-up        # run pending migrations
 just migrate-down      # roll back one migration
