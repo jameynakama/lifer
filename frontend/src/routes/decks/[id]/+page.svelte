@@ -13,6 +13,9 @@
   }
 
   let deckId = $derived(page.params.id)
+  let deckName = $state('')
+  let editingName = $state(false)
+  let nameInput = $state('')
   let deckSpecies: Species[] = $state([])
   let audioDue = $state(0)
   let imageDue = $state(0)
@@ -49,6 +52,7 @@
       ])
       if (deckRes.ok) {
         const d = await deckRes.json()
+        deckName = d.name ?? ''
         audioDue = d.audio_due ?? 0
         imageDue = d.image_due ?? 0
       }
@@ -58,6 +62,28 @@
     } finally {
       loading = false
     }
+  }
+
+  function startEditing() {
+    nameInput = deckName
+    editingName = true
+  }
+
+  async function saveName() {
+    const trimmed = nameInput.trim()
+    if (!trimmed || trimmed === deckName) { editingName = false; return }
+    const res = await fetch(`/api/v1/decks/${deckId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: trimmed }),
+    })
+    if (res.ok) deckName = trimmed
+    editingName = false
+  }
+
+  function handleNameKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') saveName()
+    else if (e.key === 'Escape') editingName = false
   }
 
   async function addSpecies(ebirdCode: string) {
@@ -131,6 +157,22 @@
 </script>
 
 <div class="deck-detail">
+  <div class="deck-header">
+    {#if editingName}
+      <!-- svelte-ignore a11y_autofocus -->
+      <input
+        class="name-input"
+        bind:value={nameInput}
+        onkeydown={handleNameKeydown}
+        onblur={saveName}
+        autofocus
+      />
+    {:else}
+      <h1 class="deck-name">{deckName}</h1>
+      <button class="btn-rename" onclick={startEditing} aria-label="Rename deck">✎</button>
+    {/if}
+  </div>
+
   <div class="actions">
     <button
       class="btn-study"
@@ -164,10 +206,10 @@
     <ul class="species-list">
       {#each deckSpecies as s (s.ebird_code)}
         <li class="species-row">
-          <span class="species-names">
+          <a href="/explore/{s.ebird_code}" class="species-names">
             <strong>{s.common_name}</strong>
             <em>{s.scientific_name}</em>
-          </span>
+          </a>
           <div class="row-actions">
             <div class="lane-toggles">
               <button
@@ -223,6 +265,40 @@
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
+  }
+  .deck-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .deck-name {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+  .btn-rename {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1rem;
+    cursor: pointer;
+    padding: 0.125rem 0.25rem;
+    line-height: 1;
+  }
+  .btn-rename:hover {
+    color: var(--text);
+  }
+  .name-input {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 0.125rem 0.375rem;
+    font-family: inherit;
+    flex: 1;
   }
   .actions {
     display: flex;
@@ -287,6 +363,7 @@
     display: flex;
     flex-direction: column;
     gap: 0.125rem;
+    text-decoration: none;
   }
   .search-row span {
     display: flex;

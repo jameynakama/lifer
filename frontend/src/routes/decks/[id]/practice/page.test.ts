@@ -44,7 +44,7 @@ function makeFetch(data: object[] = cards) {
 
 beforeEach(() => {
   page.params = { id: '42' }
-  page.url = new URL('http://localhost/decks/42/practice?lane=audio')
+  page.url = new URL('http://localhost/decks/42/practice?lane=audio') as typeof page.url
   vi.mocked(goto).mockClear()
 })
 

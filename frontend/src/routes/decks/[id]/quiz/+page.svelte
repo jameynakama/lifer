@@ -12,7 +12,7 @@
     page.url.searchParams.get('lane') === 'image' ? 'image' : 'audio'
   )
 
-  let card: BirdCard | null = $state(null)
+  let card = $state<BirdCard | null>(null)
   let deckSpecies: Species[] = $state([])
   let revealed = $state(false)
   let done = $state(false)

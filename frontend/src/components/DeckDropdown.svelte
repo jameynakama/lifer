@@ -92,7 +92,14 @@
   }
 </script>
 
-<div class="dropdown" role="dialog" aria-label="Add to deck" onclick={(e) => e.stopPropagation()}>
+<div
+  class="dropdown"
+  role="dialog"
+  aria-label="Add to deck"
+  tabindex="-1"
+  onclick={(e) => e.stopPropagation()}
+  onkeydown={(e) => e.stopPropagation()}
+>
   <div class="create-section">
     <input
       class="create-input"

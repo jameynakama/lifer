@@ -4,9 +4,9 @@ import SpeciesTypeahead from './SpeciesTypeahead.svelte'
 import type { Species } from '../types'
 
 const species: Species[] = [
-  { id: 1, common_name: 'Song Sparrow', scientific_name: 'Melospiza melodia', ebird_code: 'sonspa' },
-  { id: 2, common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', ebird_code: 'foxspa' },
-  { id: 3, common_name: 'Dark-eyed Junco', scientific_name: 'Junco hyemalis', ebird_code: 'daejun' },
+  { common_name: 'Song Sparrow', scientific_name: 'Melospiza melodia', ebird_code: 'sonspa' },
+  { common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', ebird_code: 'foxspa' },
+  { common_name: 'Dark-eyed Junco', scientific_name: 'Junco hyemalis', ebird_code: 'daejun' },
 ]
 
 describe('SpeciesTypeahead', () => {

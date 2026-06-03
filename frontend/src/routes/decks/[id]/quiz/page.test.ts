@@ -50,7 +50,7 @@ function makeFetch(opts: { card?: object | null; status?: number } = {}) {
 
 beforeEach(() => {
   page.params = { id: '42' }
-  page.url = new URL('http://localhost/decks/42/quiz?lane=audio')
+  page.url = new URL('http://localhost/decks/42/quiz?lane=audio') as typeof page.url
   vi.mocked(goto).mockClear()
 })
 

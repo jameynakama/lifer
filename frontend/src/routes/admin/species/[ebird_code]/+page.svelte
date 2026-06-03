@@ -95,7 +95,7 @@
   }
 </script>
 
-<a href="/admin">← Back to search</a>
+<a href="/admin/species">← Back to search</a>
 <h2>{ebirdCode}</h2>
 
 {#if loading}

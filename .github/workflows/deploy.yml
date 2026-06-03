@@ -29,13 +29,13 @@ jobs:
           go-version-file: backend/go.mod
           cache: true
           cache-dependency-path: backend/go.sum
-      - run: cd backend && go test ./...
+      - run: cd backend && go vet ./... && go test ./...
       - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - run: cd frontend && npm ci && npx svelte-kit sync && npm test
+      - run: cd frontend && npm ci && npx svelte-kit sync && npx svelte-check --tsconfig tsconfig.json && npm test
 
   deploy:
     needs: test

@@ -2,9 +2,10 @@ set dotenv-load
 
 default: test
 
-# Run tests with nicer output
+# Run all tests and checks (backend + frontend)
 test args='':
-    cd backend && gotestsum ./... -- {{ args }}
+    cd backend && go vet ./... && gotestsum ./... -- {{ args }}
+    cd frontend && npx svelte-check --tsconfig tsconfig.json && npm test
 
 # Run regular tests with certain args that gotestsum seems to ignore
 gotest args='':

@@ -3,8 +3,8 @@ import { render, screen, fireEvent } from '@testing-library/svelte'
 import DeckList from './DeckList.svelte'
 
 const decks = [
-  { id: '1', name: 'Pacific Northwest', audio_due: 8, image_due: 5 },
-  { id: '2', name: 'My Warblers', audio_due: 3, image_due: 0 },
+  { id: 1, name: 'Pacific Northwest', audio_due: 8, image_due: 5 },
+  { id: 2, name: 'My Warblers', audio_due: 3, image_due: 0 },
 ]
 
 describe('DeckList', () => {
@@ -27,7 +27,7 @@ describe('DeckList', () => {
   })
 
   it('shows All done when both lanes are 0', () => {
-    const noDueDecks = [{ id: '3', name: 'Empty Deck', audio_due: 0, image_due: 0 }]
+    const noDueDecks = [{ id: 3, name: 'Empty Deck', audio_due: 0, image_due: 0 }]
     render(DeckList, { props: { decks: noDueDecks, onPractice: vi.fn() } })
     expect(screen.getByText('All done')).toBeInTheDocument()
   })
