@@ -30,6 +30,12 @@ jobs:
           cache: true
           cache-dependency-path: backend/go.sum
       - run: cd backend && go test ./...
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: cd frontend && npm ci && npm test
 
   deploy:
     needs: test
