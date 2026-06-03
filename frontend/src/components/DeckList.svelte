@@ -13,9 +13,7 @@
 <div class="deck-list">
   {#each decks as deck}
     <div class="deck-card">
-      <div class="deck-info">
-        <span class="deck-name">{deck.name}</span>
-      </div>
+      <a href="/decks/{deck.id}" class="deck-name">{deck.name}</a>
       <div class="deck-actions">
         {#if deck.audio_due > 0}
           <button class="btn-lane" onclick={() => onPractice(deck, 'audio')}>
@@ -57,15 +55,12 @@
     align-items: center;
     box-shadow: var(--shadow);
   }
-  .deck-info {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-  }
   .deck-name {
+    flex: 1;
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--text);
+    text-decoration: none;
   }
   .deck-actions {
     display: flex;
