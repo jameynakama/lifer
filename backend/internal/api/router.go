@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/jameynakama/flockdeck/internal/auth"
+	"github.com/jameynakama/flockdeck/internal/r2"
 	"github.com/jameynakama/flockdeck/internal/store"
 	"golang.org/x/oauth2"
 )
@@ -16,6 +17,7 @@ type RouterConfig struct {
 	OAuthConfig *oauth2.Config
 	JWTSecret   []byte
 	FrontendURL string
+	R2Client    *r2.Client
 }
 
 type Handler struct {
@@ -23,6 +25,7 @@ type Handler struct {
 	oauthConfig *oauth2.Config
 	jwtSecret   []byte
 	frontendURL string
+	r2Client    *r2.Client
 }
 
 func NewRouter(cfg RouterConfig) http.Handler {
@@ -31,6 +34,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		oauthConfig: cfg.OAuthConfig,
 		jwtSecret:   cfg.JWTSecret,
 		frontendURL: cfg.FrontendURL,
+		r2Client:    cfg.R2Client,
 	}
 
 	r := chi.NewRouter()
@@ -67,6 +71,14 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			r.Get("/species/{ebird_code}", h.getSpeciesDetail)
 			r.Get("/species/{ebird_code}/decks", h.getSpeciesDecks)
 			r.Put("/species/{ebird_code}/preferences", h.updatePreferences)
+		})
+
+		r.With(auth.RequireAuth(cfg.JWTSecret), auth.RequireAdmin).Route("/admin", func(r chi.Router) {
+			r.Get("/species/{ebird_code}", h.adminGetSpeciesDetail)
+			r.Post("/species/{ebird_code}/images", h.adminUploadImage)
+			r.Post("/species/{ebird_code}/recordings", h.adminUploadRecording)
+			r.Delete("/species/{ebird_code}/images/{macaulay_id}", h.adminDeleteImage)
+			r.Delete("/species/{ebird_code}/recordings/{xeno_canto_id}", h.adminDeleteRecording)
 		})
 	})
 
