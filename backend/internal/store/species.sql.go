@@ -11,6 +11,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const deleteImage = `-- name: DeleteImage :exec
+DELETE FROM species_images WHERE macaulay_id = $1
+`
+
+func (q *Queries) DeleteImage(ctx context.Context, macaulayID string) error {
+	_, err := q.db.Exec(ctx, deleteImage, macaulayID)
+	return err
+}
+
+const deleteRecording = `-- name: DeleteRecording :exec
+DELETE FROM species_recordings WHERE xeno_canto_id = $1
+`
+
+func (q *Queries) DeleteRecording(ctx context.Context, xenoCantoID string) error {
+	_, err := q.db.Exec(ctx, deleteRecording, xenoCantoID)
+	return err
+}
+
 const getDecksForSpecies = `-- name: GetDecksForSpecies :many
 SELECT deck_id
 FROM deck_species
@@ -41,6 +59,45 @@ func (q *Queries) GetDecksForSpecies(ctx context.Context, arg GetDecksForSpecies
 		return nil, err
 	}
 	return items, nil
+}
+
+const getImageByID = `-- name: GetImageByID :one
+SELECT macaulay_id, species_code, file_path, credit, created_at
+FROM species_images
+WHERE macaulay_id = $1
+`
+
+func (q *Queries) GetImageByID(ctx context.Context, macaulayID string) (SpeciesImage, error) {
+	row := q.db.QueryRow(ctx, getImageByID, macaulayID)
+	var i SpeciesImage
+	err := row.Scan(
+		&i.MacaulayID,
+		&i.SpeciesCode,
+		&i.FilePath,
+		&i.Credit,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getRecordingByID = `-- name: GetRecordingByID :one
+SELECT xeno_canto_id, species_code, file_path, quality, type, created_at
+FROM species_recordings
+WHERE xeno_canto_id = $1
+`
+
+func (q *Queries) GetRecordingByID(ctx context.Context, xenoCantoID string) (SpeciesRecording, error) {
+	row := q.db.QueryRow(ctx, getRecordingByID, xenoCantoID)
+	var i SpeciesRecording
+	err := row.Scan(
+		&i.XenoCantoID,
+		&i.SpeciesCode,
+		&i.FilePath,
+		&i.Quality,
+		&i.Type,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const getSpeciesByCode = `-- name: GetSpeciesByCode :one
@@ -235,6 +292,7 @@ SELECT
 FROM species
 WHERE common_name ILIKE '%' || $1 || '%'
    OR scientific_name ILIKE '%' || $1 || '%'
+   OR ebird_code ILIKE '%' || $1 || '%'
 ORDER BY common_name
 LIMIT 50
 `

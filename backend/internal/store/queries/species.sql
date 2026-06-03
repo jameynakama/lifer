@@ -7,6 +7,7 @@ SELECT
 FROM species
 WHERE common_name ILIKE '%' || $1 || '%'
    OR scientific_name ILIKE '%' || $1 || '%'
+   OR ebird_code ILIKE '%' || $1 || '%'
 ORDER BY common_name
 LIMIT 50;
 
@@ -51,3 +52,19 @@ SELECT
     (SELECT file_path FROM species_images WHERE species_code = species.ebird_code LIMIT 1) AS image_url
 FROM species
 ORDER BY common_name;
+
+-- name: GetImageByID :one
+SELECT macaulay_id, species_code, file_path, credit, created_at
+FROM species_images
+WHERE macaulay_id = $1;
+
+-- name: GetRecordingByID :one
+SELECT xeno_canto_id, species_code, file_path, quality, type, created_at
+FROM species_recordings
+WHERE xeno_canto_id = $1;
+
+-- name: DeleteImage :exec
+DELETE FROM species_images WHERE macaulay_id = $1;
+
+-- name: DeleteRecording :exec
+DELETE FROM species_recordings WHERE xeno_canto_id = $1;

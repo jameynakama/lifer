@@ -16,6 +16,8 @@ type Querier interface {
 	CreateDeck(ctx context.Context, arg CreateDeckParams) (Deck, error)
 	DeleteCard(ctx context.Context, arg DeleteCardParams) error
 	DeleteDeck(ctx context.Context, id int64) error
+	DeleteImage(ctx context.Context, macaulayID string) error
+	DeleteRecording(ctx context.Context, xenoCantoID string) error
 	DeleteRecordingsBySpeciesCode(ctx context.Context, speciesCode string) error
 	DeleteSpeciesByCode(ctx context.Context, ebirdCode string) error
 	DeleteSpeciesImagesBySpeciesCode(ctx context.Context, speciesCode string) error
@@ -24,10 +26,12 @@ type Querier interface {
 	GetDeckPracticeCards(ctx context.Context, deckID int64) ([]GetDeckPracticeCardsRow, error)
 	GetDeckWithDue(ctx context.Context, arg GetDeckWithDueParams) (GetDeckWithDueRow, error)
 	GetDecksForSpecies(ctx context.Context, arg GetDecksForSpeciesParams) ([]int64, error)
+	GetImageByID(ctx context.Context, macaulayID string) (SpeciesImage, error)
 	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
 	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)
 	GetRandomImage(ctx context.Context, speciesCode string) (string, error)
 	GetRandomRecording(ctx context.Context, speciesCode string) (GetRandomRecordingRow, error)
+	GetRecordingByID(ctx context.Context, xenoCantoID string) (SpeciesRecording, error)
 	GetSpeciesByCode(ctx context.Context, ebirdCode string) (GetSpeciesByCodeRow, error)
 	GetSpeciesImages(ctx context.Context, speciesCode string) ([]GetSpeciesImagesRow, error)
 	GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]GetSpeciesRecordingsRow, error)
