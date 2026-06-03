@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -109,4 +110,21 @@ func (c *Client) DeletePrefix(ctx context.Context, prefix string) error {
 		contToken = out.NextContinuationToken
 	}
 	return nil
+}
+
+// Delete removes a single object at key from the bucket.
+func (c *Client) Delete(ctx context.Context, key string) error {
+	_, err := c.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("r2: delete %s: %w", key, err)
+	}
+	return nil
+}
+
+// KeyFor derives the R2 object key from a full public URL by stripping the public URL prefix.
+func (c *Client) KeyFor(fileURL string) string {
+	return strings.TrimPrefix(fileURL, c.pubURL+"/")
 }

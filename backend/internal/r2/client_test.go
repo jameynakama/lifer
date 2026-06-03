@@ -51,3 +51,30 @@ func TestUpload_R2ErrorReturnsError(t *testing.T) {
 	_, err = c.Upload(context.Background(), "recordings/busti/123.mp3", "audio/mpeg", strings.NewReader("data"))
 	require.Error(t, err)
 }
+
+func TestDelete_SendsDeleteRequest(t *testing.T) {
+	var gotMethod, gotPath string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	c, err := r2.NewWithEndpoint(ts.URL, "key", "secret", "flockdeck", "https://pub.example.com")
+	require.NoError(t, err)
+
+	err = c.Delete(context.Background(), "images/sonspa/admin-abc123.jpg")
+	require.NoError(t, err)
+
+	assert.Equal(t, http.MethodDelete, gotMethod)
+	assert.Contains(t, gotPath, "images/sonspa/admin-abc123.jpg")
+}
+
+func TestKeyFor_StripsPublicURL(t *testing.T) {
+	c, err := r2.NewWithEndpoint("http://localhost", "key", "secret", "flockdeck", "https://pub.example.com")
+	require.NoError(t, err)
+
+	key := c.KeyFor("https://pub.example.com/images/sonspa/admin-abc123.jpg")
+	assert.Equal(t, "images/sonspa/admin-abc123.jpg", key)
+}
