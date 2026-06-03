@@ -96,7 +96,6 @@
   })
 </script>
 
-<div class="page-content">
 <div class="quiz">
   <StatsBar {stats} />
 
@@ -130,13 +129,8 @@
     <p class="status error">Something went wrong. <button onclick={fetchNext}>Retry</button></p>
   {/if}
 </div>
-</div>
 
 <style>
-  .page-content {
-    max-width: 720px;
-    margin: 0 auto;
-  }
   .quiz {
     display: flex;
     flex-direction: column;
