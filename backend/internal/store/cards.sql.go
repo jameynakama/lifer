@@ -137,6 +137,22 @@ func (q *Queries) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]Get
 	return items, nil
 }
 
+const getNextDueAt = `-- name: GetNextDueAt :one
+SELECT due AS next_due_at
+FROM cards
+WHERE user_id = $1
+  AND due > NOW()
+ORDER BY due
+LIMIT 1
+`
+
+func (q *Queries) GetNextDueAt(ctx context.Context, userID int64) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, getNextDueAt, userID)
+	var next_due_at pgtype.Timestamptz
+	err := row.Scan(&next_due_at)
+	return next_due_at, err
+}
+
 const getNextDueCard = `-- name: GetNextDueCard :one
 SELECT c.id, c.user_id, c.species_code, c.lane,
        c.stability, c.difficulty, c.due, c.last_review,

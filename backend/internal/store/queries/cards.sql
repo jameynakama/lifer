@@ -80,3 +80,11 @@ FROM species s
 JOIN deck_species ds ON ds.species_code = s.ebird_code
 WHERE ds.deck_id = $1
 ORDER BY s.common_name;
+
+-- name: GetNextDueAt :one
+SELECT due AS next_due_at
+FROM cards
+WHERE user_id = $1
+  AND due > NOW()
+ORDER BY due
+LIMIT 1;

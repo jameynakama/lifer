@@ -27,6 +27,7 @@ type Querier interface {
 	GetDeckWithDue(ctx context.Context, arg GetDeckWithDueParams) (GetDeckWithDueRow, error)
 	GetDecksForSpecies(ctx context.Context, arg GetDecksForSpeciesParams) ([]int64, error)
 	GetImageByID(ctx context.Context, macaulayID string) (SpeciesImage, error)
+	GetNextDueAt(ctx context.Context, userID int64) (pgtype.Timestamptz, error)
 	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
 	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)
 	GetRandomImage(ctx context.Context, speciesCode string) (string, error)
