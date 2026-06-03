@@ -134,7 +134,7 @@
 
 <style>
   .page-content {
-    max-width: 560px;
+    max-width: 720px;
     margin: 0 auto;
   }
   .quiz {
