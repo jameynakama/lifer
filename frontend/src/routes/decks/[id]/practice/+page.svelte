@@ -100,6 +100,7 @@
   })
 </script>
 
+<div class="page-content">
 <div class="quiz">
   {#if !done && !noMedia && !error && cards.length > 0}
     <StatsBar {stats} />
@@ -138,8 +139,13 @@
     <p class="status error">Something went wrong. <button onclick={loadCards}>Retry</button></p>
   {/if}
 </div>
+</div>
 
 <style>
+  .page-content {
+    max-width: 560px;
+    margin: 0 auto;
+  }
   .quiz {
     display: flex;
     flex-direction: column;
