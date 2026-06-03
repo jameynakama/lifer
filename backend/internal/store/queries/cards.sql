@@ -5,9 +5,9 @@ SELECT c.id, c.user_id, c.species_code, c.lane,
        s.common_name, s.scientific_name
 FROM cards c
 JOIN species s ON s.ebird_code = c.species_code
-JOIN group_species gs ON gs.species_code = c.species_code
+JOIN deck_species ds ON ds.species_code = c.species_code
 WHERE c.user_id = $1
-  AND gs.group_id = $2
+  AND ds.deck_id = $2
   AND c.lane = $3
   AND c.due <= NOW()
 ORDER BY c.due
@@ -22,9 +22,9 @@ LIMIT 1;
 -- name: CountDueCards :one
 SELECT COUNT(*)
 FROM cards c
-JOIN group_species gs ON gs.species_code = c.species_code
+JOIN deck_species ds ON ds.species_code = c.species_code
 WHERE c.user_id = $1
-  AND gs.group_id = $2
+  AND ds.deck_id = $2
   AND c.lane = $3
   AND c.due <= NOW();
 
@@ -62,7 +62,7 @@ ON CONFLICT (user_id, species_code, lane) DO NOTHING;
 DELETE FROM cards
 WHERE user_id = $1 AND species_code = $2 AND lane = $3;
 
--- name: GetGroupPracticeCards :many
+-- name: GetDeckPracticeCards :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,
        COALESCE(
            (SELECT file_path FROM species_recordings
@@ -77,6 +77,6 @@ SELECT s.ebird_code, s.common_name, s.scientific_name,
            ''
        )::text AS image_url
 FROM species s
-JOIN group_species gs ON gs.species_code = s.ebird_code
-WHERE gs.group_id = $1
+JOIN deck_species ds ON ds.species_code = s.ebird_code
+WHERE ds.deck_id = $1
 ORDER BY s.common_name;

@@ -2,7 +2,7 @@
   import { createQuery } from '@tanstack/svelte-query'
   import { goto } from '$app/navigation'
   import { page } from '$app/state'
-  import GroupDropdown from '$components/GroupDropdown.svelte'
+  import DeckDropdown from '$components/DeckDropdown.svelte'
   import RecordingsList from '$components/RecordingsList.svelte'
   import PhotoGrid from '$components/PhotoGrid.svelte'
 
@@ -46,12 +46,12 @@
         <h1 class="common-name">{sp.common_name}</h1>
         <p class="scientific-name">{sp.scientific_name}</p>
       </div>
-      <div class="group-btn-wrapper">
-        <button class="group-btn" onclick={toggleDropdown} aria-label="Add to group">
-          + Group
+      <div class="deck-btn-wrapper">
+        <button class="deck-btn" onclick={toggleDropdown} aria-label="Add to deck">
+          + Deck
         </button>
         {#if dropdownOpen}
-          <GroupDropdown ebird_code={sp.ebird_code} onClose={() => { dropdownOpen = false }} />
+          <DeckDropdown ebird_code={sp.ebird_code} onClose={() => { dropdownOpen = false }} />
         {/if}
       </div>
     </div>
@@ -96,12 +96,12 @@
     margin: 0.125rem 0 0;
   }
 
-  .group-btn-wrapper {
+  .deck-btn-wrapper {
     position: relative;
     flex-shrink: 0;
   }
 
-  .group-btn {
+  .deck-btn {
     background: var(--surface);
     border: 1px solid var(--border);
     color: var(--text-secondary);
@@ -115,7 +115,7 @@
     box-shadow: var(--shadow);
   }
 
-  .group-btn:hover {
+  .deck-btn:hover {
     border-color: var(--accent);
     color: var(--accent);
   }

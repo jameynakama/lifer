@@ -11,31 +11,31 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getGroupsForSpecies = `-- name: GetGroupsForSpecies :many
-SELECT group_id
-FROM group_species
+const getDecksForSpecies = `-- name: GetDecksForSpecies :many
+SELECT deck_id
+FROM deck_species
 WHERE species_code = $1
-  AND group_id IN (SELECT id FROM groups WHERE owner_id = $2)
+  AND deck_id IN (SELECT id FROM decks WHERE owner_id = $2)
 `
 
-type GetGroupsForSpeciesParams struct {
+type GetDecksForSpeciesParams struct {
 	SpeciesCode string      `db:"species_code" json:"species_code"`
 	OwnerID     pgtype.Int8 `db:"owner_id" json:"owner_id"`
 }
 
-func (q *Queries) GetGroupsForSpecies(ctx context.Context, arg GetGroupsForSpeciesParams) ([]int64, error) {
-	rows, err := q.db.Query(ctx, getGroupsForSpecies, arg.SpeciesCode, arg.OwnerID)
+func (q *Queries) GetDecksForSpecies(ctx context.Context, arg GetDecksForSpeciesParams) ([]int64, error) {
+	rows, err := q.db.Query(ctx, getDecksForSpecies, arg.SpeciesCode, arg.OwnerID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 	var items []int64
 	for rows.Next() {
-		var group_id int64
-		if err := rows.Scan(&group_id); err != nil {
+		var deck_id int64
+		if err := rows.Scan(&deck_id); err != nil {
 			return nil, err
 		}
-		items = append(items, group_id)
+		items = append(items, deck_id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

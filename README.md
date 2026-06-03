@@ -1,4 +1,4 @@
-# Lifer
+# FlockDeck
 
 Spaced repetition practice for bird song and call identification.
 
@@ -21,10 +21,9 @@ brew install just sqlc golang-migrate
 **First run:**
 
 ```bash
-git clone https://github.com/jameynakama/lifer
-cd lifer
+git clone https://github.com/jameynakama/flockdeck
+cd flockdeck
 cp .env.example .env   # fill in Google OAuth credentials and JWT secret
-createdb lifer_dev
 just migrate-up
 just run               # backend on http://localhost:8080
 ```
@@ -36,7 +35,7 @@ just run               # backend on http://localhost:8080
 ```
 just            # run tests (default)
 just run        # start backend server
-just build      # build binary to backend/bin/lifer
+just build      # build binary to backend/bin/flockdeck
 just migrate-up        # run pending migrations
 just migrate-down      # roll back one migration
 just generate          # regenerate sqlc types after schema changes

@@ -38,7 +38,7 @@ describe('Layout', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }))
     render(Layout)
     await vi.waitFor(() => {
-      expect(screen.getByText('Lifer')).toBeInTheDocument()
+      expect(screen.getByText('FlockDeck')).toBeInTheDocument()
     })
     expect(get(auth)).toEqual(user)
   })

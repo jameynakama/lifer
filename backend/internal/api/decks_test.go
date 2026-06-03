@@ -1,0 +1,374 @@
+package api
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+
+	"github.com/jameynakama/flockdeck/internal/store"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// deckStubQuerier stubs only deck-related methods.
+type deckStubQuerier struct {
+	store.Querier
+	listUserDecks          func(ctx context.Context, userID int64) ([]store.ListUserDecksRow, error)
+	createDeck             func(ctx context.Context, arg store.CreateDeckParams) (store.Deck, error)
+	getDeck                func(ctx context.Context, id int64) (store.Deck, error)
+	updateDeckName         func(ctx context.Context, arg store.UpdateDeckNameParams) (store.Deck, error)
+	deleteDeck             func(ctx context.Context, id int64) error
+	listDeckSpeciesWithPrefs func(ctx context.Context, arg store.ListDeckSpeciesWithPrefsParams) ([]store.ListDeckSpeciesWithPrefsRow, error)
+	addSpeciesToDeck       func(ctx context.Context, arg store.AddSpeciesToDeckParams) error
+	removeSpeciesFromDeck  func(ctx context.Context, arg store.RemoveSpeciesFromDeckParams) error
+	upsertCard             func(ctx context.Context, arg store.UpsertCardParams) error
+}
+
+func (s *deckStubQuerier) ListUserDecks(ctx context.Context, userID int64) ([]store.ListUserDecksRow, error) {
+	return s.listUserDecks(ctx, userID)
+}
+func (s *deckStubQuerier) CreateDeck(ctx context.Context, arg store.CreateDeckParams) (store.Deck, error) {
+	return s.createDeck(ctx, arg)
+}
+func (s *deckStubQuerier) GetDeck(ctx context.Context, id int64) (store.Deck, error) {
+	return s.getDeck(ctx, id)
+}
+func (s *deckStubQuerier) UpdateDeckName(ctx context.Context, arg store.UpdateDeckNameParams) (store.Deck, error) {
+	return s.updateDeckName(ctx, arg)
+}
+func (s *deckStubQuerier) DeleteDeck(ctx context.Context, id int64) error {
+	return s.deleteDeck(ctx, id)
+}
+func (s *deckStubQuerier) ListDeckSpeciesWithPrefs(ctx context.Context, arg store.ListDeckSpeciesWithPrefsParams) ([]store.ListDeckSpeciesWithPrefsRow, error) {
+	return s.listDeckSpeciesWithPrefs(ctx, arg)
+}
+func (s *deckStubQuerier) AddSpeciesToDeck(ctx context.Context, arg store.AddSpeciesToDeckParams) error {
+	return s.addSpeciesToDeck(ctx, arg)
+}
+func (s *deckStubQuerier) RemoveSpeciesFromDeck(ctx context.Context, arg store.RemoveSpeciesFromDeckParams) error {
+	return s.removeSpeciesFromDeck(ctx, arg)
+}
+func (s *deckStubQuerier) UpsertCard(ctx context.Context, arg store.UpsertCardParams) error {
+	return s.upsertCard(ctx, arg)
+}
+
+func ownerID(id int64) pgtype.Int8 {
+	return pgtype.Int8{Int64: id, Valid: true}
+}
+
+func TestListDecks_ReturnsList(t *testing.T) {
+	q := &deckStubQuerier{
+		listUserDecks: func(_ context.Context, userID int64) ([]store.ListUserDecksRow, error) {
+			assert.Equal(t, int64(1), userID)
+			return []store.ListUserDecksRow{
+				{ID: 1, Name: "My Warblers", OwnerID: ownerID(1), AudioDue: 3, ImageDue: 1},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks", nil)
+	r = injectUserID(r, 1)
+	w := httptest.NewRecorder()
+
+	h.listDecks(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []store.ListUserDecksRow
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Len(t, body, 1)
+	assert.Equal(t, "My Warblers", body[0].Name)
+	assert.Equal(t, int64(3), body[0].AudioDue)
+}
+
+func TestCreateDeck_ReturnsDeck(t *testing.T) {
+	q := &deckStubQuerier{
+		createDeck: func(_ context.Context, arg store.CreateDeckParams) (store.Deck, error) {
+			assert.Equal(t, "Pacific Northwest", arg.Name)
+			assert.Equal(t, int64(1), arg.OwnerID.Int64)
+			return store.Deck{ID: 42, Name: "Pacific Northwest", OwnerID: ownerID(1)}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":"Pacific Northwest"}`
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	w := httptest.NewRecorder()
+
+	h.createDeck(w, r)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	var got store.Deck
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.Equal(t, int64(42), got.ID)
+	assert.Equal(t, "Pacific Northwest", got.Name)
+}
+
+func TestCreateDeck_EmptyName_Returns400(t *testing.T) {
+	h := makeHandler(&deckStubQuerier{})
+	body := `{"name":""}`
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	w := httptest.NewRecorder()
+
+	h.createDeck(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestUpdateDeck_RenamesDeck(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, Name: "Old Name", OwnerID: ownerID(1)}, nil
+		},
+		updateDeckName: func(_ context.Context, arg store.UpdateDeckNameParams) (store.Deck, error) {
+			assert.Equal(t, int64(42), arg.ID)
+			assert.Equal(t, "New Name", arg.Name)
+			return store.Deck{ID: 42, Name: "New Name", OwnerID: ownerID(1)}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":"New Name"}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/decks/42", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.updateDeck(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var got store.Deck
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.Equal(t, "New Name", got.Name)
+}
+
+func TestUpdateDeck_WrongOwner_Returns403(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(999)}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":"New Name"}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/decks/42", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.updateDeck(w, r)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestUpdateDeck_EmptyName_Returns400(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(1)}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":""}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/decks/42", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.updateDeck(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestUpdateDeck_InvalidDeckID_Returns400(t *testing.T) {
+	h := makeHandler(&deckStubQuerier{})
+	body := `{"name":"New Name"}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/decks/notanumber", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "notanumber")
+	w := httptest.NewRecorder()
+
+	h.updateDeck(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestUpdateDeck_InvalidBody_Returns400(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(1)}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/decks/42", strings.NewReader("not-json"))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.updateDeck(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestDeleteDeck_DeletesDeck(t *testing.T) {
+	deleted := false
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(1)}, nil
+		},
+		deleteDeck: func(_ context.Context, id int64) error {
+			assert.Equal(t, int64(42), id)
+			deleted = true
+			return nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodDelete, "/api/v1/decks/42", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.deleteDeck(w, r)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.True(t, deleted)
+}
+
+func TestDeleteDeck_NotFound_Returns404(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{}, pgx.ErrNoRows
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodDelete, "/api/v1/decks/99", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "99")
+	w := httptest.NewRecorder()
+
+	h.deleteDeck(w, r)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestListDeckSpecies_ReturnsList(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(1)}, nil
+		},
+		listDeckSpeciesWithPrefs: func(_ context.Context, arg store.ListDeckSpeciesWithPrefsParams) ([]store.ListDeckSpeciesWithPrefsRow, error) {
+			assert.Equal(t, int64(42), arg.DeckID)
+			assert.Equal(t, int64(1), arg.UserID)
+			return []store.ListDeckSpeciesWithPrefsRow{
+				{EbirdCode: "sonspa", CommonName: "Song Sparrow", ScientificName: "Melospiza melodia", AudioEnabled: true, ImageEnabled: true},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/species", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.listDeckSpecies(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []store.ListDeckSpeciesWithPrefsRow
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Len(t, body, 1)
+	assert.Equal(t, "Song Sparrow", body[0].CommonName)
+	assert.True(t, body[0].AudioEnabled)
+	assert.True(t, body[0].ImageEnabled)
+}
+
+func TestListDeckSpecies_PassesThroughDisabledLanes(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(1)}, nil
+		},
+		listDeckSpeciesWithPrefs: func(_ context.Context, arg store.ListDeckSpeciesWithPrefsParams) ([]store.ListDeckSpeciesWithPrefsRow, error) {
+			assert.Equal(t, int64(1), arg.UserID)
+			return []store.ListDeckSpeciesWithPrefsRow{
+				{EbirdCode: "amcro", CommonName: "American Crow", ScientificName: "Corvus brachyrhynchos", AudioEnabled: false, ImageEnabled: true},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/species", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.listDeckSpecies(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []store.ListDeckSpeciesWithPrefsRow
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Len(t, body, 1)
+	assert.False(t, body[0].AudioEnabled)
+	assert.True(t, body[0].ImageEnabled)
+}
+
+func TestAddSpeciesToDeck_InsertsAndUpsertsBothCards(t *testing.T) {
+	upsertedLanes := []string{}
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(1)}, nil
+		},
+		addSpeciesToDeck: func(_ context.Context, arg store.AddSpeciesToDeckParams) error {
+			assert.Equal(t, int64(42), arg.DeckID)
+			assert.Equal(t, "sonspa", arg.SpeciesCode)
+			return nil
+		},
+		upsertCard: func(_ context.Context, arg store.UpsertCardParams) error {
+			upsertedLanes = append(upsertedLanes, arg.Lane)
+			return nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"ebird_code":"sonspa"}`
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks/42/species", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.addSpeciesToDeck(w, r)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.ElementsMatch(t, []string{"audio", "image"}, upsertedLanes)
+}
+
+func TestRemoveSpeciesFromDeck_RemovesEntry(t *testing.T) {
+	removed := false
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(1)}, nil
+		},
+		removeSpeciesFromDeck: func(_ context.Context, arg store.RemoveSpeciesFromDeckParams) error {
+			assert.Equal(t, int64(42), arg.DeckID)
+			assert.Equal(t, "sonspa", arg.SpeciesCode)
+			removed = true
+			return nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodDelete, "/api/v1/decks/42/species/sonspa", nil)
+	r = injectUserID(r, 1)
+	r = withChiParams(r, map[string]string{"id": "42", "ebird_code": "sonspa"})
+	w := httptest.NewRecorder()
+
+	h.removeSpeciesFromDeck(w, r)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.True(t, removed)
+}

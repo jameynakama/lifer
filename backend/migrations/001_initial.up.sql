@@ -34,19 +34,18 @@ CREATE TABLE species_images (
 );
 CREATE INDEX idx_species_images_species_code ON species_images(species_code);
 
-CREATE TABLE groups (
+CREATE TABLE decks (
     id          BIGSERIAL PRIMARY KEY,
     name        TEXT    NOT NULL,
     description TEXT    NOT NULL DEFAULT '',
-    is_preset   BOOLEAN NOT NULL DEFAULT FALSE,
     owner_id    BIGINT  REFERENCES users(id),
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE group_species (
-    group_id     BIGINT NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+CREATE TABLE deck_species (
+    deck_id      BIGINT NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
     species_code TEXT   NOT NULL REFERENCES species(ebird_code) ON DELETE CASCADE,
-    PRIMARY KEY (group_id, species_code)
+    PRIMARY KEY (deck_id, species_code)
 );
 
 CREATE TABLE cards (

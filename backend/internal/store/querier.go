@@ -11,19 +11,19 @@ import (
 )
 
 type Querier interface {
-	AddSpeciesToGroup(ctx context.Context, arg AddSpeciesToGroupParams) error
+	AddSpeciesToDeck(ctx context.Context, arg AddSpeciesToDeckParams) error
 	CountDueCards(ctx context.Context, arg CountDueCardsParams) (int64, error)
-	CreateGroup(ctx context.Context, arg CreateGroupParams) (Group, error)
+	CreateDeck(ctx context.Context, arg CreateDeckParams) (Deck, error)
 	DeleteCard(ctx context.Context, arg DeleteCardParams) error
-	DeleteGroup(ctx context.Context, id int64) error
+	DeleteDeck(ctx context.Context, id int64) error
 	DeleteRecordingsBySpeciesCode(ctx context.Context, speciesCode string) error
 	DeleteSpeciesByCode(ctx context.Context, ebirdCode string) error
 	DeleteSpeciesImagesBySpeciesCode(ctx context.Context, speciesCode string) error
 	GetCard(ctx context.Context, arg GetCardParams) (Card, error)
-	GetGroup(ctx context.Context, id int64) (Group, error)
-	GetGroupPracticeCards(ctx context.Context, groupID int64) ([]GetGroupPracticeCardsRow, error)
-	GetGroupWithDue(ctx context.Context, arg GetGroupWithDueParams) (GetGroupWithDueRow, error)
-	GetGroupsForSpecies(ctx context.Context, arg GetGroupsForSpeciesParams) ([]int64, error)
+	GetDeck(ctx context.Context, id int64) (Deck, error)
+	GetDeckPracticeCards(ctx context.Context, deckID int64) ([]GetDeckPracticeCardsRow, error)
+	GetDeckWithDue(ctx context.Context, arg GetDeckWithDueParams) (GetDeckWithDueRow, error)
+	GetDecksForSpecies(ctx context.Context, arg GetDecksForSpeciesParams) ([]int64, error)
 	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
 	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)
 	GetRandomImage(ctx context.Context, speciesCode string) (string, error)
@@ -35,14 +35,14 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id int64) (User, error)
 	ListAllSpecies(ctx context.Context) ([]ListAllSpeciesRow, error)
 	ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, error)
-	ListGroupSpeciesWithPrefs(ctx context.Context, arg ListGroupSpeciesWithPrefsParams) ([]ListGroupSpeciesWithPrefsRow, error)
+	ListDeckSpeciesWithPrefs(ctx context.Context, arg ListDeckSpeciesWithPrefsParams) ([]ListDeckSpeciesWithPrefsRow, error)
 	ListIncompleteSpecies(ctx context.Context) ([]string, error)
 	ListSpecies(ctx context.Context, arg ListSpeciesParams) ([]ListSpeciesRow, error)
-	ListUserGroups(ctx context.Context, userID int64) ([]ListUserGroupsRow, error)
-	RemoveSpeciesFromGroup(ctx context.Context, arg RemoveSpeciesFromGroupParams) error
+	ListUserDecks(ctx context.Context, userID int64) ([]ListUserDecksRow, error)
+	RemoveSpeciesFromDeck(ctx context.Context, arg RemoveSpeciesFromDeckParams) error
 	SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]SearchSpeciesRow, error)
 	UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error)
-	UpdateGroupName(ctx context.Context, arg UpdateGroupNameParams) (Group, error)
+	UpdateDeckName(ctx context.Context, arg UpdateDeckNameParams) (Deck, error)
 	UpsertCard(ctx context.Context, arg UpsertCardParams) error
 	UpsertPreferences(ctx context.Context, arg UpsertPreferencesParams) (UserSpeciesPreference, error)
 	UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (SpeciesRecording, error)

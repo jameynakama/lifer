@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/svelte'
 import { goto } from '$app/navigation'
 import { page } from '$app/state'
-import GroupDetailPage from './+page.svelte'
+import DeckDetailPage from './+page.svelte'
 
 vi.mock('@tanstack/svelte-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/svelte-query')>()
@@ -33,10 +33,10 @@ function makeFetch(overrides: Record<string, unknown> = {}) {
     if (opts?.method === 'PUT' && (overrides.putHandler as (url: string, opts: RequestInit) => unknown)) {
       return (overrides.putHandler as (url: string, opts: RequestInit) => unknown)(url, opts!)
     }
-    if (url.match(/\/api\/v1\/groups\/\d+\/species/)) {
+    if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
     }
-    // group detail (audio_due / image_due)
+    // deck detail (audio_due / image_due)
     return Promise.resolve({ ok: true, json: () => Promise.resolve({ audio_due: 0, image_due: 0 }) })
   })
 }
@@ -57,10 +57,10 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('Group detail page', () => {
-  it('renders species list for the group', async () => {
+describe('Deck detail page', () => {
+  it('renders species list for the deck', async () => {
     vi.stubGlobal('fetch', makeFetch())
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => {
       expect(screen.getAllByText(/song sparrow/i).length).toBeGreaterThan(0)
     })
@@ -68,34 +68,34 @@ describe('Group detail page', () => {
 
   it('navigates to audio quiz on Study Audio click', async () => {
     vi.stubGlobal('fetch', makeFetch())
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /study audio/i }))
     await fireEvent.click(screen.getByRole('button', { name: /study audio/i }))
-    expect(goto).toHaveBeenCalledWith('/groups/42/quiz?lane=audio')
+    expect(goto).toHaveBeenCalledWith('/decks/42/quiz?lane=audio')
   })
 
   it('navigates to image quiz on Study Image click', async () => {
     vi.stubGlobal('fetch', makeFetch())
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /study image/i }))
     await fireEvent.click(screen.getByRole('button', { name: /study image/i }))
-    expect(goto).toHaveBeenCalledWith('/groups/42/quiz?lane=image')
+    expect(goto).toHaveBeenCalledWith('/decks/42/quiz?lane=image')
   })
 
   it('navigates to practice page on Practice Audio click', async () => {
     vi.stubGlobal('fetch', makeFetch())
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /^practice audio$/i }))
     await fireEvent.click(screen.getByRole('button', { name: /^practice audio$/i }))
-    expect(goto).toHaveBeenCalledWith('/groups/42/practice?lane=audio')
+    expect(goto).toHaveBeenCalledWith('/decks/42/practice?lane=audio')
   })
 
   it('navigates to practice page on Practice Image click', async () => {
     vi.stubGlobal('fetch', makeFetch())
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /^practice image$/i }))
     await fireEvent.click(screen.getByRole('button', { name: /^practice image$/i }))
-    expect(goto).toHaveBeenCalledWith('/groups/42/practice?lane=image')
+    expect(goto).toHaveBeenCalledWith('/decks/42/practice?lane=image')
   })
 
   it('searches species and shows results', async () => {
@@ -112,7 +112,7 @@ describe('Group detail page', () => {
       isError: false,
     } as any)
     vi.stubGlobal('fetch', makeFetch())
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
     await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
       target: { value: 'fox' },
@@ -122,19 +122,19 @@ describe('Group detail page', () => {
     })
   })
 
-  it('removes species from group on Remove click', async () => {
+  it('removes species from deck on Remove click', async () => {
     let deleteCalled = false
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       if (opts?.method === 'DELETE') {
         deleteCalled = true
         return Promise.resolve({ ok: true })
       }
-      if (url.match(/\/api\/v1\/groups\/\d+\/species/)) {
+      if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ audio_due: 0, image_due: 0 }) })
     }))
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /remove/i }))
     await fireEvent.click(screen.getByRole('button', { name: /remove/i }))
     await vi.waitFor(() => { expect(deleteCalled).toBe(true) })
@@ -157,7 +157,7 @@ describe('Group detail page', () => {
       isError: false,
     } as any)
     vi.stubGlobal('fetch', makeFetch())
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
     await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
       target: { value: 'fox' },
@@ -170,7 +170,7 @@ describe('Group detail page', () => {
     })
   })
 
-  it('shows Added indicator for species already in the group', async () => {
+  it('shows Added indicator for species already in the deck', async () => {
     const { createQuery } = await import('@tanstack/svelte-query')
     vi.mocked(createQuery).mockReturnValue({
       data: speciesWithPrefs.map((s) => ({ ...s, image_url: null })),
@@ -178,7 +178,7 @@ describe('Group detail page', () => {
       isError: false,
     } as any)
     vi.stubGlobal('fetch', makeFetch())
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
     await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
       target: { value: 'song' },
@@ -201,7 +201,7 @@ describe('Group detail page', () => {
         })
       },
     }))
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /toggle audio/i }))
     await fireEvent.click(screen.getByRole('button', { name: /toggle audio/i }))
     await vi.waitFor(() => {
@@ -222,7 +222,7 @@ describe('Group detail page', () => {
         })
       },
     }))
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /toggle image/i }))
     await fireEvent.click(screen.getByRole('button', { name: /toggle image/i }))
     await vi.waitFor(() => {
@@ -234,7 +234,7 @@ describe('Group detail page', () => {
     vi.stubGlobal('fetch', makeFetch({
       putHandler: () => Promise.resolve({ ok: false, json: () => Promise.resolve({}) }),
     }))
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /toggle audio/i }))
 
     // audio starts enabled; click to disable (optimistic), then server fails → reverts
@@ -254,7 +254,7 @@ describe('Group detail page', () => {
         resolvePut = () => resolve({ ok: true, json: () => Promise.resolve({ audio_enabled: false, image_enabled: true }) })
       }),
     }))
-    render(GroupDetailPage)
+    render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /toggle audio/i }))
 
     await fireEvent.click(screen.getByRole('button', { name: /toggle audio/i }))

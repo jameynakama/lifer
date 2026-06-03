@@ -10,7 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jameynakama/lifer/internal/store"
+	"github.com/jameynakama/flockdeck/internal/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -213,19 +213,19 @@ func TestGetSpeciesDetail_NotFound_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
-// speciesGroupsStubQuerier stubs GetGroupsForSpecies.
-type speciesGroupsStubQuerier struct {
+// speciesDecksStubQuerier stubs GetDecksForSpecies.
+type speciesDecksStubQuerier struct {
 	store.Querier
-	getGroupsForSpecies func(ctx context.Context, arg store.GetGroupsForSpeciesParams) ([]int64, error)
+	getDecksForSpecies func(ctx context.Context, arg store.GetDecksForSpeciesParams) ([]int64, error)
 }
 
-func (s *speciesGroupsStubQuerier) GetGroupsForSpecies(ctx context.Context, arg store.GetGroupsForSpeciesParams) ([]int64, error) {
-	return s.getGroupsForSpecies(ctx, arg)
+func (s *speciesDecksStubQuerier) GetDecksForSpecies(ctx context.Context, arg store.GetDecksForSpeciesParams) ([]int64, error) {
+	return s.getDecksForSpecies(ctx, arg)
 }
 
-func TestGetSpeciesGroups_ReturnsMembership(t *testing.T) {
-	q := &speciesGroupsStubQuerier{
-		getGroupsForSpecies: func(_ context.Context, arg store.GetGroupsForSpeciesParams) ([]int64, error) {
+func TestGetSpeciesDecks_ReturnsMembership(t *testing.T) {
+	q := &speciesDecksStubQuerier{
+		getDecksForSpecies: func(_ context.Context, arg store.GetDecksForSpeciesParams) ([]int64, error) {
 			assert.Equal(t, "amro", arg.SpeciesCode)
 			assert.Equal(t, int64(1), arg.OwnerID.Int64)
 			assert.True(t, arg.OwnerID.Valid)
@@ -233,38 +233,38 @@ func TestGetSpeciesGroups_ReturnsMembership(t *testing.T) {
 		},
 	}
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/amro/groups", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/amro/decks", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "ebird_code", "amro")
 	w := httptest.NewRecorder()
 
-	h.getSpeciesGroups(w, r)
+	h.getSpeciesDecks(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var body SpeciesGroupsResponse
+	var body SpeciesDecksResponse
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
-	assert.ElementsMatch(t, []int64{2, 5}, body.GroupIDs)
+	assert.ElementsMatch(t, []int64{2, 5}, body.DeckIDs)
 }
 
-func TestGetSpeciesGroups_NoMembership_ReturnsEmptySlice(t *testing.T) {
-	q := &speciesGroupsStubQuerier{
-		getGroupsForSpecies: func(_ context.Context, arg store.GetGroupsForSpeciesParams) ([]int64, error) {
+func TestGetSpeciesDecks_NoMembership_ReturnsEmptySlice(t *testing.T) {
+	q := &speciesDecksStubQuerier{
+		getDecksForSpecies: func(_ context.Context, arg store.GetDecksForSpeciesParams) ([]int64, error) {
 			return []int64{}, nil
 		},
 	}
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/amro/groups", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/species/amro/decks", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "ebird_code", "amro")
 	w := httptest.NewRecorder()
 
-	h.getSpeciesGroups(w, r)
+	h.getSpeciesDecks(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var body SpeciesGroupsResponse
+	var body SpeciesDecksResponse
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
-	assert.NotNil(t, body.GroupIDs)
-	assert.Empty(t, body.GroupIDs)
+	assert.NotNil(t, body.DeckIDs)
+	assert.Empty(t, body.DeckIDs)
 }
 
 // allSpeciesStubQuerier stubs ListAllSpecies.

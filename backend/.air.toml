@@ -2,8 +2,8 @@ root = "."
 tmp_dir = "bin/air"
 
 [build]
-  cmd = "go build -o bin/air/lifer ./cmd/server"
-  bin = "bin/air/lifer"
+  cmd = "go build -o bin/air/flockdeck ./cmd/server"
+  bin = "bin/air/flockdeck"
   include_ext = ["go"]
   exclude_dir = ["bin", "migrations"]
   delay = 500

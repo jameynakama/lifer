@@ -6,8 +6,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/jameynakama/lifer/internal/auth"
-	"github.com/jameynakama/lifer/internal/store"
+	"github.com/jameynakama/flockdeck/internal/auth"
+	"github.com/jameynakama/flockdeck/internal/store"
 	"golang.org/x/oauth2"
 )
 
@@ -48,24 +48,24 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			r.Use(auth.RequireAuth(cfg.JWTSecret))
 			r.Get("/me", h.getMe)
 
-			r.Get("/groups", h.listGroups)
-			r.Post("/groups", h.createGroup)
-			r.Get("/groups/{id}", h.getGroupDetail)
-			r.Patch("/groups/{id}", h.updateGroup)
-			r.Delete("/groups/{id}", h.deleteGroup)
+			r.Get("/decks", h.listDecks)
+			r.Post("/decks", h.createDeck)
+			r.Get("/decks/{id}", h.getDeckDetail)
+			r.Patch("/decks/{id}", h.updateDeck)
+			r.Delete("/decks/{id}", h.deleteDeck)
 
-			r.Get("/groups/{id}/species", h.listGroupSpecies)
-			r.Post("/groups/{id}/species", h.addSpeciesToGroup)
-			r.Delete("/groups/{id}/species/{ebird_code}", h.removeSpeciesFromGroup)
+			r.Get("/decks/{id}/species", h.listDeckSpecies)
+			r.Post("/decks/{id}/species", h.addSpeciesToDeck)
+			r.Delete("/decks/{id}/species/{ebird_code}", h.removeSpeciesFromDeck)
 
-			r.Get("/groups/{id}/next", h.getNextCard)
-			r.Post("/groups/{id}/rate", h.rateCard)
-			r.Get("/groups/{id}/practice", h.getPracticeCards)
+			r.Get("/decks/{id}/next", h.getNextCard)
+			r.Post("/decks/{id}/rate", h.rateCard)
+			r.Get("/decks/{id}/practice", h.getPracticeCards)
 
 			r.Get("/species", h.listSpecies)
 			r.Get("/species/all", h.listAllSpecies)
 			r.Get("/species/{ebird_code}", h.getSpeciesDetail)
-			r.Get("/species/{ebird_code}/groups", h.getSpeciesGroups)
+			r.Get("/species/{ebird_code}/decks", h.getSpeciesDecks)
 			r.Put("/species/{ebird_code}/preferences", h.updatePreferences)
 		})
 	})

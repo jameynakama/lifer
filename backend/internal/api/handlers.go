@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/jameynakama/lifer/internal/auth"
-	"github.com/jameynakama/lifer/internal/store"
+	"github.com/jameynakama/flockdeck/internal/auth"
+	"github.com/jameynakama/flockdeck/internal/store"
 )
 
 const (
 	stateCookieName = "oauth_state"
-	authCookieName  = "lifer_token"
+	authCookieName  = "flockdeck_token"
 )
 
 func (h *Handler) googleLogin(w http.ResponseWriter, r *http.Request) {
@@ -90,5 +90,3 @@ func randomState() string {
 	rand.Read(b) //nolint:errcheck
 	return base64.URLEncoding.EncodeToString(b)
 }
-
-

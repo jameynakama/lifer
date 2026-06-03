@@ -4,7 +4,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: lifer_dev
+      POSTGRES_DB: flockdeck_dev
     ports:
       - "5435:5432"
     volumes:

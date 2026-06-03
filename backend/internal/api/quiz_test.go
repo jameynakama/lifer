@@ -13,8 +13,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jameynakama/lifer/internal/auth"
-	"github.com/jameynakama/lifer/internal/store"
+	"github.com/jameynakama/flockdeck/internal/auth"
+	"github.com/jameynakama/flockdeck/internal/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -28,8 +28,8 @@ type stubQuerier struct {
 	getRandomImage        func(ctx context.Context, speciesCode string) (string, error)
 	getCard               func(ctx context.Context, arg store.GetCardParams) (store.Card, error)
 	updateCardSchedule    func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
-	getGroupPracticeCards func(ctx context.Context, groupID int64) ([]store.GetGroupPracticeCardsRow, error)
-	getGroup              func(ctx context.Context, id int64) (store.Group, error)
+	getDeckPracticeCards func(ctx context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error)
+	getDeck              func(ctx context.Context, id int64) (store.Deck, error)
 }
 
 func (s *stubQuerier) GetNextDueCard(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
@@ -53,11 +53,11 @@ func (s *stubQuerier) GetCard(ctx context.Context, arg store.GetCardParams) (sto
 func (s *stubQuerier) UpdateCardSchedule(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error) {
 	return s.updateCardSchedule(ctx, arg)
 }
-func (s *stubQuerier) GetGroupPracticeCards(ctx context.Context, groupID int64) ([]store.GetGroupPracticeCardsRow, error) {
-	return s.getGroupPracticeCards(ctx, groupID)
+func (s *stubQuerier) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error) {
+	return s.getDeckPracticeCards(ctx, deckID)
 }
-func (s *stubQuerier) GetGroup(ctx context.Context, id int64) (store.Group, error) {
-	return s.getGroup(ctx, id)
+func (s *stubQuerier) GetDeck(ctx context.Context, id int64) (store.Deck, error) {
+	return s.getDeck(ctx, id)
 }
 
 func makeHandler(q store.Querier) *Handler {
@@ -93,7 +93,7 @@ func TestGetNextCard_Audio_ReturnsDueCard(t *testing.T) {
 	q := &stubQuerier{
 		getNextDueCard: func(_ context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
 			assert.Equal(t, int64(1), arg.UserID)
-			assert.Equal(t, int64(42), arg.GroupID)
+			assert.Equal(t, int64(42), arg.DeckID)
 			assert.Equal(t, "audio", arg.Lane)
 			return store.GetNextDueCardRow{
 				SpeciesCode:    "spotto",
@@ -113,7 +113,7 @@ func TestGetNextCard_Audio_ReturnsDueCard(t *testing.T) {
 	}
 
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/next?lane=audio", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/next?lane=audio", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()
@@ -138,7 +138,7 @@ func TestGetNextCard_NothingDue_Returns204(t *testing.T) {
 	}
 
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/next?lane=audio", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/next?lane=audio", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()
@@ -150,7 +150,7 @@ func TestGetNextCard_NothingDue_Returns204(t *testing.T) {
 
 func TestGetNextCard_InvalidLane_Returns400(t *testing.T) {
 	h := makeHandler(&stubQuerier{})
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/next?lane=video", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/next?lane=video", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()
@@ -162,7 +162,7 @@ func TestGetNextCard_InvalidLane_Returns400(t *testing.T) {
 
 func TestGetNextCard_InvalidGroupID_Returns400(t *testing.T) {
 	h := makeHandler(&stubQuerier{})
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/notanumber/next?lane=audio", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/notanumber/next?lane=audio", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "notanumber")
 	w := httptest.NewRecorder()
@@ -209,7 +209,7 @@ func TestRateCard_UpdatesSchedule(t *testing.T) {
 
 	h := makeHandler(q)
 	body := `{"ebird_code":"spotto","lane":"audio","rating":3}`
-	r := httptest.NewRequest(http.MethodPost, "/api/v1/groups/42/rate", strings.NewReader(body))
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks/42/rate", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
@@ -227,7 +227,7 @@ func TestRateCard_UpdatesSchedule(t *testing.T) {
 func TestRateCard_InvalidRating_Returns400(t *testing.T) {
 	h := makeHandler(&stubQuerier{})
 	body := `{"ebird_code":"spotto","lane":"audio","rating":9}`
-	r := httptest.NewRequest(http.MethodPost, "/api/v1/groups/42/rate", strings.NewReader(body))
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks/42/rate", strings.NewReader(body))
 	r.Header.Set("Content-Type", "application/json")
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
@@ -252,7 +252,7 @@ func TestGetNextCard_NoMedia_Returns500(t *testing.T) {
 	}
 
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/next?lane=audio", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/next?lane=audio", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()
@@ -264,15 +264,15 @@ func TestGetNextCard_NoMedia_Returns500(t *testing.T) {
 
 func TestGetPracticeCards_Audio_ReturnsAllSpecies(t *testing.T) {
 	q := &stubQuerier{
-		getGroup: func(_ context.Context, id int64) (store.Group, error) {
-			return store.Group{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{
 				ID:      id,
 				OwnerID: pgtype.Int8{Int64: 1, Valid: true}, // user 1 owns this group
 			}, nil
 		},
-		getGroupPracticeCards: func(_ context.Context, groupID int64) ([]store.GetGroupPracticeCardsRow, error) {
-			assert.Equal(t, int64(42), groupID)
-			return []store.GetGroupPracticeCardsRow{
+		getDeckPracticeCards: func(_ context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error) {
+			assert.Equal(t, int64(42), deckID)
+			return []store.GetDeckPracticeCardsRow{
 				{
 					EbirdCode:      "spotto",
 					CommonName:     "Spotted Towhee",
@@ -285,7 +285,7 @@ func TestGetPracticeCards_Audio_ReturnsAllSpecies(t *testing.T) {
 	}
 
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/practice?lane=audio", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()
@@ -304,14 +304,14 @@ func TestGetPracticeCards_Audio_ReturnsAllSpecies(t *testing.T) {
 
 func TestGetPracticeCards_Image_UsesImageAsMediaURL(t *testing.T) {
 	q := &stubQuerier{
-		getGroup: func(_ context.Context, id int64) (store.Group, error) {
-			return store.Group{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{
 				ID:      id,
 				OwnerID: pgtype.Int8{Int64: 1, Valid: true}, // user 1 owns this group
 			}, nil
 		},
-		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
-			return []store.GetGroupPracticeCardsRow{
+		getDeckPracticeCards: func(_ context.Context, _ int64) ([]store.GetDeckPracticeCardsRow, error) {
+			return []store.GetDeckPracticeCardsRow{
 				{
 					EbirdCode:      "spotto",
 					CommonName:     "Spotted Towhee",
@@ -324,7 +324,7 @@ func TestGetPracticeCards_Image_UsesImageAsMediaURL(t *testing.T) {
 	}
 
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=image", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/practice?lane=image", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()
@@ -342,14 +342,14 @@ func TestGetPracticeCards_Image_UsesImageAsMediaURL(t *testing.T) {
 
 func TestGetPracticeCards_FiltersSpeciesWithNoMedia(t *testing.T) {
 	q := &stubQuerier{
-		getGroup: func(_ context.Context, id int64) (store.Group, error) {
-			return store.Group{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{
 				ID:      id,
 				OwnerID: pgtype.Int8{Int64: 1, Valid: true}, // user 1 owns this group
 			}, nil
 		},
-		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
-			return []store.GetGroupPracticeCardsRow{
+		getDeckPracticeCards: func(_ context.Context, _ int64) ([]store.GetDeckPracticeCardsRow, error) {
+			return []store.GetDeckPracticeCardsRow{
 				// has audio
 				{EbirdCode: "spotto", AudioUrl: "https://r2.example.com/rec.mp3", ImageUrl: ""},
 				// no audio
@@ -359,7 +359,7 @@ func TestGetPracticeCards_FiltersSpeciesWithNoMedia(t *testing.T) {
 	}
 
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/practice?lane=audio", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()
@@ -375,19 +375,19 @@ func TestGetPracticeCards_FiltersSpeciesWithNoMedia(t *testing.T) {
 
 func TestGetPracticeCards_EmptyGroup_ReturnsEmptyArray(t *testing.T) {
 	q := &stubQuerier{
-		getGroup: func(_ context.Context, id int64) (store.Group, error) {
-			return store.Group{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{
 				ID:      id,
 				OwnerID: pgtype.Int8{Int64: 1, Valid: true}, // user 1 owns this group
 			}, nil
 		},
-		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
-			return []store.GetGroupPracticeCardsRow{}, nil
+		getDeckPracticeCards: func(_ context.Context, _ int64) ([]store.GetDeckPracticeCardsRow, error) {
+			return []store.GetDeckPracticeCardsRow{}, nil
 		},
 	}
 
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/practice?lane=audio", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()
@@ -402,7 +402,7 @@ func TestGetPracticeCards_EmptyGroup_ReturnsEmptyArray(t *testing.T) {
 
 func TestGetPracticeCards_InvalidLane_Returns400(t *testing.T) {
 	h := makeHandler(&stubQuerier{})
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=video", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/practice?lane=video", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()
@@ -414,7 +414,7 @@ func TestGetPracticeCards_InvalidLane_Returns400(t *testing.T) {
 
 func TestGetPracticeCards_InvalidGroupID_Returns400(t *testing.T) {
 	h := makeHandler(&stubQuerier{})
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/notanumber/practice?lane=audio", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/notanumber/practice?lane=audio", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "notanumber")
 	w := httptest.NewRecorder()
@@ -426,19 +426,19 @@ func TestGetPracticeCards_InvalidGroupID_Returns400(t *testing.T) {
 
 func TestGetPracticeCards_DBError_Returns500(t *testing.T) {
 	q := &stubQuerier{
-		getGroup: func(_ context.Context, id int64) (store.Group, error) {
-			return store.Group{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{
 				ID:      id,
 				OwnerID: pgtype.Int8{Int64: 1, Valid: true}, // user 1 owns this group
 			}, nil
 		},
-		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
+		getDeckPracticeCards: func(_ context.Context, _ int64) ([]store.GetDeckPracticeCardsRow, error) {
 			return nil, errors.New("db error")
 		},
 	}
 
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/practice?lane=audio", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()
@@ -450,8 +450,8 @@ func TestGetPracticeCards_DBError_Returns500(t *testing.T) {
 
 func TestGetPracticeCards_ForbiddenGroup_Returns403(t *testing.T) {
 	q := &stubQuerier{
-		getGroup: func(_ context.Context, id int64) (store.Group, error) {
-			return store.Group{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{
 				ID:      id,
 				OwnerID: pgtype.Int8{Int64: 999, Valid: true}, // owned by user 999
 			}, nil
@@ -459,7 +459,7 @@ func TestGetPracticeCards_ForbiddenGroup_Returns403(t *testing.T) {
 	}
 
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/practice?lane=audio", nil)
 	r = injectUserID(r, 1) // user 1 is not owner
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()
@@ -471,19 +471,19 @@ func TestGetPracticeCards_ForbiddenGroup_Returns403(t *testing.T) {
 
 func TestGetPracticeCards_PresetGroup_AllowsAccess(t *testing.T) {
 	q := &stubQuerier{
-		getGroup: func(_ context.Context, id int64) (store.Group, error) {
-			return store.Group{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{
 				ID:      id,
 				OwnerID: pgtype.Int8{Valid: false}, // preset: no owner
 			}, nil
 		},
-		getGroupPracticeCards: func(_ context.Context, _ int64) ([]store.GetGroupPracticeCardsRow, error) {
-			return []store.GetGroupPracticeCardsRow{}, nil
+		getDeckPracticeCards: func(_ context.Context, _ int64) ([]store.GetDeckPracticeCardsRow, error) {
+			return []store.GetDeckPracticeCardsRow{}, nil
 		},
 	}
 
 	h := makeHandler(q)
-	r := httptest.NewRequest(http.MethodGet, "/api/v1/groups/42/practice?lane=audio", nil)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/practice?lane=audio", nil)
 	r = injectUserID(r, 1)
 	r = withChiParam(r, "id", "42")
 	w := httptest.NewRecorder()

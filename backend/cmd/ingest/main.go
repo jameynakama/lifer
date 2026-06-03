@@ -13,11 +13,11 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jameynakama/lifer/internal/ebird"
-	"github.com/jameynakama/lifer/internal/macaulay"
-	"github.com/jameynakama/lifer/internal/r2"
-	"github.com/jameynakama/lifer/internal/store"
-	"github.com/jameynakama/lifer/internal/xenocanto"
+	"github.com/jameynakama/flockdeck/internal/ebird"
+	"github.com/jameynakama/flockdeck/internal/macaulay"
+	"github.com/jameynakama/flockdeck/internal/r2"
+	"github.com/jameynakama/flockdeck/internal/store"
+	"github.com/jameynakama/flockdeck/internal/xenocanto"
 )
 
 func main() {

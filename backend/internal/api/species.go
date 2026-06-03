@@ -10,8 +10,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jameynakama/lifer/internal/auth"
-	"github.com/jameynakama/lifer/internal/store"
+	"github.com/jameynakama/flockdeck/internal/auth"
+	"github.com/jameynakama/flockdeck/internal/store"
 )
 
 const defaultPageSize = 20
@@ -56,9 +56,9 @@ type Image struct {
 	Credit     string `json:"credit"`
 }
 
-// SpeciesGroupsResponse is the response for GET /api/v1/species/:ebird_code/groups.
-type SpeciesGroupsResponse struct {
-	GroupIDs []int64 `json:"group_ids"`
+// SpeciesDecksResponse is the response for GET /api/v1/species/:ebird_code/decks.
+type SpeciesDecksResponse struct {
+	DeckIDs []int64 `json:"deck_ids"`
 }
 
 // listSpecies handles GET /api/v1/species.
@@ -229,25 +229,25 @@ func (h *Handler) getSpeciesDetail(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// getSpeciesGroups handles GET /api/v1/species/:ebird_code/groups.
-func (h *Handler) getSpeciesGroups(w http.ResponseWriter, r *http.Request) {
+// getSpeciesDecks handles GET /api/v1/species/:ebird_code/decks.
+func (h *Handler) getSpeciesDecks(w http.ResponseWriter, r *http.Request) {
 	ebirdCode := chi.URLParam(r, "ebird_code")
 	userID := auth.UserIDFromCtx(r.Context())
 
-	groupIDs, err := h.queries.GetGroupsForSpecies(r.Context(), store.GetGroupsForSpeciesParams{
+	deckIDs, err := h.queries.GetDecksForSpecies(r.Context(), store.GetDecksForSpeciesParams{
 		SpeciesCode: ebirdCode,
 		OwnerID:     pgtype.Int8{Int64: userID, Valid: true},
 	})
 	if err != nil {
-		log.Printf("GetGroupsForSpecies error: %v", err)
+		log.Printf("GetDecksForSpecies error: %v", err)
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}
-	if groupIDs == nil {
-		groupIDs = []int64{}
+	if deckIDs == nil {
+		deckIDs = []int64{}
 	}
 
-	writeJSON(w, http.StatusOK, SpeciesGroupsResponse{GroupIDs: groupIDs})
+	writeJSON(w, http.StatusOK, SpeciesDecksResponse{DeckIDs: deckIDs})
 }
 
 // listAllSpecies handles GET /api/v1/species/all.

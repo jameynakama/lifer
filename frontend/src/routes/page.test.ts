@@ -3,9 +3,9 @@ import { render, screen, fireEvent } from '@testing-library/svelte'
 import { goto } from '$app/navigation'
 import Dashboard from './+page.svelte'
 
-const groups = [
-  { id: 1, name: 'Pacific Northwest', is_preset: false, audio_due: 8, image_due: 5 },
-  { id: 2, name: 'My Warblers', is_preset: false, audio_due: 3, image_due: 0 },
+const decks = [
+  { id: 1, name: 'Pacific Northwest', audio_due: 8, image_due: 5 },
+  { id: 2, name: 'My Warblers', audio_due: 3, image_due: 0 },
 ]
 
 beforeEach(() => {
@@ -18,10 +18,10 @@ afterEach(() => {
 })
 
 describe('Dashboard page', () => {
-  it('renders group names from API', async () => {
+  it('renders deck names from API', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(groups),
+      json: () => Promise.resolve(decks),
     }))
     render(Dashboard)
     await vi.waitFor(() => {
@@ -30,36 +30,36 @@ describe('Dashboard page', () => {
     expect(screen.getAllByText(/my warblers/i).length).toBeGreaterThan(0)
   })
 
-  it('shows empty state when no groups', async () => {
+  it('shows empty state when no decks', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve([]),
     }))
     render(Dashboard)
     await vi.waitFor(() => {
-      expect(screen.getByText(/no groups yet/i)).toBeInTheDocument()
+      expect(screen.getByText(/no decks yet/i)).toBeInTheDocument()
     })
   })
 
   it('navigates to quiz when Audio button clicked', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(groups),
+      json: () => Promise.resolve(decks),
     }))
     render(Dashboard)
     await vi.waitFor(() => screen.getAllByRole('button', { name: /audio/i }))
     await fireEvent.click(screen.getAllByRole('button', { name: /audio/i })[0])
-    expect(goto).toHaveBeenCalledWith('/groups/1/quiz?lane=audio')
+    expect(goto).toHaveBeenCalledWith('/decks/1/quiz?lane=audio')
   })
 
   it('navigates to quiz when Image button clicked', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(groups),
+      json: () => Promise.resolve(decks),
     }))
     render(Dashboard)
     await vi.waitFor(() => screen.getAllByRole('button', { name: /image/i }))
     await fireEvent.click(screen.getAllByRole('button', { name: /image/i })[0])
-    expect(goto).toHaveBeenCalledWith('/groups/1/quiz?lane=image')
+    expect(goto).toHaveBeenCalledWith('/decks/1/quiz?lane=image')
   })
 })

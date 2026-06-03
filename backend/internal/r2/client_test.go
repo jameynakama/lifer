@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jameynakama/lifer/internal/r2"
+	"github.com/jameynakama/flockdeck/internal/r2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,7 +26,7 @@ func TestUpload_PutsObjectAndReturnsPublicURL(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c, err := r2.NewWithEndpoint(ts.URL, "key", "secret", "lifer-media", "https://pub.example.com")
+	c, err := r2.NewWithEndpoint(ts.URL, "key", "secret", "flockdeck", "https://pub.example.com")
 	require.NoError(t, err)
 
 	url, err := c.Upload(context.Background(), "recordings/busti/123.mp3", "audio/mpeg", strings.NewReader("audio data"))
@@ -45,7 +45,7 @@ func TestUpload_R2ErrorReturnsError(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c, err := r2.NewWithEndpoint(ts.URL, "key", "secret", "lifer-media", "https://pub.example.com")
+	c, err := r2.NewWithEndpoint(ts.URL, "key", "secret", "flockdeck", "https://pub.example.com")
 	require.NoError(t, err)
 
 	_, err = c.Upload(context.Background(), "recordings/busti/123.mp3", "audio/mpeg", strings.NewReader("data"))

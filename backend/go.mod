@@ -1,4 +1,4 @@
-module github.com/jameynakama/lifer
+module github.com/jameynakama/flockdeck
 
 go 1.26.1
 

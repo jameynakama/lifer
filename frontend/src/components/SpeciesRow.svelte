@@ -1,5 +1,5 @@
 <script lang="ts">
-  import GroupDropdown from './GroupDropdown.svelte'
+  import DeckDropdown from './DeckDropdown.svelte'
 
   let {
     ebird_code,
@@ -40,12 +40,12 @@
       <span class="scientific-name">{scientific_name}</span>
     </div>
   </a>
-  <div class="group-btn-wrapper">
-    <button class="group-btn" onclick={toggleDropdown} aria-label="Add to group">
-      + Group
+  <div class="deck-btn-wrapper">
+    <button class="deck-btn" onclick={toggleDropdown} aria-label="Add to deck">
+      + Deck
     </button>
     {#if dropdownOpen}
-      <GroupDropdown {ebird_code} onClose={closeDropdown} />
+      <DeckDropdown {ebird_code} onClose={closeDropdown} />
     {/if}
   </div>
 </div>
@@ -111,12 +111,12 @@
     font-style: italic;
   }
 
-  .group-btn-wrapper {
+  .deck-btn-wrapper {
     position: relative;
     flex-shrink: 0;
   }
 
-  .group-btn {
+  .deck-btn {
     background: var(--surface);
     border: 1px solid var(--border);
     border-left: none;
@@ -131,7 +131,7 @@
     box-shadow: var(--shadow);
   }
 
-  .group-btn:hover {
+  .deck-btn:hover {
     color: var(--accent);
   }
 </style>

@@ -13,7 +13,7 @@ const isAdminKey contextKey = "isAdmin"
 func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie("lifer_token")
+			cookie, err := r.Cookie("flockdeck_token")
 			if err != nil {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
 				return

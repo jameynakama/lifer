@@ -8,9 +8,9 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jameynakama/lifer/internal/api"
-	"github.com/jameynakama/lifer/internal/auth"
-	"github.com/jameynakama/lifer/internal/store"
+	"github.com/jameynakama/flockdeck/internal/api"
+	"github.com/jameynakama/flockdeck/internal/auth"
+	"github.com/jameynakama/flockdeck/internal/store"
 )
 
 type config struct {

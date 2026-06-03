@@ -45,7 +45,7 @@ describe('getCurrentTheme', () => {
 
 describe('initTheme', () => {
   it('sets data-theme from localStorage when saved', () => {
-    localStorage.setItem('lifer-theme', 'light')
+    localStorage.setItem('flockdeck-theme', 'light')
     mockMatchMedia(true)
     initTheme()
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
@@ -64,7 +64,7 @@ describe('toggleTheme', () => {
     mockMatchMedia(true)
     toggleTheme()
     expect(document.documentElement.getAttribute('data-theme')).toBe('light')
-    expect(localStorage.getItem('lifer-theme')).toBe('light')
+    expect(localStorage.getItem('flockdeck-theme')).toBe('light')
   })
 
   it('switches light to dark and persists', () => {
@@ -72,6 +72,6 @@ describe('toggleTheme', () => {
     mockMatchMedia(false)
     toggleTheme()
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
-    expect(localStorage.getItem('lifer-theme')).toBe('dark')
+    expect(localStorage.getItem('flockdeck-theme')).toBe('dark')
   })
 })

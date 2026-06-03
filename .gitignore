@@ -7,7 +7,7 @@
 
 # Go binaries
 backend/bin/
-backend/lifer
+backend/flockdeck
 backend/server
 backend/ingest
 

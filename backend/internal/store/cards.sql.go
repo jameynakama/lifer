@@ -14,21 +14,21 @@ import (
 const countDueCards = `-- name: CountDueCards :one
 SELECT COUNT(*)
 FROM cards c
-JOIN group_species gs ON gs.species_code = c.species_code
+JOIN deck_species ds ON ds.species_code = c.species_code
 WHERE c.user_id = $1
-  AND gs.group_id = $2
+  AND ds.deck_id = $2
   AND c.lane = $3
   AND c.due <= NOW()
 `
 
 type CountDueCardsParams struct {
-	UserID  int64  `db:"user_id" json:"user_id"`
-	GroupID int64  `db:"group_id" json:"group_id"`
-	Lane    string `db:"lane" json:"lane"`
+	UserID int64  `db:"user_id" json:"user_id"`
+	DeckID int64  `db:"deck_id" json:"deck_id"`
+	Lane   string `db:"lane" json:"lane"`
 }
 
 func (q *Queries) CountDueCards(ctx context.Context, arg CountDueCardsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countDueCards, arg.UserID, arg.GroupID, arg.Lane)
+	row := q.db.QueryRow(ctx, countDueCards, arg.UserID, arg.DeckID, arg.Lane)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -83,7 +83,7 @@ func (q *Queries) GetCard(ctx context.Context, arg GetCardParams) (Card, error) 
 	return i, err
 }
 
-const getGroupPracticeCards = `-- name: GetGroupPracticeCards :many
+const getDeckPracticeCards = `-- name: GetDeckPracticeCards :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,
        COALESCE(
            (SELECT file_path FROM species_recordings
@@ -98,12 +98,12 @@ SELECT s.ebird_code, s.common_name, s.scientific_name,
            ''
        )::text AS image_url
 FROM species s
-JOIN group_species gs ON gs.species_code = s.ebird_code
-WHERE gs.group_id = $1
+JOIN deck_species ds ON ds.species_code = s.ebird_code
+WHERE ds.deck_id = $1
 ORDER BY s.common_name
 `
 
-type GetGroupPracticeCardsRow struct {
+type GetDeckPracticeCardsRow struct {
 	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
 	CommonName     string `db:"common_name" json:"common_name"`
 	ScientificName string `db:"scientific_name" json:"scientific_name"`
@@ -111,15 +111,15 @@ type GetGroupPracticeCardsRow struct {
 	ImageUrl       string `db:"image_url" json:"image_url"`
 }
 
-func (q *Queries) GetGroupPracticeCards(ctx context.Context, groupID int64) ([]GetGroupPracticeCardsRow, error) {
-	rows, err := q.db.Query(ctx, getGroupPracticeCards, groupID)
+func (q *Queries) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]GetDeckPracticeCardsRow, error) {
+	rows, err := q.db.Query(ctx, getDeckPracticeCards, deckID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []GetGroupPracticeCardsRow
+	var items []GetDeckPracticeCardsRow
 	for rows.Next() {
-		var i GetGroupPracticeCardsRow
+		var i GetDeckPracticeCardsRow
 		if err := rows.Scan(
 			&i.EbirdCode,
 			&i.CommonName,
@@ -144,9 +144,9 @@ SELECT c.id, c.user_id, c.species_code, c.lane,
        s.common_name, s.scientific_name
 FROM cards c
 JOIN species s ON s.ebird_code = c.species_code
-JOIN group_species gs ON gs.species_code = c.species_code
+JOIN deck_species ds ON ds.species_code = c.species_code
 WHERE c.user_id = $1
-  AND gs.group_id = $2
+  AND ds.deck_id = $2
   AND c.lane = $3
   AND c.due <= NOW()
 ORDER BY c.due
@@ -154,9 +154,9 @@ LIMIT 1
 `
 
 type GetNextDueCardParams struct {
-	UserID  int64  `db:"user_id" json:"user_id"`
-	GroupID int64  `db:"group_id" json:"group_id"`
-	Lane    string `db:"lane" json:"lane"`
+	UserID int64  `db:"user_id" json:"user_id"`
+	DeckID int64  `db:"deck_id" json:"deck_id"`
+	Lane   string `db:"lane" json:"lane"`
 }
 
 type GetNextDueCardRow struct {
@@ -177,7 +177,7 @@ type GetNextDueCardRow struct {
 }
 
 func (q *Queries) GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error) {
-	row := q.db.QueryRow(ctx, getNextDueCard, arg.UserID, arg.GroupID, arg.Lane)
+	row := q.db.QueryRow(ctx, getNextDueCard, arg.UserID, arg.DeckID, arg.Lane)
 	var i GetNextDueCardRow
 	err := row.Scan(
 		&i.ID,

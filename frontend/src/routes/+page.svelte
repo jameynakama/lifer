@@ -1,39 +1,39 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
-  import type { Group } from '../types'
+  import type { Deck } from '../types'
   import StatsBar from '$components/StatsBar.svelte'
-  import GroupList from '$components/GroupList.svelte'
+  import DeckList from '$components/DeckList.svelte'
 
-  let groups: Group[] = $state([])
+  let decks: Deck[] = $state([])
   let loading = $state(true)
 
   $effect(() => {
-    fetch('/api/v1/groups')
+    fetch('/api/v1/decks')
       .then(async (res) => {
-        if (res.ok) groups = await res.json()
+        if (res.ok) decks = await res.json()
       })
       .finally(() => { loading = false })
   })
 
-  const totalDue = $derived(groups.reduce((sum, g) => sum + g.audio_due + g.image_due, 0))
+  const totalDue = $derived(decks.reduce((sum, d) => sum + d.audio_due + d.image_due, 0))
 
   const stats = $derived([
     { label: 'Due today', value: totalDue },
   ])
 
-  function startPractice(group: Group, lane: 'audio' | 'image') {
-    goto(`/groups/${group.id}/quiz?lane=${lane}`)
+  function startPractice(deck: Deck, lane: 'audio' | 'image') {
+    goto(`/decks/${deck.id}/quiz?lane=${lane}`)
   }
 </script>
 
 <div class="dashboard">
   {#if loading}
     <p class="status">Loading...</p>
-  {:else if groups.length === 0}
-    <p class="empty">No groups yet. <a href="/groups">Create one</a> to get started.</p>
+  {:else if decks.length === 0}
+    <p class="empty">No decks yet. <a href="/decks">Create one</a> to get started.</p>
   {:else}
     <StatsBar {stats} />
-    <GroupList {groups} onPractice={startPractice} />
+    <DeckList {decks} onPractice={startPractice} />
   {/if}
 </div>
 

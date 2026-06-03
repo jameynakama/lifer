@@ -20,7 +20,7 @@ run:
 
 # Build the backend binary
 build:
-    cd backend && go build -o bin/lifer ./cmd/server
+    cd backend && go build -o bin/flockdeck ./cmd/server
 
 # Run migrations up
 migrate-up:

@@ -1,7 +1,7 @@
 <div class="login">
   <div class="bird" aria-hidden="true">🐦‍🔥</div>
   <div class="content">
-    <h1>Lifer</h1>
+    <h1>FlockDeck</h1>
     <p class="tagline">Learn bird songs by ear</p>
     <p class="detail">Bird song identification practice</p>
     <a href="/api/v1/auth/google" class="google-btn">

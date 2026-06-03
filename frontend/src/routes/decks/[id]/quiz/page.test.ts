@@ -50,7 +50,7 @@ function makeFetch(opts: { card?: object | null; status?: number } = {}) {
 
 beforeEach(() => {
   page.params = { id: '42' }
-  page.url = new URL('http://localhost/groups/42/quiz?lane=audio')
+  page.url = new URL('http://localhost/decks/42/quiz?lane=audio')
   vi.mocked(goto).mockClear()
 })
 
@@ -66,7 +66,7 @@ describe('Quiz page', () => {
     expect(screen.getByText(/loading/i)).toBeInTheDocument()
   })
 
-  it('fetches group species on mount', async () => {
+  it('fetches deck species on mount', async () => {
     const fetchMock = makeFetch()
     vi.stubGlobal('fetch', fetchMock)
     render(QuizPage)
@@ -92,12 +92,12 @@ describe('Quiz page', () => {
     })
   })
 
-  it('navigates to group detail when Back to group is clicked', async () => {
+  it('navigates to deck detail when Back to deck is clicked', async () => {
     vi.stubGlobal('fetch', makeFetch({ status: 204 }))
     render(QuizPage)
-    await vi.waitFor(() => screen.getByRole('button', { name: /back to group/i }))
-    await fireEvent.click(screen.getByRole('button', { name: /back to group/i }))
-    expect(goto).toHaveBeenCalledWith('/groups/42')
+    await vi.waitFor(() => screen.getByRole('button', { name: /back to deck/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /back to deck/i }))
+    expect(goto).toHaveBeenCalledWith('/decks/42')
   })
 
   it('passes correct=true to RevealCard when selected species matches card', async () => {

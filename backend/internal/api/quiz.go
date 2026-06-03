@@ -13,8 +13,8 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
 
-	"github.com/jameynakama/lifer/internal/auth"
-	"github.com/jameynakama/lifer/internal/store"
+	"github.com/jameynakama/flockdeck/internal/auth"
+	"github.com/jameynakama/flockdeck/internal/store"
 )
 
 type nextCardResponse struct {
@@ -31,9 +31,9 @@ type nextCardResponse struct {
 func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 
-	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		http.Error(w, "invalid group id", http.StatusBadRequest)
+		http.Error(w, "invalid deck id", http.StatusBadRequest)
 		return
 	}
 
@@ -44,9 +44,9 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	card, err := h.queries.GetNextDueCard(r.Context(), store.GetNextDueCardParams{
-		UserID:  userID,
-		GroupID: groupID,
-		Lane:    lane,
+		UserID: userID,
+		DeckID: deckID,
+		Lane:   lane,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		w.WriteHeader(http.StatusNoContent)
@@ -59,9 +59,9 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dueRemaining, err := h.queries.CountDueCards(r.Context(), store.CountDueCardsParams{
-		UserID:  userID,
-		GroupID: groupID,
-		Lane:    lane,
+		UserID: userID,
+		DeckID: deckID,
+		Lane:   lane,
 	})
 	if err != nil {
 		log.Printf("CountDueCards error: %v", err)
@@ -125,9 +125,9 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 
-	groupID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
 	if err != nil {
-		http.Error(w, "invalid group id", http.StatusBadRequest)
+		http.Error(w, "invalid deck id", http.StatusBadRequest)
 		return
 	}
 
@@ -137,24 +137,24 @@ func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	group, err := h.queries.GetGroup(r.Context(), groupID)
+	deck, err := h.queries.GetDeck(r.Context(), deckID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
 	if err != nil {
-		log.Printf("GetGroup error: %v", err)
+		log.Printf("GetDeck error: %v", err)
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}
-	if group.OwnerID.Valid && group.OwnerID.Int64 != userID {
+	if deck.OwnerID.Valid && deck.OwnerID.Int64 != userID {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 
-	rows, err := h.queries.GetGroupPracticeCards(r.Context(), groupID)
+	rows, err := h.queries.GetDeckPracticeCards(r.Context(), deckID)
 	if err != nil {
-		log.Printf("GetGroupPracticeCards error: %v", err)
+		log.Printf("GetDeckPracticeCards error: %v", err)
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}

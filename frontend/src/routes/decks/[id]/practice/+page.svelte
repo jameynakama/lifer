@@ -7,7 +7,7 @@
   import RevealCard from '$components/RevealCard.svelte'
   import StatsBar from '$components/StatsBar.svelte'
 
-  let groupId = $derived(page.params.id)
+  let deckId = $derived(page.params.id)
   let lane: 'audio' | 'image' = $derived(
     page.url.searchParams.get('lane') === 'image' ? 'image' : 'audio'
   )
@@ -48,7 +48,7 @@
     cards = []
     index = 0
     try {
-      const res = await fetch(`/api/v1/groups/${groupId}/practice?lane=${lane}`)
+      const res = await fetch(`/api/v1/decks/${deckId}/practice?lane=${lane}`)
       if (!res.ok) throw new Error(`Server error ${res.status}`)
       const data: BirdCard[] = await res.json()
       if (data.length === 0) {
@@ -96,7 +96,7 @@
   ])
 
   $effect(() => {
-    if (groupId) loadCards()
+    if (deckId) loadCards()
   })
 </script>
 
@@ -111,8 +111,8 @@
     <p class="status error">{error} <button onclick={loadCards}>Retry</button></p>
   {:else if noMedia}
     <div class="done">
-      <p class="done-title">No species with media in this group.</p>
-      <button onclick={() => goto(`/groups/${groupId}`)}>Back to Group</button>
+      <p class="done-title">No species with media in this deck.</p>
+      <button onclick={() => goto(`/decks/${deckId}`)}>Back to Deck</button>
     </div>
   {:else if done}
     <div class="done">
@@ -120,7 +120,7 @@
       <p class="done-title">All done!</p>
       <p class="done-sub">{cards.length} species practiced.</p>
       <button class="btn-primary" onclick={practiceAgain}>Practice Again</button>
-      <button class="btn-secondary" onclick={() => goto(`/groups/${groupId}`)}>Back to Group</button>
+      <button class="btn-secondary" onclick={() => goto(`/decks/${deckId}`)}>Back to Deck</button>
     </div>
   {:else if card}
     {#if revealed}

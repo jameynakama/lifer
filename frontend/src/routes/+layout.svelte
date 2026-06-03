@@ -38,9 +38,9 @@
   {:else}
     <div class="app-container">
       <header>
-        <a href="/" class="wordmark">Lifer</a>
+        <a href="/" class="wordmark">FlockDeck</a>
         <nav>
-          <a href="/groups">Groups</a>
+          <a href="/decks">Decks</a>
           <a href="/explore">Explore</a>
         </nav>
         <button

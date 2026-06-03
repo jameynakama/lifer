@@ -1,6 +1,6 @@
 type Theme = 'dark' | 'light'
 
-const STORAGE_KEY = 'lifer-theme'
+const STORAGE_KEY = 'flockdeck-theme'
 
 export function getCurrentTheme(): Theme {
   const attr = document.documentElement.getAttribute('data-theme') as Theme | null

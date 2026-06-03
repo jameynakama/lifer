@@ -44,7 +44,7 @@ function makeFetch(data: object[] = cards) {
 
 beforeEach(() => {
   page.params = { id: '42' }
-  page.url = new URL('http://localhost/groups/42/practice?lane=audio')
+  page.url = new URL('http://localhost/decks/42/practice?lane=audio')
   vi.mocked(goto).mockClear()
 })
 
@@ -112,7 +112,7 @@ describe('Practice page', () => {
     })
   })
 
-  it('shows done screen with Practice Again and Back to Group after last card', async () => {
+  it('shows done screen with Practice Again and Back to Deck after last card', async () => {
     // Single-card deck so done triggers after one Next
     const singleCard = [cards[0]]
     vi.stubGlobal('fetch', makeFetch(singleCard))
@@ -123,11 +123,11 @@ describe('Practice page', () => {
     await fireEvent.click(screen.getByRole('button', { name: /next/i }))
     await vi.waitFor(() => {
       expect(screen.getByRole('button', { name: /practice again/i })).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: /back to group/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /back to deck/i })).toBeInTheDocument()
     })
   })
 
-  it('Back to Group navigates to group detail', async () => {
+  it('Back to Deck navigates to deck detail', async () => {
     const singleCard = [cards[0]]
     vi.stubGlobal('fetch', makeFetch(singleCard))
     render(PracticePage)
@@ -135,9 +135,9 @@ describe('Practice page', () => {
     await fireEvent.click(screen.getByRole('button', { name: /i don't know/i }))
     await vi.waitFor(() => screen.getByRole('button', { name: /next/i }))
     await fireEvent.click(screen.getByRole('button', { name: /next/i }))
-    await vi.waitFor(() => screen.getByRole('button', { name: /back to group/i }))
-    await fireEvent.click(screen.getByRole('button', { name: /back to group/i }))
-    expect(goto).toHaveBeenCalledWith('/groups/42')
+    await vi.waitFor(() => screen.getByRole('button', { name: /back to deck/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /back to deck/i }))
+    expect(goto).toHaveBeenCalledWith('/decks/42')
   })
 
   it('shows no-media message when API returns empty array', async () => {

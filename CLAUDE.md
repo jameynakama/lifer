@@ -1,4 +1,4 @@
-# Lifer -- Claude Code Context
+# FlockDeck -- Claude Code Context
 
 ## What this is
 A spaced repetition web app for bird song/call and image identification practice. Users hear a recording or see a photo, type the species name via a typeahead, reveal the answer, and advance. Rating is automatic: correct → Good (3), wrong → Again (1). FSRS drives scheduling. Groups let users practice by region (eBird-sourced presets) or custom species sets.
@@ -95,8 +95,8 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 
 ## Local setup on a new machine
 ```
-git clone https://github.com/jameynakama/lifer
-cd lifer
+git clone https://github.com/jameynakama/flockdeck
+cd flockdeck
 cp .env.example .env   # fill in values (including R2_* vars)
 docker compose up -d   # starts postgres on port 5433
 just migrate-up

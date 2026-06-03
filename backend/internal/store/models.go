@@ -23,17 +23,16 @@ type Card struct {
 	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
-type Group struct {
+type Deck struct {
 	ID          int64              `db:"id" json:"id"`
 	Name        string             `db:"name" json:"name"`
 	Description string             `db:"description" json:"description"`
-	IsPreset    bool               `db:"is_preset" json:"is_preset"`
 	OwnerID     pgtype.Int8        `db:"owner_id" json:"owner_id"`
 	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 }
 
-type GroupSpecy struct {
-	GroupID     int64  `db:"group_id" json:"group_id"`
+type DeckSpecy struct {
+	DeckID      int64  `db:"deck_id" json:"deck_id"`
 	SpeciesCode string `db:"species_code" json:"species_code"`
 }
 

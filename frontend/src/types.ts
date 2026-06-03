@@ -14,10 +14,9 @@ export interface BirdCard {
     due_remaining: number;
 }
 
-export interface Group {
+export interface Deck {
     id: number;
     name: string;
-    is_preset: boolean;
     audio_due: number;
     image_due: number;
 }

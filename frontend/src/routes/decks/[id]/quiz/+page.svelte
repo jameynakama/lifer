@@ -7,13 +7,13 @@
   import RevealCard from '$components/RevealCard.svelte'
   import StatsBar from '$components/StatsBar.svelte'
 
-  let groupId = $derived(page.params.id)
+  let deckId = $derived(page.params.id)
   let lane: 'audio' | 'image' = $derived(
     page.url.searchParams.get('lane') === 'image' ? 'image' : 'audio'
   )
 
   let card: BirdCard | null = $state(null)
-  let groupSpecies: Species[] = $state([])
+  let deckSpecies: Species[] = $state([])
   let revealed = $state(false)
   let done = $state(false)
   let reviewed = $state(0)
@@ -22,10 +22,10 @@
   let guessed: Species | null = $state(null)
   let correct = $state(false)
 
-  async function loadGroupSpecies() {
+  async function loadDeckSpecies() {
     try {
-      const res = await fetch(`/api/v1/groups/${groupId}/species`)
-      if (res.ok) groupSpecies = await res.json()
+      const res = await fetch(`/api/v1/decks/${deckId}/species`)
+      if (res.ok) deckSpecies = await res.json()
     } catch {
       // non-fatal -- typeahead will be empty but quiz still works
     }
@@ -35,7 +35,7 @@
     loading = true
     error = ''
     try {
-      const res = await fetch(`/api/v1/groups/${groupId}/next?lane=${lane}`)
+      const res = await fetch(`/api/v1/decks/${deckId}/next?lane=${lane}`)
       if (res.status === 204) {
         done = true
         card = null
@@ -60,7 +60,7 @@
     if (!card) return
     const rating = correct ? 3 : 1
     try {
-      await fetch(`/api/v1/groups/${groupId}/rate`, {
+      await fetch(`/api/v1/decks/${deckId}/rate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ebird_code: card.ebird_code, lane: card.lane, rating }),
@@ -82,15 +82,15 @@
   ])
 
   $effect(() => {
-    if (groupId) {
+    if (deckId) {
       reviewed = 0
       done = false
       revealed = false
       card = null
       guessed = null
       correct = false
-      groupSpecies = []
-      loadGroupSpecies()
+      deckSpecies = []
+      loadDeckSpecies()
       fetchNext()
     }
   })
@@ -111,18 +111,18 @@
         <p class="done-sub">{reviewed} {reviewed === 1 ? 'card' : 'cards'} reviewed this session.</p>
       {/if}
       <p class="done-sub">Come back later when more cards are due.</p>
-      <button onclick={() => goto(`/groups/${groupId}`)}>Back to group</button>
+      <button onclick={() => goto(`/decks/${deckId}`)}>Back to deck</button>
     </div>
   {:else if card}
     {#if revealed}
       <RevealCard {card} {correct} {guessed} {onNext} />
     {:else if lane === 'audio'}
       {#key card.ebird_code}
-        <QuizCard {card} species={groupSpecies} {onReveal} />
+        <QuizCard {card} species={deckSpecies} {onReveal} />
       {/key}
     {:else}
       {#key card.ebird_code}
-        <ImageQuizCard {card} species={groupSpecies} {onReveal} />
+        <ImageQuizCard {card} species={deckSpecies} {onReveal} />
       {/key}
     {/if}
   {:else}

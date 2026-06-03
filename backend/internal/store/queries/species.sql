@@ -37,11 +37,11 @@ SELECT macaulay_id, file_path, credit
 FROM species_images
 WHERE species_code = $1;
 
--- name: GetGroupsForSpecies :many
-SELECT group_id
-FROM group_species
+-- name: GetDecksForSpecies :many
+SELECT deck_id
+FROM deck_species
 WHERE species_code = $1
-  AND group_id IN (SELECT id FROM groups WHERE owner_id = $2);
+  AND deck_id IN (SELECT id FROM decks WHERE owner_id = $2);
 
 -- name: ListAllSpecies :many
 SELECT

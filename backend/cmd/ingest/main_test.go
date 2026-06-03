@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jameynakama/lifer/internal/ebird"
-	"github.com/jameynakama/lifer/internal/r2"
-	"github.com/jameynakama/lifer/internal/xenocanto"
+	"github.com/jameynakama/flockdeck/internal/ebird"
+	"github.com/jameynakama/flockdeck/internal/r2"
+	"github.com/jameynakama/flockdeck/internal/xenocanto"
 )
 
 func nopSend(any) {}

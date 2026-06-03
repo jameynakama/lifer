@@ -1,34 +1,33 @@
 <script lang="ts">
-  import type { Group } from '../types'
+  import type { Deck } from '../types'
 
   let {
-    groups,
+    decks,
     onPractice,
   }: {
-    groups: Group[];
-    onPractice: (group: Group, lane: 'audio' | 'image') => void;
+    decks: Deck[];
+    onPractice: (deck: Deck, lane: 'audio' | 'image') => void;
   } = $props()
 </script>
 
-<div class="group-list">
-  {#each groups as group}
-    <div class="group-card">
-      <div class="group-info">
-        <span class="group-name">{group.name}</span>
-        {#if group.is_preset}<span class="preset-badge">Preset</span>{/if}
+<div class="deck-list">
+  {#each decks as deck}
+    <div class="deck-card">
+      <div class="deck-info">
+        <span class="deck-name">{deck.name}</span>
       </div>
-      <div class="group-actions">
-        {#if group.audio_due > 0}
-          <button class="btn-lane" onclick={() => onPractice(group, 'audio')}>
-            🔊 Audio · {group.audio_due}
+      <div class="deck-actions">
+        {#if deck.audio_due > 0}
+          <button class="btn-lane" onclick={() => onPractice(deck, 'audio')}>
+            🔊 Audio · {deck.audio_due}
           </button>
         {/if}
-        {#if group.image_due > 0}
-          <button class="btn-lane" onclick={() => onPractice(group, 'image')}>
-            👁 Image · {group.image_due}
+        {#if deck.image_due > 0}
+          <button class="btn-lane" onclick={() => onPractice(deck, 'image')}>
+            👁 Image · {deck.image_due}
           </button>
         {/if}
-        {#if group.audio_due === 0 && group.image_due === 0}
+        {#if deck.audio_due === 0 && deck.image_due === 0}
           <span class="all-done">All done</span>
         {/if}
       </div>
@@ -37,12 +36,12 @@
 </div>
 
 <style>
-  .group-list {
+  .deck-list {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
   }
-  .group-card {
+  .deck-card {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -52,26 +51,17 @@
     align-items: center;
     box-shadow: var(--shadow);
   }
-  .group-info {
+  .deck-info {
     display: flex;
     align-items: center;
     gap: 0.5rem;
   }
-  .group-name {
+  .deck-name {
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--text);
   }
-  .preset-badge {
-    font-size: 0.625rem;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-muted);
-    background: var(--border);
-    border-radius: 4px;
-    padding: 0.125rem 0.375rem;
-  }
-  .group-actions {
+  .deck-actions {
     display: flex;
     gap: 0.5rem;
   }

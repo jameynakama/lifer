@@ -1,17 +1,17 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
-  import type { Group } from '../../types'
+  import type { Deck } from '../../types'
 
-  let groups: Group[] = $state([])
+  let decks: Deck[] = $state([])
   let loading = $state(true)
   let newName = $state('')
   let creating = $state(false)
   let practiceMode = $state(false)
 
-  async function loadGroups() {
+  async function loadDecks() {
     try {
-      const res = await fetch('/api/v1/groups')
-      if (res.ok) groups = await res.json()
+      const res = await fetch('/api/v1/decks')
+      if (res.ok) decks = await res.json()
     } catch {
       // network error, loading still ends
     } finally {
@@ -19,18 +19,18 @@
     }
   }
 
-  async function createGroup() {
+  async function createDeck() {
     if (!newName.trim()) return
     creating = true
     try {
-      const res = await fetch('/api/v1/groups', {
+      const res = await fetch('/api/v1/decks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: newName.trim() }),
       })
       if (res.ok) {
         const created = await res.json()
-        groups = [...groups, { ...created, audio_due: 0, image_due: 0 }]
+        decks = [...decks, { ...created, audio_due: 0, image_due: 0 }]
         newName = ''
       }
     } finally {
@@ -38,23 +38,23 @@
     }
   }
 
-  async function deleteGroup(id: number) {
+  async function deleteDeck(id: number) {
     try {
-      const res = await fetch(`/api/v1/groups/${id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/v1/decks/${id}`, { method: 'DELETE' })
       if (res.ok) {
-        groups = groups.filter((g) => g.id !== id)
+        decks = decks.filter((d) => d.id !== id)
       }
     } catch {
       // network error, leave state unchanged
     }
   }
 
-  loadGroups()
+  loadDecks()
 </script>
 
-<div class="groups-page">
+<div class="decks-page">
   <div class="page-header">
-    <h1>Groups</h1>
+    <h1>Decks</h1>
     <button
       class="btn-toggle"
       class:active={practiceMode}
@@ -70,11 +70,11 @@
     </p>
   {/if}
 
-  <form class="create-form" onsubmit={(e) => { e.preventDefault(); createGroup() }}>
+  <form class="create-form" onsubmit={(e) => { e.preventDefault(); createDeck() }}>
     <input
       type="text"
       bind:value={newName}
-      placeholder="Group name"
+      placeholder="Deck name"
       disabled={creating}
     />
     <button type="submit" disabled={creating || !newName.trim()}>Create</button>
@@ -82,32 +82,32 @@
 
   {#if loading}
     <p class="status">Loading...</p>
-  {:else if groups.length === 0}
-    <p class="empty">No groups yet. Create your first one above.</p>
+  {:else if decks.length === 0}
+    <p class="empty">No decks yet. Create your first one above.</p>
   {:else}
-    <ul class="group-list">
-      {#each groups as group (group.id)}
-        <li class="group-row">
-          <a href="/groups/{group.id}" class="group-name">{group.name}</a>
-          <div class="group-meta">
+    <ul class="deck-list">
+      {#each decks as deck (deck.id)}
+        <li class="deck-row">
+          <a href="/decks/{deck.id}" class="deck-name">{deck.name}</a>
+          <div class="deck-meta">
             {#if practiceMode}
               <button
                 class="btn-practice-quick"
-                onclick={() => goto(`/groups/${group.id}/practice?lane=audio`)}
+                onclick={() => goto(`/decks/${deck.id}/practice?lane=audio`)}
               >▶ Audio</button>
               <button
                 class="btn-practice-quick"
-                onclick={() => goto(`/groups/${group.id}/practice?lane=image`)}
+                onclick={() => goto(`/decks/${deck.id}/practice?lane=image`)}
               >◉ Image</button>
             {:else}
-              {#if group.audio_due > 0}
-                <span class="due-badge">🔊 {group.audio_due}</span>
+              {#if deck.audio_due > 0}
+                <span class="due-badge">🔊 {deck.audio_due}</span>
               {/if}
-              {#if group.image_due > 0}
-                <span class="due-badge">👁 {group.image_due}</span>
+              {#if deck.image_due > 0}
+                <span class="due-badge">👁 {deck.image_due}</span>
               {/if}
             {/if}
-            <button class="btn-delete" onclick={() => deleteGroup(group.id)}>Delete</button>
+            <button class="btn-delete" onclick={() => deleteDeck(deck.id)}>Delete</button>
           </div>
         </li>
       {/each}
@@ -116,7 +116,7 @@
 </div>
 
 <style>
-  .groups-page {
+  .decks-page {
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
@@ -186,7 +186,7 @@
     opacity: 0.5;
     cursor: not-allowed;
   }
-  .group-list {
+  .deck-list {
     list-style: none;
     padding: 0;
     margin: 0;
@@ -194,7 +194,7 @@
     flex-direction: column;
     gap: 0.5rem;
   }
-  .group-row {
+  .deck-row {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -204,14 +204,14 @@
     gap: 0.75rem;
     box-shadow: var(--shadow);
   }
-  .group-name {
+  .deck-name {
     color: var(--text);
     font-weight: 600;
     text-decoration: none;
     font-size: 0.9375rem;
     flex: 1;
   }
-  .group-meta {
+  .deck-meta {
     display: flex;
     align-items: center;
     gap: 0.375rem;
