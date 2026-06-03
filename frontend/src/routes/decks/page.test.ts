@@ -19,7 +19,7 @@ afterEach(() => {
 describe('Decks page', () => {
   it('renders deck list from API', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(decks),
+      ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
     render(DecksPage)
     await vi.waitFor(() => {
@@ -34,7 +34,7 @@ describe('Decks page', () => {
         postCalled = true
         return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 2, name: 'New Deck', audio_due: 0, image_due: 0 }) })
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(decks) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks, next_due_at: null }) })
     }))
     render(DecksPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/deck name/i))
@@ -48,7 +48,7 @@ describe('Decks page', () => {
 
   it('navigates to deck detail when name clicked', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(decks),
+      ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
     render(DecksPage)
     await vi.waitFor(() => screen.getByRole('link', { name: /my warblers/i }))
@@ -64,7 +64,7 @@ describe('Decks page', () => {
         deleteCalled = true
         return Promise.resolve({ ok: true })
       }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(decks) })
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks, next_due_at: null }) })
     }))
     render(DecksPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /delete/i }))
@@ -77,7 +77,7 @@ describe('Decks page', () => {
 
   it('shows Free Practice toggle button', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(decks),
+      ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
     render(DecksPage)
     await vi.waitFor(() => {
@@ -87,7 +87,7 @@ describe('Decks page', () => {
 
   it('shows practice banner when Free Practice toggled on', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(decks),
+      ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
     render(DecksPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /free practice/i }))
@@ -99,7 +99,7 @@ describe('Decks page', () => {
 
   it('shows practice audio quick button in practice mode', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(decks),
+      ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
     render(DecksPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /free practice/i }))
@@ -111,7 +111,7 @@ describe('Decks page', () => {
 
   it('quick audio button navigates to practice page', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(decks),
+      ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
     render(DecksPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /free practice/i }))
@@ -124,7 +124,7 @@ describe('Decks page', () => {
   it('hides due badges in practice mode', async () => {
     const deckWithDue = [{ id: 1, name: 'My Warblers', audio_due: 2, image_due: 1 }]
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true, json: () => Promise.resolve(deckWithDue),
+      ok: true, json: () => Promise.resolve({ decks: deckWithDue, next_due_at: null }),
     }))
     render(DecksPage)
     // Due badges visible normally

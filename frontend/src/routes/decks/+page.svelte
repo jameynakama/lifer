@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
-  import type { Deck } from '../../types'
+  import type { Deck, DecksResponse } from '../../types'
 
   let decks: Deck[] = $state([])
   let loading = $state(true)
@@ -11,7 +11,10 @@
   async function loadDecks() {
     try {
       const res = await fetch('/api/v1/decks')
-      if (res.ok) decks = await res.json()
+      if (res.ok) {
+        const data: DecksResponse = await res.json()
+        decks = data.decks
+      }
     } catch {
       // network error, loading still ends
     } finally {
