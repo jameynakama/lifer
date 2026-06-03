@@ -1,0 +1,8 @@
+# Macaulay Library asset IDs to skip during ingestion.
+# One ID per line. Comments (#) and blank lines are ignored.
+# Format matches skip.txt -- paste the asset ID, optionally followed by a comment.
+#
+# Example:
+# 558551971  # Leucistic bird, confusing for ID practice
+
+558551971  # Leucistic bird, confusing for ID practice

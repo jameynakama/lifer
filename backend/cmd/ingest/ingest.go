@@ -38,6 +38,7 @@ func ingestSpecies(
 	maxRec, maxImg, maxLenSecs int,
 	r2c *r2.Client,
 	xcOverrides map[string][2]string,
+	bannedImages map[string]struct{},
 	workerID int,
 	send func(any),
 ) (stats ingestStats, err error) {
@@ -152,14 +153,23 @@ func ingestSpecies(
 	}
 	recWg.Wait()
 
-	photos, err := mac.Photos(ctx, entry.SpeciesCode, maxImg)
+	photos, err := mac.Photos(ctx, entry.SpeciesCode, maxImg+len(bannedImages))
 	if err != nil {
 		err = nil // non-fatal: species will show 0 images in missingMedia report
 		return
 	}
+	var filtered []macaulay.Photo
+	for _, p := range photos {
+		if _, banned := bannedImages[p.AssetID]; !banned {
+			filtered = append(filtered, p)
+		}
+	}
+	if len(filtered) > maxImg {
+		filtered = filtered[:maxImg]
+	}
 
 	var imgWg sync.WaitGroup
-	for _, photo := range photos {
+	for _, photo := range filtered {
 		imgWg.Add(1)
 		go func(photo macaulay.Photo) {
 			defer imgWg.Done()

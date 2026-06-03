@@ -157,6 +157,11 @@ func main() {
 		fmt.Fprintf(os.Stderr, "skipping %d species per skip.txt, processing %d remaining\n", before-len(codes), len(codes))
 	}
 
+	bannedImages := loadManualSkips("cmd/ingest/banned_images.txt")
+	if len(bannedImages) > 0 {
+		fmt.Fprintf(os.Stderr, "loaded %d banned image IDs from banned_images.txt\n", len(bannedImages))
+	}
+
 	// Pre-filter to codes with taxonomy entries; warn for missing ones.
 	type codeEntry struct {
 		code  string
@@ -195,7 +200,7 @@ func main() {
 			go func(ce codeEntry, workerID int) {
 				defer wg.Done()
 				defer func() { slots <- workerID }()
-				stats, err := ingestSpecies(ctx, q, xcClient, macaulayClient, ce.entry, *maxRecordings, *maxImages, *maxRecordingSecs, r2c, xcOverrides, workerID, send)
+				stats, err := ingestSpecies(ctx, q, xcClient, macaulayClient, ce.entry, *maxRecordings, *maxImages, *maxRecordingSecs, r2c, xcOverrides, bannedImages, workerID, send)
 				if err != nil {
 					_ = err
 				}
