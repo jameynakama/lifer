@@ -85,20 +85,22 @@ func (q *Queries) GetCard(ctx context.Context, arg GetCardParams) (Card, error) 
 
 const getDeckPracticeCards = `-- name: GetDeckPracticeCards :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,
-       COALESCE(
-           (SELECT file_path FROM species_recordings
-            WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
-            ORDER BY random() LIMIT 1),
-           ''
-       )::text AS audio_url,
-       COALESCE(
-           (SELECT file_path FROM species_images
-            WHERE species_code = s.ebird_code
-            ORDER BY random() LIMIT 1),
-           ''
-       )::text AS image_url
+       COALESCE(rec.file_path, '') AS audio_url,
+       COALESCE(rec.credit, '')    AS audio_credit,
+       COALESCE(img.file_path, '') AS image_url,
+       COALESCE(img.credit, '')    AS image_credit
 FROM species s
 JOIN deck_species ds ON ds.species_code = s.ebird_code
+LEFT JOIN LATERAL (
+    SELECT file_path, credit FROM species_recordings
+    WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
+    ORDER BY random() LIMIT 1
+) rec ON true
+LEFT JOIN LATERAL (
+    SELECT file_path, credit FROM species_images
+    WHERE species_code = s.ebird_code
+    ORDER BY random() LIMIT 1
+) img ON true
 WHERE ds.deck_id = $1
 ORDER BY s.common_name
 `
@@ -108,7 +110,9 @@ type GetDeckPracticeCardsRow struct {
 	CommonName     string `db:"common_name" json:"common_name"`
 	ScientificName string `db:"scientific_name" json:"scientific_name"`
 	AudioUrl       string `db:"audio_url" json:"audio_url"`
+	AudioCredit    string `db:"audio_credit" json:"audio_credit"`
 	ImageUrl       string `db:"image_url" json:"image_url"`
+	ImageCredit    string `db:"image_credit" json:"image_credit"`
 }
 
 func (q *Queries) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]GetDeckPracticeCardsRow, error) {
@@ -125,7 +129,9 @@ func (q *Queries) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]Get
 			&i.CommonName,
 			&i.ScientificName,
 			&i.AudioUrl,
+			&i.AudioCredit,
 			&i.ImageUrl,
+			&i.ImageCredit,
 		); err != nil {
 			return nil, err
 		}
@@ -215,21 +221,26 @@ func (q *Queries) GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) 
 }
 
 const getRandomImage = `-- name: GetRandomImage :one
-SELECT file_path FROM species_images
+SELECT file_path, credit FROM species_images
 WHERE species_code = $1
 ORDER BY random()
 LIMIT 1
 `
 
-func (q *Queries) GetRandomImage(ctx context.Context, speciesCode string) (string, error) {
+type GetRandomImageRow struct {
+	FilePath string `db:"file_path" json:"file_path"`
+	Credit   string `db:"credit" json:"credit"`
+}
+
+func (q *Queries) GetRandomImage(ctx context.Context, speciesCode string) (GetRandomImageRow, error) {
 	row := q.db.QueryRow(ctx, getRandomImage, speciesCode)
-	var file_path string
-	err := row.Scan(&file_path)
-	return file_path, err
+	var i GetRandomImageRow
+	err := row.Scan(&i.FilePath, &i.Credit)
+	return i, err
 }
 
 const getRandomRecording = `-- name: GetRandomRecording :one
-SELECT file_path, type FROM species_recordings
+SELECT file_path, type, credit FROM species_recordings
 WHERE species_code = $1 AND quality IN ('A', 'B')
 ORDER BY random()
 LIMIT 1
@@ -238,12 +249,13 @@ LIMIT 1
 type GetRandomRecordingRow struct {
 	FilePath string `db:"file_path" json:"file_path"`
 	Type     string `db:"type" json:"type"`
+	Credit   string `db:"credit" json:"credit"`
 }
 
 func (q *Queries) GetRandomRecording(ctx context.Context, speciesCode string) (GetRandomRecordingRow, error) {
 	row := q.db.QueryRow(ctx, getRandomRecording, speciesCode)
 	var i GetRandomRecordingRow
-	err := row.Scan(&i.FilePath, &i.Type)
+	err := row.Scan(&i.FilePath, &i.Type, &i.Credit)
 	return i, err
 }
 

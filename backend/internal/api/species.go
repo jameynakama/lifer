@@ -47,6 +47,7 @@ type Recording struct {
 	FilePath    string `json:"file_path"`
 	Quality     string `json:"quality"`
 	Type        string `json:"type"`
+	Credit      string `json:"credit"`
 }
 
 // Image is a single photo entry.
@@ -208,6 +209,7 @@ func (h *Handler) getSpeciesDetail(w http.ResponseWriter, r *http.Request) {
 			FilePath:    rec.FilePath,
 			Quality:     rec.Quality,
 			Type:        rec.Type,
+			Credit:      rec.Credit,
 		}
 	}
 

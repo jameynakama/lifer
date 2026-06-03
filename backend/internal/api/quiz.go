@@ -18,14 +18,16 @@ import (
 )
 
 type nextCardResponse struct {
-	EbirdCode      string `json:"ebird_code"`
-	CommonName     string `json:"common_name"`
-	ScientificName string `json:"scientific_name"`
-	MediaURL       string `json:"media_url"`
-	PhotoURL       string `json:"photo_url"`
-	Lane           string `json:"lane"`
-	RecordingType  string `json:"recording_type"`
-	DueRemaining   int64  `json:"due_remaining"`
+	EbirdCode       string `json:"ebird_code"`
+	CommonName      string `json:"common_name"`
+	ScientificName  string `json:"scientific_name"`
+	MediaURL        string `json:"media_url"`
+	PhotoURL        string `json:"photo_url"`
+	Lane            string `json:"lane"`
+	RecordingType   string `json:"recording_type"`
+	RecordingCredit string `json:"recording_credit"`
+	PhotoCredit     string `json:"photo_credit"`
+	DueRemaining    int64  `json:"due_remaining"`
 }
 
 func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
@@ -69,7 +71,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var mediaURL, recordingType string
+	var mediaURL, recordingType, recordingCredit string
 	if lane == "audio" {
 		rec, recErr := h.queries.GetRandomRecording(r.Context(), card.SpeciesCode)
 		if errors.Is(recErr, pgx.ErrNoRows) {
@@ -84,41 +86,50 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		}
 		mediaURL = rec.FilePath
 		recordingType = rec.Type
+		recordingCredit = rec.Credit
 	} else {
-		mediaURL, err = h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
-		if errors.Is(err, pgx.ErrNoRows) {
+		img, imgErr := h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
+		if errors.Is(imgErr, pgx.ErrNoRows) {
 			log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
 			http.Error(w, "no media available", http.StatusInternalServerError)
 			return
 		}
-		if err != nil {
-			log.Printf("GetRandom media error: %v", err)
+		if imgErr != nil {
+			log.Printf("GetRandom media error: %v", imgErr)
 			http.Error(w, "server error", http.StatusInternalServerError)
 			return
 		}
+		mediaURL = img.FilePath
 	}
 
-	photoURL := mediaURL
+	var photoURL, photoCredit string
 	if lane == "audio" {
-		photoURL, err = h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
-		if errors.Is(err, pgx.ErrNoRows) {
+		img, imgErr := h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
+		if errors.Is(imgErr, pgx.ErrNoRows) {
 			photoURL = ""
-		} else if err != nil {
-			log.Printf("GetRandomImage error: %v", err)
+		} else if imgErr != nil {
+			log.Printf("GetRandomImage error: %v", imgErr)
 			http.Error(w, "server error", http.StatusInternalServerError)
 			return
+		} else {
+			photoURL = img.FilePath
+			photoCredit = img.Credit
 		}
+	} else {
+		photoURL = mediaURL
 	}
 
 	writeJSON(w, http.StatusOK, nextCardResponse{
-		EbirdCode:      card.SpeciesCode,
-		CommonName:     card.CommonName,
-		ScientificName: card.ScientificName,
-		MediaURL:       mediaURL,
-		PhotoURL:       photoURL,
-		Lane:           lane,
-		RecordingType:  recordingType,
-		DueRemaining:   dueRemaining,
+		EbirdCode:       card.SpeciesCode,
+		CommonName:      card.CommonName,
+		ScientificName:  card.ScientificName,
+		MediaURL:        mediaURL,
+		PhotoURL:        photoURL,
+		Lane:            lane,
+		RecordingType:   recordingType,
+		RecordingCredit: recordingCredit,
+		PhotoCredit:     photoCredit,
+		DueRemaining:    dueRemaining,
 	})
 }
 
@@ -175,13 +186,22 @@ func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
 			mediaURL = row.ImageUrl
 			photoURL = row.ImageUrl
 		}
+		var recordingCredit, photoCredit string
+		if lane == "audio" {
+			recordingCredit = row.AudioCredit
+			photoCredit = row.ImageCredit
+		} else {
+			photoCredit = row.ImageCredit
+		}
 		cards = append(cards, nextCardResponse{
-			EbirdCode:      row.EbirdCode,
-			CommonName:     row.CommonName,
-			ScientificName: row.ScientificName,
-			MediaURL:       mediaURL,
-			PhotoURL:       photoURL,
-			Lane:           lane,
+			EbirdCode:       row.EbirdCode,
+			CommonName:      row.CommonName,
+			ScientificName:  row.ScientificName,
+			MediaURL:        mediaURL,
+			PhotoURL:        photoURL,
+			Lane:            lane,
+			RecordingCredit: recordingCredit,
+			PhotoCredit:     photoCredit,
 		})
 	}
 

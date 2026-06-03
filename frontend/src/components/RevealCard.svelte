@@ -33,6 +33,9 @@
         <span class="recording-type">{card.recording_type}</span>
       {/if}
       <WavePlayer url={card.media_url} />
+      {#if card.recording_credit}
+        <p class="credit">{card.recording_credit}</p>
+      {/if}
     </div>
   {/if}
 
@@ -43,6 +46,9 @@
     <div class="species-info">
       <p class="common-name">{card.common_name}</p>
       <p class="scientific-name">{card.scientific_name}</p>
+      {#if card.photo_credit}
+        <p class="credit">{card.photo_credit}</p>
+      {/if}
     </div>
   </div>
 
@@ -135,6 +141,11 @@
     font-size: 0.8125rem;
     font-style: italic;
     margin-top: 0.25rem;
+  }
+  .credit {
+    color: var(--text-muted);
+    font-size: 0.6875rem;
+    margin-top: 0.375rem;
   }
   .btn-next {
     background: var(--accent);

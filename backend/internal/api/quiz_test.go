@@ -25,7 +25,7 @@ type stubQuerier struct {
 	getNextDueCard        func(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error)
 	countDueCards         func(ctx context.Context, arg store.CountDueCardsParams) (int64, error)
 	getRandomRecording    func(ctx context.Context, speciesCode string) (store.GetRandomRecordingRow, error)
-	getRandomImage        func(ctx context.Context, speciesCode string) (string, error)
+	getRandomImage        func(ctx context.Context, speciesCode string) (store.GetRandomImageRow, error)
 	getCard               func(ctx context.Context, arg store.GetCardParams) (store.Card, error)
 	updateCardSchedule    func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
 	getDeckPracticeCards func(ctx context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error)
@@ -44,7 +44,7 @@ func (s *stubQuerier) CountDueCards(ctx context.Context, arg store.CountDueCards
 func (s *stubQuerier) GetRandomRecording(ctx context.Context, speciesCode string) (store.GetRandomRecordingRow, error) {
 	return s.getRandomRecording(ctx, speciesCode)
 }
-func (s *stubQuerier) GetRandomImage(ctx context.Context, speciesCode string) (string, error) {
+func (s *stubQuerier) GetRandomImage(ctx context.Context, speciesCode string) (store.GetRandomImageRow, error) {
 	return s.getRandomImage(ctx, speciesCode)
 }
 func (s *stubQuerier) GetCard(ctx context.Context, arg store.GetCardParams) (store.Card, error) {
@@ -107,8 +107,8 @@ func TestGetNextCard_Audio_ReturnsDueCard(t *testing.T) {
 			assert.Equal(t, "spotto", speciesCode)
 			return store.GetRandomRecordingRow{FilePath: "https://r2.example.com/recordings/spotto/123.mp3", Type: "song"}, nil
 		},
-		getRandomImage: func(_ context.Context, speciesCode string) (string, error) {
-			return "https://r2.example.com/images/spotto/456.jpg", nil
+		getRandomImage: func(_ context.Context, speciesCode string) (store.GetRandomImageRow, error) {
+			return store.GetRandomImageRow{FilePath: "https://r2.example.com/images/spotto/456.jpg"}, nil
 		},
 	}
 

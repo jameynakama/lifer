@@ -28,7 +28,7 @@ FROM species
 WHERE ebird_code = $1;
 
 -- name: GetSpeciesRecordings :many
-SELECT xeno_canto_id, file_path, quality, type
+SELECT xeno_canto_id, file_path, quality, type, credit
 FROM species_recordings
 WHERE species_code = $1
 ORDER BY quality, type;

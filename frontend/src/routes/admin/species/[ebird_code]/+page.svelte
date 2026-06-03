@@ -12,6 +12,7 @@
     file_path: string
     quality: string
     type: string
+    credit: string
   }
 
   const ebirdCode = $derived(page.params.ebird_code)
@@ -129,7 +130,7 @@
     <h3>Recordings ({recordings.length})</h3>
     <table>
       <thead>
-        <tr><th>ID</th><th>Quality</th><th>Type</th><th>Actions</th></tr>
+        <tr><th>ID</th><th>Quality</th><th>Type</th><th>Credit</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {#each recordings as rec}
@@ -137,6 +138,7 @@
             <td>{rec.xeno_canto_id}</td>
             <td>{rec.quality}</td>
             <td>{rec.type}</td>
+            <td>{rec.credit}</td>
             <td>
               <audio src={rec.file_path} controls></audio>
               <button onclick={() => deleteRecording(rec.xeno_canto_id)}>Delete</button>
@@ -161,6 +163,9 @@
           <select name="type">
             <option>song</option><option>call</option>
           </select>
+        </label>
+        <label>
+            Credit: <input type="text" name="credit" placeholder="Recorder name" />
         </label>
         <button type="submit">Upload</button>
       </form>

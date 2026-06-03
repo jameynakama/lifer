@@ -25,6 +25,8 @@ const card: BirdCard = {
   photo_url: '/photos/song-sparrow.jpg',
   lane: 'audio' as const,
   recording_type: 'song',
+  recording_credit: '',
+  photo_credit: '',
   due_remaining: 5,
 }
 

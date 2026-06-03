@@ -30,7 +30,7 @@ type Querier interface {
 	GetNextDueAt(ctx context.Context, userID int64) (pgtype.Timestamptz, error)
 	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
 	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)
-	GetRandomImage(ctx context.Context, speciesCode string) (string, error)
+	GetRandomImage(ctx context.Context, speciesCode string) (GetRandomImageRow, error)
 	GetRandomRecording(ctx context.Context, speciesCode string) (GetRandomRecordingRow, error)
 	GetRecordingByID(ctx context.Context, xenoCantoID string) (SpeciesRecording, error)
 	GetSpeciesByCode(ctx context.Context, ebirdCode string) (GetSpeciesByCodeRow, error)

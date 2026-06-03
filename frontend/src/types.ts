@@ -11,6 +11,8 @@ export interface BirdCard {
     photo_url: string;
     lane: 'audio' | 'image';
     recording_type: string;
+    recording_credit: string;
+    photo_credit: string;
     due_remaining: number;
 }
 

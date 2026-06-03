@@ -59,6 +59,7 @@ describe('Decks page', () => {
 
   it('deletes a deck when delete button clicked', async () => {
     let deleteCalled = false
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true))
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       if (opts?.method === 'DELETE') {
         deleteCalled = true
@@ -127,12 +128,12 @@ describe('Decks page', () => {
       ok: true, json: () => Promise.resolve({ decks: deckWithDue, next_due_at: null }),
     }))
     render(DecksPage)
-    // Due badges visible normally
-    await vi.waitFor(() => screen.getByText(/🔊 2/))
+    // Due buttons visible normally
+    await vi.waitFor(() => screen.getByRole('button', { name: /🔊 audio/i }))
     // Toggle practice mode
     await fireEvent.click(screen.getByRole('button', { name: /free practice/i }))
     await vi.waitFor(() => {
-      expect(screen.queryByText(/🔊 2/)).toBeNull()
+      expect(screen.queryByRole('button', { name: /🔊 audio/i })).toBeNull()
     })
   })
 })

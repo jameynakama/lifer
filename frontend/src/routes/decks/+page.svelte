@@ -42,6 +42,7 @@
   }
 
   async function deleteDeck(id: number) {
+    if (!confirm('Delete this deck? This cannot be undone.')) return
     try {
       const res = await fetch(`/api/v1/decks/${id}`, { method: 'DELETE' })
       if (res.ok) {
@@ -95,19 +96,28 @@
           <div class="deck-meta">
             {#if practiceMode}
               <button
-                class="btn-practice-quick"
+                class="btn-action"
                 onclick={() => goto(`/decks/${deck.id}/practice?lane=audio`)}
               >▶ Audio</button>
               <button
-                class="btn-practice-quick"
+                class="btn-action"
                 onclick={() => goto(`/decks/${deck.id}/practice?lane=image`)}
               >◉ Image</button>
             {:else}
               {#if deck.audio_due > 0}
-                <span class="due-badge">🔊 {deck.audio_due}</span>
+                <button
+                  class="btn-action"
+                  onclick={() => goto(`/decks/${deck.id}/quiz?lane=audio`)}
+                >🔊 Audio · {deck.audio_due}</button>
               {/if}
               {#if deck.image_due > 0}
-                <span class="due-badge">👁 {deck.image_due}</span>
+                <button
+                  class="btn-action"
+                  onclick={() => goto(`/decks/${deck.id}/quiz?lane=image`)}
+                >👁 Image · {deck.image_due}</button>
+              {/if}
+              {#if deck.audio_due === 0 && deck.image_due === 0}
+                <span class="all-done">All done</span>
               {/if}
             {/if}
             <button class="btn-delete" onclick={() => deleteDeck(deck.id)}>Delete</button>
@@ -220,24 +230,21 @@
     gap: 0.375rem;
     flex-shrink: 0;
   }
-  .due-badge {
-    font-size: 0.75rem;
-    font-weight: 600;
+  .btn-action {
+    background: var(--surface);
+    border: 1px solid var(--border);
     color: var(--text-secondary);
-    background: var(--border);
-    border-radius: 6px;
-    padding: 0.1875rem 0.5rem;
-  }
-  .btn-practice-quick {
-    background: transparent;
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    border-radius: 6px;
-    padding: 0.25rem 0.625rem;
+    border-radius: 8px;
+    padding: 0.375rem 0.625rem;
     font-size: 0.75rem;
     font-weight: 600;
     cursor: pointer;
     font-family: inherit;
+    box-shadow: var(--shadow);
+  }
+  .all-done {
+    font-size: 0.75rem;
+    color: var(--text-muted);
   }
   .btn-delete {
     background: transparent;

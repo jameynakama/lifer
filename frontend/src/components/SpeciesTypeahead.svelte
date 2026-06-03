@@ -49,6 +49,7 @@
       highlighted = Math.max(highlighted - 1, 0)
     } else if (e.key === 'Enter') {
       e.preventDefault()
+      e.stopPropagation()
       if (open && filtered[highlighted]) selectSpecies(filtered[highlighted])
       else if (!open) onSubmit?.()
     } else if (e.key === 'Escape') {

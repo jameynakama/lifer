@@ -153,7 +153,7 @@ func (q *Queries) GetSpeciesImages(ctx context.Context, speciesCode string) ([]G
 }
 
 const getSpeciesRecordings = `-- name: GetSpeciesRecordings :many
-SELECT xeno_canto_id, file_path, quality, type
+SELECT xeno_canto_id, file_path, quality, type, credit
 FROM species_recordings
 WHERE species_code = $1
 ORDER BY quality, type
@@ -164,6 +164,7 @@ type GetSpeciesRecordingsRow struct {
 	FilePath    string `db:"file_path" json:"file_path"`
 	Quality     string `db:"quality" json:"quality"`
 	Type        string `db:"type" json:"type"`
+	Credit      string `db:"credit" json:"credit"`
 }
 
 func (q *Queries) GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]GetSpeciesRecordingsRow, error) {
@@ -180,6 +181,7 @@ func (q *Queries) GetSpeciesRecordings(ctx context.Context, speciesCode string) 
 			&i.FilePath,
 			&i.Quality,
 			&i.Type,
+			&i.Credit,
 		); err != nil {
 			return nil, err
 		}

@@ -4,7 +4,7 @@
   let {
     recordings,
   }: {
-    recordings: { xeno_canto_id: string; file_path: string; quality: string; type: string }[]
+    recordings: { xeno_canto_id: string; file_path: string; quality: string; type: string; credit: string }[]
   } = $props()
 </script>
 
@@ -12,7 +12,7 @@
   <div class="recordings-list">
     {#each recordings as rec (rec.xeno_canto_id)}
       <div class="recording-row">
-        <div class="recording-meta">{rec.type} · {rec.quality}</div>
+        <div class="recording-meta">{rec.type} · {rec.quality}{#if rec.credit} · {rec.credit}{/if}</div>
         <WavePlayer url={rec.file_path} />
       </div>
     {/each}

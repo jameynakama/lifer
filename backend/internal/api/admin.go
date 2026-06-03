@@ -72,9 +72,6 @@ func (h *Handler) adminUploadImage(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	credit := r.FormValue("credit")
-	if credit == "" {
-		credit = "admin upload"
-	}
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	contentType := extContentType[ext]
@@ -126,6 +123,7 @@ func (h *Handler) adminUploadRecording(w http.ResponseWriter, r *http.Request) {
 	if recType == "" {
 		recType = "song"
 	}
+	credit := r.FormValue("credit")
 
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	contentType := extContentType[ext]
@@ -148,6 +146,7 @@ func (h *Handler) adminUploadRecording(w http.ResponseWriter, r *http.Request) {
 		FilePath:    fileURL,
 		Quality:     quality,
 		Type:        recType,
+		Credit:      credit,
 	})
 	if err != nil {
 		log.Printf("admin: insert recording DB %s: %v", id, err)

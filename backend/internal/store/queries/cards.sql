@@ -14,7 +14,7 @@ ORDER BY c.due
 LIMIT 1;
 
 -- name: GetRandomRecording :one
-SELECT file_path, type FROM species_recordings
+SELECT file_path, type, credit FROM species_recordings
 WHERE species_code = $1 AND quality IN ('A', 'B')
 ORDER BY random()
 LIMIT 1;
@@ -29,7 +29,7 @@ WHERE c.user_id = $1
   AND c.due <= NOW();
 
 -- name: GetRandomImage :one
-SELECT file_path FROM species_images
+SELECT file_path, credit FROM species_images
 WHERE species_code = $1
 ORDER BY random()
 LIMIT 1;
@@ -64,20 +64,22 @@ WHERE user_id = $1 AND species_code = $2 AND lane = $3;
 
 -- name: GetDeckPracticeCards :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,
-       COALESCE(
-           (SELECT file_path FROM species_recordings
-            WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
-            ORDER BY random() LIMIT 1),
-           ''
-       )::text AS audio_url,
-       COALESCE(
-           (SELECT file_path FROM species_images
-            WHERE species_code = s.ebird_code
-            ORDER BY random() LIMIT 1),
-           ''
-       )::text AS image_url
+       COALESCE(rec.file_path, '') AS audio_url,
+       COALESCE(rec.credit, '')    AS audio_credit,
+       COALESCE(img.file_path, '') AS image_url,
+       COALESCE(img.credit, '')    AS image_credit
 FROM species s
 JOIN deck_species ds ON ds.species_code = s.ebird_code
+LEFT JOIN LATERAL (
+    SELECT file_path, credit FROM species_recordings
+    WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
+    ORDER BY random() LIMIT 1
+) rec ON true
+LEFT JOIN LATERAL (
+    SELECT file_path, credit FROM species_images
+    WHERE species_code = s.ebird_code
+    ORDER BY random() LIMIT 1
+) img ON true
 WHERE ds.deck_id = $1
 ORDER BY s.common_name;
 
