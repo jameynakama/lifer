@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jameynakama/flockdeck/internal/store"
 	"github.com/jackc/pgx/v5"
@@ -18,15 +19,16 @@ import (
 // deckStubQuerier stubs only deck-related methods.
 type deckStubQuerier struct {
 	store.Querier
-	listUserDecks          func(ctx context.Context, userID int64) ([]store.ListUserDecksRow, error)
-	createDeck             func(ctx context.Context, arg store.CreateDeckParams) (store.Deck, error)
-	getDeck                func(ctx context.Context, id int64) (store.Deck, error)
-	updateDeckName         func(ctx context.Context, arg store.UpdateDeckNameParams) (store.Deck, error)
-	deleteDeck             func(ctx context.Context, id int64) error
+	listUserDecks            func(ctx context.Context, userID int64) ([]store.ListUserDecksRow, error)
+	createDeck               func(ctx context.Context, arg store.CreateDeckParams) (store.Deck, error)
+	getDeck                  func(ctx context.Context, id int64) (store.Deck, error)
+	updateDeckName           func(ctx context.Context, arg store.UpdateDeckNameParams) (store.Deck, error)
+	deleteDeck               func(ctx context.Context, id int64) error
 	listDeckSpeciesWithPrefs func(ctx context.Context, arg store.ListDeckSpeciesWithPrefsParams) ([]store.ListDeckSpeciesWithPrefsRow, error)
-	addSpeciesToDeck       func(ctx context.Context, arg store.AddSpeciesToDeckParams) error
-	removeSpeciesFromDeck  func(ctx context.Context, arg store.RemoveSpeciesFromDeckParams) error
-	upsertCard             func(ctx context.Context, arg store.UpsertCardParams) error
+	addSpeciesToDeck         func(ctx context.Context, arg store.AddSpeciesToDeckParams) error
+	removeSpeciesFromDeck    func(ctx context.Context, arg store.RemoveSpeciesFromDeckParams) error
+	upsertCard               func(ctx context.Context, arg store.UpsertCardParams) error
+	getNextDueAt             func(ctx context.Context, userID int64) (pgtype.Timestamptz, error)
 }
 
 func (s *deckStubQuerier) ListUserDecks(ctx context.Context, userID int64) ([]store.ListUserDecksRow, error) {
@@ -56,6 +58,12 @@ func (s *deckStubQuerier) RemoveSpeciesFromDeck(ctx context.Context, arg store.R
 func (s *deckStubQuerier) UpsertCard(ctx context.Context, arg store.UpsertCardParams) error {
 	return s.upsertCard(ctx, arg)
 }
+func (s *deckStubQuerier) GetNextDueAt(ctx context.Context, userID int64) (pgtype.Timestamptz, error) {
+	if s.getNextDueAt != nil {
+		return s.getNextDueAt(ctx, userID)
+	}
+	return pgtype.Timestamptz{}, nil
+}
 
 func ownerID(id int64) pgtype.Int8 {
 	return pgtype.Int8{Int64: id, Valid: true}
@@ -78,11 +86,60 @@ func TestListDecks_ReturnsList(t *testing.T) {
 	h.listDecks(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code)
-	var body []store.ListUserDecksRow
+	var body listDecksResponse
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
-	assert.Len(t, body, 1)
-	assert.Equal(t, "My Warblers", body[0].Name)
-	assert.Equal(t, int64(3), body[0].AudioDue)
+	assert.Len(t, body.Decks, 1)
+	assert.Equal(t, "My Warblers", body.Decks[0].Name)
+	assert.Equal(t, int64(3), body.Decks[0].AudioDue)
+	assert.Nil(t, body.NextDueAt)
+}
+
+func TestListDecks_NextDueAtSetWhenFutureCardExists(t *testing.T) {
+	futureTime := time.Now().Add(2 * time.Hour)
+	q := &deckStubQuerier{
+		listUserDecks: func(_ context.Context, _ int64) ([]store.ListUserDecksRow, error) {
+			return []store.ListUserDecksRow{}, nil
+		},
+		getNextDueAt: func(_ context.Context, _ int64) (pgtype.Timestamptz, error) {
+			return pgtype.Timestamptz{Time: futureTime, Valid: true}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks", nil)
+	r = injectUserID(r, 1)
+	w := httptest.NewRecorder()
+
+	h.listDecks(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body listDecksResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	require.NotNil(t, body.NextDueAt)
+	parsed, err := time.Parse(time.RFC3339, *body.NextDueAt)
+	require.NoError(t, err)
+	assert.WithinDuration(t, futureTime, parsed, time.Second)
+}
+
+func TestListDecks_NextDueAtNullWhenNoFutureCards(t *testing.T) {
+	q := &deckStubQuerier{
+		listUserDecks: func(_ context.Context, _ int64) ([]store.ListUserDecksRow, error) {
+			return []store.ListUserDecksRow{}, nil
+		},
+		getNextDueAt: func(_ context.Context, _ int64) (pgtype.Timestamptz, error) {
+			return pgtype.Timestamptz{}, pgx.ErrNoRows
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks", nil)
+	r = injectUserID(r, 1)
+	w := httptest.NewRecorder()
+
+	h.listDecks(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body listDecksResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Nil(t, body.NextDueAt)
 }
 
 func TestCreateDeck_ReturnsDeck(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
@@ -72,6 +73,11 @@ func (h *Handler) getDeckDetail(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, deck)
 }
 
+type listDecksResponse struct {
+	Decks     []store.ListUserDecksRow `json:"decks"`
+	NextDueAt *string                  `json:"next_due_at"`
+}
+
 func (h *Handler) listDecks(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 	decks, err := h.queries.ListUserDecks(r.Context(), userID)
@@ -83,7 +89,20 @@ func (h *Handler) listDecks(w http.ResponseWriter, r *http.Request) {
 	if decks == nil {
 		decks = []store.ListUserDecksRow{}
 	}
-	writeJSON(w, http.StatusOK, decks)
+	nextDue, err := h.queries.GetNextDueAt(r.Context(), userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// no future cards -- next_due_at stays nil
+	} else if err != nil {
+		log.Printf("GetNextDueAt error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	} else if nextDue.Valid {
+		t := nextDue.Time.UTC().Format(time.RFC3339)
+		resp := listDecksResponse{Decks: decks, NextDueAt: &t}
+		writeJSON(w, http.StatusOK, resp)
+		return
+	}
+	writeJSON(w, http.StatusOK, listDecksResponse{Decks: decks})
 }
 
 func (h *Handler) createDeck(w http.ResponseWriter, r *http.Request) {
