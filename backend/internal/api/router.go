@@ -47,6 +47,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Get("/auth/google", h.googleLogin)
 		r.Get("/auth/google/callback", h.googleCallback)
+		r.Post("/auth/logout", h.logout)
 
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth(cfg.JWTSecret))

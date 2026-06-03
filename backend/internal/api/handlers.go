@@ -75,6 +75,19 @@ func (h *Handler) googleCallback(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, h.frontendURL, http.StatusTemporaryRedirect)
 }
 
+func (h *Handler) logout(w http.ResponseWriter, r *http.Request) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     authCookieName,
+		Value:    "",
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteLaxMode,
+		Path:     "/",
+	})
+	w.WriteHeader(http.StatusNoContent)
+}
+
 func (h *Handler) getMe(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 	user, err := h.queries.GetUserByID(r.Context(), userID)

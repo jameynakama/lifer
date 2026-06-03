@@ -26,6 +26,11 @@
     toggleTheme()
     theme = getCurrentTheme()
   }
+
+  async function handleLogout() {
+    await fetch('/api/v1/auth/logout', { method: 'POST' })
+    $auth = null
+  }
 </script>
 
 <QueryClientProvider client={queryClient}>
@@ -46,12 +51,15 @@
             <a href="/admin">Admin</a>
           {/if}
         </nav>
-        <button
-          onclick={handleToggle}
-          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {theme === 'dark' ? '☀️' : '🌙'}
-        </button>
+        <div class="header-actions">
+          <button
+            onclick={handleToggle}
+            aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {theme === 'dark' ? '☀️' : '🌙'}
+          </button>
+          <button onclick={handleLogout} class="logout">Log out</button>
+        </div>
       </header>
       <main>
         {@render children?.()}
@@ -104,6 +112,11 @@
   nav a:hover {
     color: var(--text);
   }
+  .header-actions {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
   header button {
     background: var(--surface);
     border: 1px solid var(--border);
@@ -114,6 +127,9 @@
     cursor: pointer;
     line-height: 1;
     box-shadow: var(--shadow);
+  }
+  .logout {
+    font-size: 0.75rem !important;
   }
   .app-container {
     max-width: 480px;
