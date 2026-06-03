@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/jameynakama/flockdeck/internal/auth"
+	"github.com/jameynakama/flockdeck/internal/r2"
 	"github.com/jameynakama/flockdeck/internal/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -85,4 +86,84 @@ func TestAdminGetSpeciesDetail_ReturnsImagesAndRecordings(t *testing.T) {
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
 	assert.Len(t, body["images"], 1)
 	assert.Len(t, body["recordings"], 1)
+}
+
+func TestAdminDeleteImage_DeletesFromR2AndDB(t *testing.T) {
+	var deletedKey string
+	var deletedID string
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deletedKey = r.URL.Path
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	r2c, err := r2.NewWithEndpoint(ts.URL, "key", "secret", "flockdeck", "https://pub.example.com")
+	require.NoError(t, err)
+
+	q := &adminStubQuerier{
+		getImageByID: func(_ context.Context, id string) (store.SpeciesImage, error) {
+			return store.SpeciesImage{
+				MacaulayID: id,
+				FilePath:   "https://pub.example.com/images/sonspa/img1.jpg",
+			}, nil
+		},
+		deleteImage: func(_ context.Context, id string) error {
+			deletedID = id
+			return nil
+		},
+	}
+	h := &Handler{queries: q, r2Client: r2c}
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/species/sonspa/images/img1", nil)
+	req = injectAdmin(req, 1)
+	req = withChiParams(req, map[string]string{"ebird_code": "sonspa", "macaulay_id": "img1"})
+	w := httptest.NewRecorder()
+
+	h.adminDeleteImage(w, req)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.Equal(t, "img1", deletedID)
+	assert.Contains(t, deletedKey, "images/sonspa/img1.jpg")
+}
+
+func TestAdminDeleteRecording_DeletesFromR2AndDB(t *testing.T) {
+	var deletedKey string
+	var deletedID string
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			deletedKey = r.URL.Path
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	r2c, err := r2.NewWithEndpoint(ts.URL, "key", "secret", "flockdeck", "https://pub.example.com")
+	require.NoError(t, err)
+
+	q := &adminStubQuerier{
+		getRecordingByID: func(_ context.Context, id string) (store.SpeciesRecording, error) {
+			return store.SpeciesRecording{
+				XenoCantoID: id,
+				FilePath:    "https://pub.example.com/recordings/sonspa/rec1.mp3",
+			}, nil
+		},
+		deleteRecording: func(_ context.Context, id string) error {
+			deletedID = id
+			return nil
+		},
+	}
+	h := &Handler{queries: q, r2Client: r2c}
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/species/sonspa/recordings/rec1", nil)
+	req = injectAdmin(req, 1)
+	req = withChiParams(req, map[string]string{"ebird_code": "sonspa", "xeno_canto_id": "rec1"})
+	w := httptest.NewRecorder()
+
+	h.adminDeleteRecording(w, req)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.Equal(t, "rec1", deletedID)
+	assert.Contains(t, deletedKey, "recordings/sonspa/rec1.mp3")
 }

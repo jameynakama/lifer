@@ -5,11 +5,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"path/filepath"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jameynakama/flockdeck/internal/store"
 )
 
 type adminSpeciesDetailResponse struct {
@@ -65,14 +62,43 @@ func (h *Handler) adminUploadRecording(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) adminDeleteImage(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not implemented", http.StatusNotImplemented)
+	id := chi.URLParam(r, "macaulay_id")
+
+	img, err := h.queries.GetImageByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err := h.r2Client.Delete(r.Context(), h.r2Client.KeyFor(img.FilePath)); err != nil {
+		log.Printf("admin: delete image R2 %s: %v", id, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	if err := h.queries.DeleteImage(r.Context(), id); err != nil {
+		log.Printf("admin: delete image DB %s: %v", id, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) adminDeleteRecording(w http.ResponseWriter, r *http.Request) {
-	http.Error(w, "not implemented", http.StatusNotImplemented)
-}
+	id := chi.URLParam(r, "xeno_canto_id")
 
-// Ensure imported packages are used in later tasks.
-var _ = filepath.Ext
-var _ = strings.HasPrefix
-var _ = store.UpsertSpeciesImageParams{}
+	rec, err := h.queries.GetRecordingByID(r.Context(), id)
+	if err != nil {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err := h.r2Client.Delete(r.Context(), h.r2Client.KeyFor(rec.FilePath)); err != nil {
+		log.Printf("admin: delete recording R2 %s: %v", id, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	if err := h.queries.DeleteRecording(r.Context(), id); err != nil {
+		log.Printf("admin: delete recording DB %s: %v", id, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
