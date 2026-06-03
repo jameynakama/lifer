@@ -3,6 +3,7 @@
   import type { Deck, DecksResponse } from '../types'
   import DashboardStats from '$components/DashboardStats.svelte'
   import DeckList from '$components/DeckList.svelte'
+  import InstallPrompt from '$components/InstallPrompt.svelte'
 
   let decks: Deck[] = $state([])
   let nextDueAt: string | null = $state(null)
@@ -29,6 +30,7 @@
 </script>
 
 <div class="dashboard">
+  <InstallPrompt />
   {#if loading}
     <p class="status">Loading...</p>
   {:else if decks.length === 0}
