@@ -21,6 +21,11 @@ export interface Deck {
     image_due: number;
 }
 
+export interface DecksResponse {
+    decks: Deck[];
+    next_due_at: string | null;
+}
+
 export interface Species {
     ebird_code: string;
     common_name: string;
