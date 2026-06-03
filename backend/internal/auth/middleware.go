@@ -35,6 +35,11 @@ func UserIDKey() any {
 	return userIDKey
 }
 
+// IsAdminKey returns the context key used by RequireAuth so tests can inject isAdmin.
+func IsAdminKey() any {
+	return isAdminKey
+}
+
 func UserIDFromCtx(ctx context.Context) int64 {
 	id, _ := ctx.Value(userIDKey).(int64)
 	return id
@@ -43,4 +48,16 @@ func UserIDFromCtx(ctx context.Context) int64 {
 func IsAdminFromCtx(ctx context.Context) bool {
 	v, _ := ctx.Value(isAdminKey).(bool)
 	return v
+}
+
+// RequireAdmin returns 403 if the request context does not have isAdmin=true.
+// Must be used after RequireAuth.
+func RequireAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !IsAdminFromCtx(r.Context()) {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
