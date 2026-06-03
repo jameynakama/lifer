@@ -32,7 +32,7 @@ generate:
 
 # Create a new migration (usage: just migration name=add_something)
 migration name:
-    migrate create -ext sql -dir backend/migrations -seq {{ name }}
+    migrate create -ext sql -dir backend/migrations -seq -digits 3 {{ name }}
 
 # Run the ingestion script (usage: just ingest US-OR)
 ingest *args:
