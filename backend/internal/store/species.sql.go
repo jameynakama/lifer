@@ -81,7 +81,7 @@ func (q *Queries) GetImageByID(ctx context.Context, macaulayID string) (SpeciesI
 }
 
 const getRecordingByID = `-- name: GetRecordingByID :one
-SELECT xeno_canto_id, species_code, file_path, quality, type, created_at
+SELECT xeno_canto_id, species_code, file_path, quality, type, created_at, credit
 FROM species_recordings
 WHERE xeno_canto_id = $1
 `
@@ -96,6 +96,7 @@ func (q *Queries) GetRecordingByID(ctx context.Context, xenoCantoID string) (Spe
 		&i.Quality,
 		&i.Type,
 		&i.CreatedAt,
+		&i.Credit,
 	)
 	return i, err
 }

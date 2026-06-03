@@ -96,7 +96,7 @@ ON CONFLICT (xeno_canto_id) DO UPDATE
     SET file_path = EXCLUDED.file_path,
         quality   = EXCLUDED.quality,
         type      = EXCLUDED.type
-RETURNING xeno_canto_id, species_code, file_path, quality, type, created_at
+RETURNING xeno_canto_id, species_code, file_path, quality, type, created_at, credit
 `
 
 type UpsertRecordingParams struct {
@@ -123,6 +123,7 @@ func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams
 		&i.Quality,
 		&i.Type,
 		&i.CreatedAt,
+		&i.Credit,
 	)
 	return i, err
 }

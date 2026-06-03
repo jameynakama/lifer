@@ -59,7 +59,7 @@ FROM species_images
 WHERE macaulay_id = $1;
 
 -- name: GetRecordingByID :one
-SELECT xeno_canto_id, species_code, file_path, quality, type, created_at
+SELECT xeno_canto_id, species_code, file_path, quality, type, created_at, credit
 FROM species_recordings
 WHERE xeno_canto_id = $1;
 

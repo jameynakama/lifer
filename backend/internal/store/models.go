@@ -58,6 +58,7 @@ type SpeciesRecording struct {
 	Quality     string             `db:"quality" json:"quality"`
 	Type        string             `db:"type" json:"type"`
 	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	Credit      string             `db:"credit" json:"credit"`
 }
 
 type User struct {
