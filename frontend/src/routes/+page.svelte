@@ -1,25 +1,27 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
-  import type { Deck } from '../types'
-  import StatsBar from '$components/StatsBar.svelte'
+  import type { Deck, DecksResponse } from '../types'
+  import DashboardStats from '$components/DashboardStats.svelte'
   import DeckList from '$components/DeckList.svelte'
 
   let decks: Deck[] = $state([])
+  let nextDueAt: string | null = $state(null)
   let loading = $state(true)
 
   $effect(() => {
     fetch('/api/v1/decks')
       .then(async (res) => {
-        if (res.ok) decks = await res.json()
+        if (res.ok) {
+          const data: DecksResponse = await res.json()
+          decks = data.decks
+          nextDueAt = data.next_due_at
+        }
       })
       .finally(() => { loading = false })
   })
 
-  const totalDue = $derived(decks.reduce((sum, d) => sum + d.audio_due + d.image_due, 0))
-
-  const stats = $derived([
-    { label: 'Due today', value: totalDue },
-  ])
+  const audioDue = $derived(decks.reduce((sum, d) => sum + d.audio_due, 0))
+  const imageDue = $derived(decks.reduce((sum, d) => sum + d.image_due, 0))
 
   function startPractice(deck: Deck, lane: 'audio' | 'image') {
     goto(`/decks/${deck.id}/quiz?lane=${lane}`)
@@ -32,7 +34,7 @@
   {:else if decks.length === 0}
     <p class="empty">No decks yet. <a href="/decks">Create one</a> to get started.</p>
   {:else}
-    <StatsBar {stats} />
+    <DashboardStats {audioDue} {imageDue} {nextDueAt} />
     <DeckList {decks} onPractice={startPractice} />
   {/if}
 </div>

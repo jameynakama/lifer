@@ -21,7 +21,7 @@ describe('Dashboard page', () => {
   it('renders deck names from API', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(decks),
+      json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
     render(Dashboard)
     await vi.waitFor(() => {
@@ -33,7 +33,7 @@ describe('Dashboard page', () => {
   it('shows empty state when no decks', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve([]),
+      json: () => Promise.resolve({ decks: [], next_due_at: null }),
     }))
     render(Dashboard)
     await vi.waitFor(() => {
@@ -44,7 +44,7 @@ describe('Dashboard page', () => {
   it('navigates to quiz when Audio button clicked', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(decks),
+      json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
     render(Dashboard)
     await vi.waitFor(() => screen.getAllByRole('button', { name: /audio/i }))
@@ -55,7 +55,7 @@ describe('Dashboard page', () => {
   it('navigates to quiz when Image button clicked', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve(decks),
+      json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
     render(Dashboard)
     await vi.waitFor(() => screen.getAllByRole('button', { name: /image/i }))
