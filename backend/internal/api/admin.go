@@ -2,11 +2,13 @@ package api
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 )
 
 type adminSpeciesDetailResponse struct {
@@ -66,7 +68,12 @@ func (h *Handler) adminDeleteImage(w http.ResponseWriter, r *http.Request) {
 
 	img, err := h.queries.GetImageByID(r.Context(), id)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("admin: get image %s: %v", id, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}
 	if err := h.r2Client.Delete(r.Context(), h.r2Client.KeyFor(img.FilePath)); err != nil {
@@ -87,7 +94,12 @@ func (h *Handler) adminDeleteRecording(w http.ResponseWriter, r *http.Request) {
 
 	rec, err := h.queries.GetRecordingByID(r.Context(), id)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		if errors.Is(err, pgx.ErrNoRows) {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("admin: get recording %s: %v", id, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}
 	if err := h.r2Client.Delete(r.Context(), h.r2Client.KeyFor(rec.FilePath)); err != nil {
