@@ -95,6 +95,19 @@ func (h *Handler) getMe(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "user not found", http.StatusNotFound)
 		return
 	}
+	if user.IsAdmin != auth.IsAdminFromCtx(r.Context()) {
+		if token, err := auth.SignToken(user.ID, user.IsAdmin, h.jwtSecret); err == nil {
+			http.SetCookie(w, &http.Cookie{
+				Name:     authCookieName,
+				Value:    token,
+				Expires:  time.Now().Add(30 * 24 * time.Hour),
+				HttpOnly: true,
+				Secure:   true,
+				SameSite: http.SameSiteLaxMode,
+				Path:     "/",
+			})
+		}
+	}
 	writeJSON(w, http.StatusOK, user)
 }
 
