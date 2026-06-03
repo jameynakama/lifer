@@ -86,6 +86,11 @@
   @keyframes spin {
     to { transform: rotate(360deg); }
   }
+  .app-container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 1.5rem 2rem;
+  }
   header {
     display: flex;
     justify-content: space-between;
@@ -131,14 +136,31 @@
   .logout {
     font-size: 0.75rem !important;
   }
-  .app-container {
-    max-width: 480px;
-    margin: 0 auto;
-    padding: 0 1.5rem 2rem;
-  }
   main {
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+
+  /* Mobile: two-row header */
+  @media (max-width: 639px) {
+    .app-container {
+      padding: 0 1rem 2rem;
+    }
+    header {
+      flex-wrap: wrap;
+      padding: 0.75rem 0 0;
+      gap: 0.25rem 0;
+    }
+    .wordmark {
+      flex: 1;
+    }
+    nav {
+      order: 3;
+      width: 100%;
+      padding: 0.375rem 0 0.625rem;
+      border-top: 1px solid var(--border);
+      margin-top: 0.25rem;
+    }
   }
 </style>
