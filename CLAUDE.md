@@ -80,11 +80,19 @@ pg_dump $DATABASE_URL | psql $PROD_DATABASE_URL
 ```
 Species, recordings, images, and groups transfer. Cards are user-scoped and start fresh.
 
-### 2. GH Actions -- activate CI/CD
+### 2. GH Actions -- activate CI/CD ✓ Done
 Add three secrets to the GitHub repo (Settings → Secrets → Actions):
 - `SSH_PRIVATE_KEY` -- private key whose public half is in `~/.ssh/authorized_keys` on the droplet
 - `SSH_USER` -- deploy user on the droplet
 - `SSH_HOST` -- droplet IP or hostname
+
+### 2b. Magic link auth (non-Google users)
+Current auth is Google OAuth only -- fine for most users, blocks anyone without a Google account. Planned solution:
+- **Provider:** Resend (free tier: 3k emails/month, generous for a birding group). Domain verification is a few DNS records, no MX setup needed.
+- **Flow:** user enters email → backend generates short-lived token → email contains `flockdeck.com/api/v1/auth/magic?token=abc123` → backend verifies, upserts user, issues existing HttpOnly JWT cookie → identical session from there
+- **Schema:** add `magic_link_tokens (email, token, expires_at, used)` table
+- **Coexistence:** Google OAuth and magic link run side by side, matched on email in the `users` table -- no conflict
+- Can skip passwords entirely; magic link is strictly better UX for non-technical users
 
 ### 3. Explore -- region filter (separate from the Explore list/detail already built)
 - eBird region codes are not stored in the DB -- no "which regions contain this species" endpoint exists
