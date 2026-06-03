@@ -9,7 +9,6 @@
 categr1=Bubulcus:ibis
 coohaw=Accipiter:cooperii
 norgos=Accipiter:gentilis
-pelcor=Urile:pelagicus
 bulshe=Ardenna:bulleri
 horpuf=Fratercula:corniculata
 leabit=Ixobrychus:exilis
