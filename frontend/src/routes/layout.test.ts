@@ -51,4 +51,23 @@ describe('Layout', () => {
       expect(screen.getByRole('button', { name: /switch to .* mode/i })).toBeInTheDocument()
     })
   })
+
+  it('shows Admin link when user is admin', async () => {
+    const user = { id: 1, email: 'test@example.com', name: 'Test User', is_admin: true }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }))
+    render(Layout)
+    await vi.waitFor(() => {
+      expect(screen.getByRole('link', { name: /admin/i })).toBeInTheDocument()
+    })
+  })
+
+  it('hides Admin link for non-admin users', async () => {
+    const user = { id: 1, email: 'test@example.com', name: 'Test User', is_admin: false }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }))
+    render(Layout)
+    await vi.waitFor(() => {
+      expect(screen.getByText('FlockDeck')).toBeInTheDocument()
+    })
+    expect(screen.queryByRole('link', { name: /admin/i })).not.toBeInTheDocument()
+  })
 })
