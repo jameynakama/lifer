@@ -3,6 +3,7 @@ package r2
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 // Client uploads objects to a Cloudflare R2 bucket via the S3-compatible API.
@@ -127,4 +129,25 @@ func (c *Client) Delete(ctx context.Context, key string) error {
 // KeyFor derives the R2 object key from a full public URL by stripping the public URL prefix.
 func (c *Client) KeyFor(fileURL string) string {
 	return strings.TrimPrefix(fileURL, c.pubURL+"/")
+}
+
+// URL returns the full public URL for a given object key.
+func (c *Client) URL(key string) string {
+	return c.pubURL + "/" + key
+}
+
+// Exists reports whether an object exists in the bucket at key.
+func (c *Client) Exists(ctx context.Context, key string) (bool, error) {
+	_, err := c.s3.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(c.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		var nf *types.NotFound
+		if errors.As(err, &nf) {
+			return false, nil
+		}
+		return false, fmt.Errorf("r2: head %s: %w", key, err)
+	}
+	return true, nil
 }

@@ -13,7 +13,7 @@
 
   const decksQuery = createQuery(() => ({
     queryKey: ['decks'],
-    queryFn: () => fetch('/api/v1/decks').then((r) => r.json()),
+    queryFn: () => fetch('/api/v1/decks').then((r) => r.json()).then((d) => d.decks ?? []),
   }))
 
   const membershipQuery = createQuery(() => ({

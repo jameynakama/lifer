@@ -118,11 +118,19 @@ func ingestSpecies(
 			key := "recordings/" + sp.EbirdCode + "/" + rec.ID + ".mp3"
 			var filePath string
 			if r2c != nil {
-				var err error
-				filePath, err = fetchAndUpload(ctx, r2c, rec.FileURL, key, "audio/mpeg", workerID, send)
+				exists, err := r2c.Exists(ctx, key)
 				if err != nil {
 					recordFailure(fmt.Sprintf("recording %s: %v", rec.ID, err))
 					return
+				}
+				if exists {
+					filePath = r2c.URL(key)
+				} else {
+					filePath, err = fetchAndUpload(ctx, r2c, rec.FileURL, key, "audio/mpeg", workerID, send)
+					if err != nil {
+						recordFailure(fmt.Sprintf("recording %s: %v", rec.ID, err))
+						return
+					}
 				}
 			} else {
 				filePath = "placeholder://" + key
@@ -133,6 +141,7 @@ func ingestSpecies(
 				FilePath:    filePath,
 				Quality:     rec.Quality,
 				Type:        rec.Type,
+				Credit:      rec.Rec,
 			}); err != nil {
 				return
 			}
@@ -159,11 +168,19 @@ func ingestSpecies(
 			key := "images/" + sp.EbirdCode + "/" + photo.AssetID + ".jpg"
 			var filePath string
 			if r2c != nil {
-				var err error
-				filePath, err = fetchAndUpload(ctx, r2c, mac.PhotoURL(photo.AssetID), key, "image/jpeg", workerID, send)
+				exists, err := r2c.Exists(ctx, key)
 				if err != nil {
 					recordFailure(fmt.Sprintf("image %s: %v", photo.AssetID, err))
 					return
+				}
+				if exists {
+					filePath = r2c.URL(key)
+				} else {
+					filePath, err = fetchAndUpload(ctx, r2c, mac.PhotoURL(photo.AssetID), key, "image/jpeg", workerID, send)
+					if err != nil {
+						recordFailure(fmt.Sprintf("image %s: %v", photo.AssetID, err))
+						return
+					}
 				}
 			} else {
 				filePath = "placeholder://" + key

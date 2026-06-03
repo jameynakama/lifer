@@ -7,12 +7,13 @@ ON CONFLICT (ebird_code) DO UPDATE
 RETURNING *;
 
 -- name: UpsertRecording :one
-INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type)
-VALUES ($1, $2, $3, $4, $5)
+INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type, credit)
+VALUES ($1, $2, $3, $4, $5, $6)
 ON CONFLICT (xeno_canto_id) DO UPDATE
     SET file_path = EXCLUDED.file_path,
         quality   = EXCLUDED.quality,
-        type      = EXCLUDED.type
+        type      = EXCLUDED.type,
+        credit    = EXCLUDED.credit
 RETURNING *;
 
 -- name: UpsertSpeciesImage :one

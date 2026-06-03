@@ -16,6 +16,7 @@ type Recording struct {
 	Quality string `json:"q"`
 	Length  string `json:"length"`
 	FileURL string `json:"file"`
+	Rec     string `json:"rec"`
 }
 
 type apiResponse struct {
