@@ -37,9 +37,15 @@
 
 <style>
   .deck-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.625rem;
+  }
+
+  @media (max-width: 639px) {
+    .deck-list {
+      grid-template-columns: 1fr;
+    }
   }
   .deck-card {
     background: var(--surface);
