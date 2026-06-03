@@ -1,10 +1,13 @@
 package api
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jameynakama/flockdeck/internal/auth"
@@ -166,4 +169,98 @@ func TestAdminDeleteRecording_DeletesFromR2AndDB(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, w.Code)
 	assert.Equal(t, "rec1", deletedID)
 	assert.Contains(t, deletedKey, "recordings/sonspa/rec1.mp3")
+}
+
+func TestAdminUploadImage_UploadsToR2AndInsertsDB(t *testing.T) {
+	var uploadedKey, uploadedContentType string
+	var insertedParams store.UpsertSpeciesImageParams
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uploadedKey = r.URL.Path
+		uploadedContentType = r.Header.Get("Content-Type")
+		w.Header().Set("ETag", `"abc"`)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	r2c, err := r2.NewWithEndpoint(ts.URL, "key", "secret", "flockdeck", "https://pub.example.com")
+	require.NoError(t, err)
+
+	q := &adminStubQuerier{
+		upsertSpeciesImage: func(_ context.Context, arg store.UpsertSpeciesImageParams) (store.SpeciesImage, error) {
+			insertedParams = arg
+			return store.SpeciesImage{MacaulayID: arg.MacaulayID}, nil
+		},
+	}
+	h := &Handler{queries: q, r2Client: r2c}
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, _ := mw.CreateFormFile("file", "sparrow.jpg")
+	fw.Write([]byte("fake image data"))
+	mw.WriteField("credit", "John Doe")
+	mw.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/species/sonspa/images", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req = injectAdmin(req, 1)
+	req = withChiParam(req, "ebird_code", "sonspa")
+	w := httptest.NewRecorder()
+
+	h.adminUploadImage(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.Contains(t, uploadedKey, "images/sonspa/")
+	assert.Contains(t, uploadedKey, ".jpg")
+	assert.Equal(t, "image/jpeg", uploadedContentType)
+	assert.Equal(t, "sonspa", insertedParams.SpeciesCode)
+	assert.Equal(t, "John Doe", insertedParams.Credit)
+	assert.True(t, strings.HasPrefix(insertedParams.MacaulayID, "admin-"))
+}
+
+func TestAdminUploadRecording_UploadsToR2AndInsertsDB(t *testing.T) {
+	var uploadedKey string
+	var insertedParams store.UpsertRecordingParams
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uploadedKey = r.URL.Path
+		w.Header().Set("ETag", `"abc"`)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	r2c, err := r2.NewWithEndpoint(ts.URL, "key", "secret", "flockdeck", "https://pub.example.com")
+	require.NoError(t, err)
+
+	q := &adminStubQuerier{
+		upsertRecording: func(_ context.Context, arg store.UpsertRecordingParams) (store.SpeciesRecording, error) {
+			insertedParams = arg
+			return store.SpeciesRecording{XenoCantoID: arg.XenoCantoID}, nil
+		},
+	}
+	h := &Handler{queries: q, r2Client: r2c}
+
+	var buf bytes.Buffer
+	mw := multipart.NewWriter(&buf)
+	fw, _ := mw.CreateFormFile("file", "sparrow.mp3")
+	fw.Write([]byte("fake audio data"))
+	mw.WriteField("quality", "A")
+	mw.WriteField("type", "song")
+	mw.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/admin/species/sonspa/recordings", &buf)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req = injectAdmin(req, 1)
+	req = withChiParam(req, "ebird_code", "sonspa")
+	w := httptest.NewRecorder()
+
+	h.adminUploadRecording(w, req)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	assert.Contains(t, uploadedKey, "recordings/sonspa/")
+	assert.Contains(t, uploadedKey, ".mp3")
+	assert.Equal(t, "sonspa", insertedParams.SpeciesCode)
+	assert.Equal(t, "A", insertedParams.Quality)
+	assert.Equal(t, "song", insertedParams.Type)
+	assert.True(t, strings.HasPrefix(insertedParams.XenoCantoID, "admin-"))
 }
