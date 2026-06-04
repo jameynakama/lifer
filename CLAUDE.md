@@ -32,35 +32,40 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 
 ## What's next
 
-### 1. Seed prod DB
-```bash
-pg_dump $DATABASE_URL | psql $PROD_DATABASE_URL
-```
-Species, recordings, images, and decks transfer. Cards are user-scoped and start fresh.
-
-### 2. Magic link auth (non-Google users)
+### 1. Magic link auth (non-Google users)
 - **Provider:** Resend (free tier 3k emails/month; domain verification is a few DNS records)
 - **Flow:** email → short-lived token → link to `/api/v1/auth/magic?token=...` → verify, upsert user, issue existing HttpOnly JWT cookie
 - **Schema:** `magic_link_tokens (email, token, expires_at, used)`
 - Coexists with Google OAuth, matched on email in `users` -- no passwords ever
 
-### 3. Recording normalization
+### 2. Recording normalization
 - Some recordings (e.g. American Barn Owl) are startlingly loud compared to others
 - Goal: normalize audio levels to a consistent dB ceiling before storing in R2
 - Options: process at ingest time (ffmpeg loudnorm filter) or run a one-off normalization job after the fact
 - Needs: ffmpeg available in ingest environment, R2 re-upload of normalized files, decision on target loudness (e.g. -16 LUFS)
 
-### 4. Media lock field
+### 3. Media lock field
 - Add `locked boolean DEFAULT false` to `species_recordings` and `species_images`
 - Locked items are undeletable: ingest cleanup and admin delete both skip/reject locked records
 - Intended for admin-uploaded media that should survive reingestions
 - Needs: migration, `just generate`, ingest cleanup logic update, admin UI toggle, backend delete guards
+- No Postgres trigger needed -- `locked` check belongs in Go (ingest cleanup + admin delete handlers); admin UI disables delete button when locked
 
-### 5. Explore -- region filter
+### 4. Explore -- region filter
 - Region codes are NOT stored in the DB; intersect on demand instead
 - Flow: user picks state → backend proxy → eBird `GET /v2/ref/region/list/subnational2/{stateCode}` → user picks county → `GET /v2/product/spplist/{countyCode}` → intersect species codes with our catalog
 - Must proxy through backend to keep the eBird API key server-side
 - `regionType`: `country`, `subnational1` (states), `subnational2` (counties)
+
+### 5. About page (`/about`)
+- What FlockDeck is and how it works
+- Credit/attribution for eBird, Xeno-canto (CC-licensed recordings), Macaulay Library photos
+- Link to source repos / contact
+
+### 6. Stats page (`/stats`)
+- Per-user aggregate stats pulled from `cards` table: total reviews, correct rate, cards by FSRS state (new/learning/review/relearning)
+- Needs a new backend endpoint (e.g. `GET /api/v1/stats`) -- no new schema required
+- Possible charts: reviews over time, due forecast, accuracy by deck or species
 
 ## Key non-obvious choices
 - OAuth state stored as short-lived cookie (5min) to prevent CSRF -- verified on callback
