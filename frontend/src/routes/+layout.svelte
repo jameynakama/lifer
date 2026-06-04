@@ -9,7 +9,7 @@
   let checking = $state(true)
   let theme = $state(getCurrentTheme())
 
-  const queryClient = new QueryClient()
+  const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 60_000 } } })
 
   $effect(() => {
     fetch('/api/v1/me')
