@@ -2,6 +2,9 @@ set dotenv-load
 
 default: test
 
+alias tbe := test-be
+alias tfe := test-fe
+
 # Run all tests and checks (backend + frontend)
 test args='':
     cd backend && go vet ./... && gotestsum ./... -- {{ args }}
