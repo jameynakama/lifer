@@ -31,7 +31,7 @@ type adminStubQuerier struct {
 	upsertRecording      func(ctx context.Context, arg store.UpsertRecordingParams) (store.SpeciesRecording, error)
 	setImageLocked       func(ctx context.Context, arg store.SetImageLockedParams) error
 	setRecordingLocked   func(ctx context.Context, arg store.SetRecordingLockedParams) error
-	getUsers             func(ctx context.Context) ([]store.User, error)
+	getUsers             func(ctx context.Context) ([]store.GetUsersRow, error)
 	setUserIsAdmin       func(ctx context.Context, arg store.SetUserIsAdminParams) error
 	listAllUserDecks     func(ctx context.Context) ([]store.ListAllUserDecksRow, error)
 	getDeckWithOwner     func(ctx context.Context, id int64) (store.GetDeckWithOwnerRow, error)
@@ -74,7 +74,7 @@ func (s *adminStubQuerier) UpsertSpeciesImage(ctx context.Context, arg store.Ups
 func (s *adminStubQuerier) UpsertRecording(ctx context.Context, arg store.UpsertRecordingParams) (store.SpeciesRecording, error) {
 	return s.upsertRecording(ctx, arg)
 }
-func (s *adminStubQuerier) GetUsers(ctx context.Context) ([]store.User, error) {
+func (s *adminStubQuerier) GetUsers(ctx context.Context) ([]store.GetUsersRow, error) {
 	return s.getUsers(ctx)
 }
 func (s *adminStubQuerier) SetUserIsAdmin(ctx context.Context, arg store.SetUserIsAdminParams) error {
@@ -424,8 +424,8 @@ func TestAdminDeletePresetDeck_UserOwnedDeck_Returns400(t *testing.T) {
 
 func TestAdminGetUsers_ReturnsUsers(t *testing.T) {
 	q := &adminStubQuerier{
-		getUsers: func(_ context.Context) ([]store.User, error) {
-			return []store.User{
+		getUsers: func(_ context.Context) ([]store.GetUsersRow, error) {
+			return []store.GetUsersRow{
 				{ID: 1, Name: "Alice", Email: "alice@example.com", IsAdmin: true},
 				{ID: 2, Name: "Bob", Email: "bob@example.com", IsAdmin: false},
 			}, nil
@@ -446,9 +446,34 @@ func TestAdminGetUsers_ReturnsUsers(t *testing.T) {
 	assert.Equal(t, "Bob", got[1].Name)
 }
 
+func TestAdminGetUsers_DoesNotExposeGoogleID(t *testing.T) {
+	q := &adminStubQuerier{
+		// GetUsersRow has no GoogleID field at all -- exclusion is enforced by
+		// the query's column list; this test guards the serialized shape.
+		getUsers: func(_ context.Context) ([]store.GetUsersRow, error) {
+			return []store.GetUsersRow{
+				{ID: 1, Name: "Alice", Email: "alice@example.com"},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
+	r = injectAdmin(r, 1)
+	w := httptest.NewRecorder()
+
+	h.adminGetUsers(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var got []map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	require.Len(t, got, 1)
+	_, exposed := got[0]["google_id"]
+	assert.False(t, exposed, "google_id must not be serialized to the client")
+}
+
 func TestAdminGetUsers_StoreError_Returns500(t *testing.T) {
 	q := &adminStubQuerier{
-		getUsers: func(_ context.Context) ([]store.User, error) {
+		getUsers: func(_ context.Context) ([]store.GetUsersRow, error) {
 			return nil, errors.New("db down")
 		},
 	}

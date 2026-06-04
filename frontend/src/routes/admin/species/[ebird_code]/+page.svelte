@@ -264,5 +264,5 @@
   summary { cursor: pointer; color: var(--text-secondary); }
   form { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; max-width: 400px; }
   label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.875rem; }
-  .error { color: var(--danger, red); }
+  .error { color: var(--danger); }
 </style>

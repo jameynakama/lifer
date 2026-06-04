@@ -118,6 +118,6 @@
     margin-top: 1rem;
   }
   .error {
-    color: var(--danger, red);
+    color: var(--danger);
   }
 </style>

@@ -45,6 +45,10 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !h.deckOwnerCheck(w, r, deckID, userID) {
+		return
+	}
+
 	card, err := h.queries.GetNextDueCard(r.Context(), store.GetNextDueCardParams{
 		UserID: userID,
 		DeckID: deckID,
@@ -76,7 +80,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		rec, recErr := h.queries.GetRandomRecording(r.Context(), card.SpeciesCode)
 		if errors.Is(recErr, pgx.ErrNoRows) {
 			log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
-			http.Error(w, "no media available", http.StatusInternalServerError)
+			http.Error(w, "no media available", http.StatusNotFound)
 			return
 		}
 		if recErr != nil {
@@ -91,7 +95,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		img, imgErr := h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
 		if errors.Is(imgErr, pgx.ErrNoRows) {
 			log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
-			http.Error(w, "no media available", http.StatusInternalServerError)
+			http.Error(w, "no media available", http.StatusNotFound)
 			return
 		}
 		if imgErr != nil {
@@ -148,18 +152,7 @@ func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deck, err := h.queries.GetDeck(r.Context(), deckID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "not found", http.StatusNotFound)
-		return
-	}
-	if err != nil {
-		log.Printf("GetDeck error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
-		return
-	}
-	if deck.OwnerID.Valid && deck.OwnerID.Int64 != userID {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	if !h.deckOwnerCheck(w, r, deckID, userID) {
 		return
 	}
 
@@ -216,6 +209,15 @@ type rateCardRequest struct {
 
 func (h *Handler) rateCard(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
+
+	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid deck id", http.StatusBadRequest)
+		return
+	}
+	if !h.deckOwnerCheck(w, r, deckID, userID) {
+		return
+	}
 
 	var req rateCardRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

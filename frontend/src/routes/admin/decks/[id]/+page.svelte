@@ -136,6 +136,6 @@
     color: var(--text-muted);
   }
   .error {
-    color: var(--danger, red);
+    color: var(--danger);
   }
 </style>

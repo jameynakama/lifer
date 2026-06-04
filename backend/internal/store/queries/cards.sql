@@ -17,6 +17,17 @@ WHERE c.user_id = $1
     OR
     ($3 = 'image' AND COALESCE(usp.image_enabled, true))
   )
+  -- Never serve a card the quiz can't render: the species must have media for
+  -- the lane (recordings must meet the A/B quality bar GetRandomRecording uses).
+  AND (
+    ($3 = 'audio' AND EXISTS (
+      SELECT 1 FROM species_recordings sr
+      WHERE sr.species_code = c.species_code AND sr.quality IN ('A', 'B')))
+    OR
+    ($3 = 'image' AND EXISTS (
+      SELECT 1 FROM species_images si
+      WHERE si.species_code = c.species_code))
+  )
 ORDER BY c.due
 LIMIT 1;
 
@@ -40,6 +51,17 @@ WHERE c.user_id = $1
     ($3 = 'audio' AND COALESCE(usp.audio_enabled, true))
     OR
     ($3 = 'image' AND COALESCE(usp.image_enabled, true))
+  )
+  -- Mirror GetNextDueCard's media filter so the due count matches what the
+  -- quiz will actually serve.
+  AND (
+    ($3 = 'audio' AND EXISTS (
+      SELECT 1 FROM species_recordings sr
+      WHERE sr.species_code = c.species_code AND sr.quality IN ('A', 'B')))
+    OR
+    ($3 = 'image' AND EXISTS (
+      SELECT 1 FROM species_images si
+      WHERE si.species_code = c.species_code))
   );
 
 -- name: GetRandomImage :one

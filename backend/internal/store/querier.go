@@ -41,9 +41,13 @@ type Querier interface {
 	GetSpeciesByCode(ctx context.Context, ebirdCode string) (GetSpeciesByCodeRow, error)
 	GetSpeciesImages(ctx context.Context, speciesCode string) ([]GetSpeciesImagesRow, error)
 	GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]GetSpeciesRecordingsRow, error)
+	// Columns are enumerated (no SELECT */RETURNING *) so that adding a column to
+	// users is an explicit decision per query, not a silent change to API output.
 	GetUserByGoogleID(ctx context.Context, googleID string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
-	GetUsers(ctx context.Context) ([]User, error)
+	// GetUsers feeds the admin users API: google_id is deliberately excluded so
+	// third-party identifiers never reach the client.
+	GetUsers(ctx context.Context) ([]GetUsersRow, error)
 	ListAllSpecies(ctx context.Context) ([]ListAllSpeciesRow, error)
 	ListAllUserDecks(ctx context.Context) ([]ListAllUserDecksRow, error)
 	ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, error)
@@ -52,6 +56,9 @@ type Querier interface {
 	ListIncompleteSpecies(ctx context.Context) ([]string, error)
 	ListPresetDecks(ctx context.Context) ([]ListPresetDecksRow, error)
 	ListSpecies(ctx context.Context, arg ListSpeciesParams) ([]ListSpeciesRow, error)
+	// Species with any locked media are protected from ingest cleanup: deleting
+	// the species row would cascade onto locked rows, so cleanup must skip them.
+	ListSpeciesCodesWithLockedMedia(ctx context.Context) ([]string, error)
 	ListUserDecks(ctx context.Context, userID int64) ([]ListUserDecksRow, error)
 	RemoveSpeciesFromDeck(ctx context.Context, arg RemoveSpeciesFromDeckParams) error
 	SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]SearchSpeciesRow, error)
@@ -63,6 +70,9 @@ type Querier interface {
 	UpsertCard(ctx context.Context, arg UpsertCardParams) error
 	UpsertCardsForDeck(ctx context.Context, arg UpsertCardsForDeckParams) error
 	UpsertPreferences(ctx context.Context, arg UpsertPreferencesParams) (UserSpeciesPreference, error)
+	// "locked" protects media from REMOVAL only (see the cleanup path and the
+	// NOT locked delete guards below); ingest may still add new media to a locked
+	// bird and refresh same-source fields on existing rows.
 	UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (SpeciesRecording, error)
 	UpsertSpecies(ctx context.Context, arg UpsertSpeciesParams) (Species, error)
 	UpsertSpeciesImage(ctx context.Context, arg UpsertSpeciesImageParams) (SpeciesImage, error)

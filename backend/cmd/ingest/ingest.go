@@ -116,34 +116,8 @@ func ingestSpecies(
 			defer recWg.Done()
 			dlSem <- struct{}{}
 			defer func() { <-dlSem }()
-			key := "recordings/" + sp.EbirdCode + "/" + rec.ID + ".mp3"
-			var filePath string
-			if r2c != nil {
-				exists, err := r2c.Exists(ctx, key)
-				if err != nil {
-					recordFailure(fmt.Sprintf("recording %s: %v", rec.ID, err))
-					return
-				}
-				if exists {
-					filePath = r2c.URL(key)
-				} else {
-					filePath, err = fetchAndUpload(ctx, r2c, rec.FileURL, key, "audio/mpeg", workerID, send)
-					if err != nil {
-						recordFailure(fmt.Sprintf("recording %s: %v", rec.ID, err))
-						return
-					}
-				}
-			} else {
-				filePath = "placeholder://" + key
-			}
-			if _, err := q.UpsertRecording(ctx, store.UpsertRecordingParams{
-				XenoCantoID: rec.ID,
-				SpeciesCode: sp.EbirdCode,
-				FilePath:    filePath,
-				Quality:     rec.Quality,
-				Type:        rec.Type,
-				Credit:      rec.Rec,
-			}); err != nil {
+			if err := uploadRecording(ctx, q, r2c, rec, sp.EbirdCode, workerID, send); err != nil {
+				recordFailure(fmt.Sprintf("recording %s: %v", rec.ID, err))
 				return
 			}
 			statsMu.Lock()
@@ -155,7 +129,10 @@ func ingestSpecies(
 
 	photos, err := mac.Photos(ctx, entry.SpeciesCode, maxImg+len(bannedImages))
 	if err != nil {
-		err = nil // non-fatal: species will show 0 images in missingMedia report
+		// Non-fatal (recordings may still have succeeded), but it must show up
+		// in the failure report -- a Macaulay outage is not "0 images exist".
+		recordFailure(fmt.Sprintf("macaulay photos %s: %v", entry.SpeciesCode, err))
+		err = nil
 		return
 	}
 	var filtered []macaulay.Photo
@@ -175,32 +152,8 @@ func ingestSpecies(
 			defer imgWg.Done()
 			dlSem <- struct{}{}
 			defer func() { <-dlSem }()
-			key := "images/" + sp.EbirdCode + "/" + photo.AssetID + ".jpg"
-			var filePath string
-			if r2c != nil {
-				exists, err := r2c.Exists(ctx, key)
-				if err != nil {
-					recordFailure(fmt.Sprintf("image %s: %v", photo.AssetID, err))
-					return
-				}
-				if exists {
-					filePath = r2c.URL(key)
-				} else {
-					filePath, err = fetchAndUpload(ctx, r2c, mac.PhotoURL(photo.AssetID), key, "image/jpeg", workerID, send)
-					if err != nil {
-						recordFailure(fmt.Sprintf("image %s: %v", photo.AssetID, err))
-						return
-					}
-				}
-			} else {
-				filePath = "placeholder://" + key
-			}
-			if _, err := q.UpsertSpeciesImage(ctx, store.UpsertSpeciesImageParams{
-				MacaulayID:  photo.AssetID,
-				SpeciesCode: sp.EbirdCode,
-				FilePath:    filePath,
-				Credit:      photo.UserDisplayName,
-			}); err != nil {
+			if err := uploadImage(ctx, q, r2c, mac, photo, sp.EbirdCode, workerID, send); err != nil {
+				recordFailure(fmt.Sprintf("image %s: %v", photo.AssetID, err))
 				return
 			}
 			statsMu.Lock()
@@ -210,6 +163,73 @@ func ingestSpecies(
 	}
 	imgWg.Wait()
 	return
+}
+
+// mediaUpserter is the slice of store.Querier the upload helpers need.
+type mediaUpserter interface {
+	UpsertRecording(ctx context.Context, arg store.UpsertRecordingParams) (store.SpeciesRecording, error)
+	UpsertSpeciesImage(ctx context.Context, arg store.UpsertSpeciesImageParams) (store.SpeciesImage, error)
+}
+
+// uploadRecording ensures the recording's file is in R2 (or a placeholder when
+// r2c is nil) and upserts its DB row. Any failure, including the DB write, is
+// returned so the caller can record it.
+func uploadRecording(ctx context.Context, q mediaUpserter, r2c *r2.Client, rec xenocanto.Recording, speciesCode string, workerID int, send func(any)) error {
+	key := "recordings/" + speciesCode + "/" + rec.ID + ".mp3"
+	filePath, err := ensureUploaded(ctx, r2c, rec.FileURL, key, "audio/mpeg", workerID, send)
+	if err != nil {
+		return err
+	}
+	if _, err := q.UpsertRecording(ctx, store.UpsertRecordingParams{
+		XenoCantoID: rec.ID,
+		SpeciesCode: speciesCode,
+		FilePath:    filePath,
+		Quality:     rec.Quality,
+		Type:        rec.Type,
+		Credit:      rec.Rec,
+	}); err != nil {
+		return fmt.Errorf("db upsert: %w", err)
+	}
+	return nil
+}
+
+// uploadImage is uploadRecording's image-lane counterpart.
+func uploadImage(ctx context.Context, q mediaUpserter, r2c *r2.Client, mac *macaulay.Client, photo macaulay.Photo, speciesCode string, workerID int, send func(any)) error {
+	key := "images/" + speciesCode + "/" + photo.AssetID + ".jpg"
+	var sourceURL string
+	if r2c != nil {
+		sourceURL = mac.PhotoURL(photo.AssetID)
+	}
+	filePath, err := ensureUploaded(ctx, r2c, sourceURL, key, "image/jpeg", workerID, send)
+	if err != nil {
+		return err
+	}
+	if _, err := q.UpsertSpeciesImage(ctx, store.UpsertSpeciesImageParams{
+		MacaulayID:  photo.AssetID,
+		SpeciesCode: speciesCode,
+		FilePath:    filePath,
+		Credit:      photo.UserDisplayName,
+	}); err != nil {
+		return fmt.Errorf("db upsert: %w", err)
+	}
+	return nil
+}
+
+// ensureUploaded returns the public R2 URL for key, fetching and uploading the
+// source if it isn't already there. With a nil R2 client it returns a
+// placeholder URL (a damp run, if you will: drier than prod, wetter than --dry-run).
+func ensureUploaded(ctx context.Context, r2c *r2.Client, sourceURL, key, contentType string, workerID int, send func(any)) (string, error) {
+	if r2c == nil {
+		return "placeholder://" + key, nil
+	}
+	exists, err := r2c.Exists(ctx, key)
+	if err != nil {
+		return "", err
+	}
+	if exists {
+		return r2c.URL(key), nil
+	}
+	return fetchAndUpload(ctx, r2c, sourceURL, key, contentType, workerID, send)
 }
 
 // xcGenSp returns the genus and species to use for a xeno-canto query.
@@ -320,6 +340,46 @@ func filterBySpecies(codes []string, taxMap map[string]ebird.TaxonomyEntry, want
 		}
 	}
 	return out
+}
+
+// cleanupSpecies removes each species' R2 objects and DB rows. Callers must
+// pre-filter locked-media species via partitionProtected.
+func cleanupSpecies(ctx context.Context, q *store.Queries, r2c *r2.Client, codes []string) {
+	for _, code := range codes {
+		if r2c != nil {
+			for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
+				if err := r2c.DeletePrefix(ctx, prefix); err != nil {
+					fmt.Fprintf(os.Stderr, "  warn: cleanup R2 %s: %v\n", prefix, err)
+				}
+			}
+		}
+		if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {
+			fmt.Fprintf(os.Stderr, "  warn: cleanup recordings %s: %v\n", code, err)
+		}
+		if err := q.DeleteSpeciesImagesBySpeciesCode(ctx, code); err != nil {
+			fmt.Fprintf(os.Stderr, "  warn: cleanup images %s: %v\n", code, err)
+		}
+		if err := q.DeleteSpeciesByCode(ctx, code); err != nil {
+			fmt.Fprintf(os.Stderr, "  warn: cleanup species %s: %v\n", code, err)
+		}
+	}
+}
+
+// partitionProtected splits cleanup candidates into deletable codes and codes
+// protected by locked media. Deleting a protected species would cascade onto
+// its locked rows (and DeletePrefix would wipe its locked R2 files), so
+// cleanup must skip the whole species.
+func partitionProtected(codes []string, locked map[string]struct{}) (deletable, protected []string) {
+	deletable = make([]string, 0, len(codes))
+	protected = make([]string, 0)
+	for _, c := range codes {
+		if _, ok := locked[c]; ok {
+			protected = append(protected, c)
+		} else {
+			deletable = append(deletable, c)
+		}
+	}
+	return deletable, protected
 }
 
 func filterArbitrary(codes []string, toSkip map[string]struct{}) []string {

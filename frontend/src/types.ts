@@ -51,9 +51,9 @@ export interface SpeciesListItem {
 
 export interface User {
   id: number;
-  google_id: string;
   email: string;
   name: string;
+  picture: string;
   is_admin: boolean;
   created_at: string;
 }

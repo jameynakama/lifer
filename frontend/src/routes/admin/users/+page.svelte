@@ -101,6 +101,6 @@
     border-color: transparent;
   }
   .error {
-    color: var(--danger, red);
+    color: var(--danger);
   }
 </style>

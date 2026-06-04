@@ -89,6 +89,34 @@ func (q *Queries) ListIncompleteSpecies(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
+const listSpeciesCodesWithLockedMedia = `-- name: ListSpeciesCodesWithLockedMedia :many
+SELECT DISTINCT species_code FROM species_recordings WHERE locked
+UNION
+SELECT DISTINCT species_code FROM species_images WHERE locked
+`
+
+// Species with any locked media are protected from ingest cleanup: deleting
+// the species row would cascade onto locked rows, so cleanup must skip them.
+func (q *Queries) ListSpeciesCodesWithLockedMedia(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listSpeciesCodesWithLockedMedia)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var species_code string
+		if err := rows.Scan(&species_code); err != nil {
+			return nil, err
+		}
+		items = append(items, species_code)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertRecording = `-- name: UpsertRecording :one
 INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type, credit)
 VALUES ($1, $2, $3, $4, $5, $6)
@@ -109,6 +137,9 @@ type UpsertRecordingParams struct {
 	Credit      string `db:"credit" json:"credit"`
 }
 
+// "locked" protects media from REMOVAL only (see the cleanup path and the
+// NOT locked delete guards below); ingest may still add new media to a locked
+// bird and refresh same-source fields on existing rows.
 func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (SpeciesRecording, error) {
 	row := q.db.QueryRow(ctx, upsertRecording,
 		arg.XenoCantoID,

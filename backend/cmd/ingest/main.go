@@ -207,11 +207,10 @@ func main() {
 				defer wg.Done()
 				defer func() { slots <- workerID }()
 				stats, err := ingestSpecies(ctx, q, xcClient, macaulayClient, ce.entry, *maxRecordings, *maxImages, *maxRecordingSecs, r2c, xcOverrides, bannedImages, workerID, send)
-				if err != nil {
-					_ = err
-				}
 				mu.Lock()
-				if len(stats.failures) > 0 {
+				if err != nil {
+					failedSpecies[ce.code] = append(stats.failures, fmt.Sprintf("ingest: %v", err))
+				} else if len(stats.failures) > 0 {
 					failedSpecies[ce.code] = stats.failures
 				} else if stats.recordings == 0 || stats.images == 0 {
 					missingMedia[ce.code] = stats
@@ -229,6 +228,21 @@ func main() {
 	}
 
 	// --- post-run cleanup and reports ---
+
+	// Species with locked media are never cleaned up: deleting the species
+	// row cascades onto locked rows and DeletePrefix would wipe locked R2
+	// files. They are reported instead (see PROTECTED section below).
+	lockedCodes, err := q.ListSpeciesCodesWithLockedMedia(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "list locked media: %v\n", err)
+		os.Exit(1)
+	}
+	lockedSet := make(map[string]struct{}, len(lockedCodes))
+	for _, c := range lockedCodes {
+		lockedSet[c] = struct{}{}
+	}
+	protectedSet := map[string]struct{}{}
+
 	if !*noCleanup {
 		fmt.Fprintln(os.Stderr, "cleaning up species missing recordings or images...")
 		incomplete, err := q.ListIncompleteSpecies(ctx)
@@ -236,25 +250,13 @@ func main() {
 			fmt.Fprintf(os.Stderr, "cleanup: %v\n", err)
 			os.Exit(1)
 		}
-		for _, code := range incomplete {
-			if r2c != nil {
-				for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
-					if err := r2c.DeletePrefix(ctx, prefix); err != nil {
-						fmt.Fprintf(os.Stderr, "  warn: cleanup R2 %s: %v\n", prefix, err)
-					}
-				}
-			}
-			if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {
-				fmt.Fprintf(os.Stderr, "  warn: cleanup recordings %s: %v\n", code, err)
-			}
-			if err := q.DeleteSpeciesImagesBySpeciesCode(ctx, code); err != nil {
-				fmt.Fprintf(os.Stderr, "  warn: cleanup images %s: %v\n", code, err)
-			}
-			if err := q.DeleteSpeciesByCode(ctx, code); err != nil {
-				fmt.Fprintf(os.Stderr, "  warn: cleanup species %s: %v\n", code, err)
-			}
+		deletable, protected := partitionProtected(incomplete, lockedSet)
+		for _, c := range protected {
+			protectedSet[c] = struct{}{}
 		}
-		fmt.Fprintf(os.Stderr, "cleanup: removed %d incomplete species\n", len(incomplete))
+		cleanupSpecies(ctx, q, r2c, deletable)
+		fmt.Fprintf(os.Stderr, "cleanup: removed %d incomplete species (%d protected by locked media)\n",
+			len(deletable), len(protected))
 	} else {
 		fmt.Fprintln(os.Stderr, "--no-cleanup: skipping post-run cleanup")
 	}
@@ -274,26 +276,25 @@ func main() {
 			}
 		}
 		fmt.Println("cleaning up partial R2 uploads and DB entries for failed species...")
-		for _, code := range failedCodes {
-			if r2c != nil {
-				for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
-					if err := r2c.DeletePrefix(ctx, prefix); err != nil {
-						fmt.Fprintf(os.Stderr, "  warn: R2 delete %s: %v\n", prefix, err)
-					}
-				}
-			}
-			if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {
-				fmt.Fprintf(os.Stderr, "  warn: DB delete recordings %s: %v\n", code, err)
-			}
-			if err := q.DeleteSpeciesImagesBySpeciesCode(ctx, code); err != nil {
-				fmt.Fprintf(os.Stderr, "  warn: DB delete images %s: %v\n", code, err)
-			}
-			if err := q.DeleteSpeciesByCode(ctx, code); err != nil {
-				fmt.Fprintf(os.Stderr, "  warn: DB delete species %s: %v\n", code, err)
-			}
+		deletable, protected := partitionProtected(failedCodes, lockedSet)
+		for _, c := range protected {
+			protectedSet[c] = struct{}{}
 		}
+		cleanupSpecies(ctx, q, r2c, deletable)
 		fmt.Printf("re-run failed species with:\n")
 		fmt.Printf("  just ingest --species %s <region>\n", strings.Join(failedCodes, ","))
+	}
+
+	if len(protectedSet) > 0 {
+		protectedCodes := make([]string, 0, len(protectedSet))
+		for code := range protectedSet {
+			protectedCodes = append(protectedCodes, code)
+		}
+		sort.Strings(protectedCodes)
+		fmt.Printf("\n=== PROTECTED (locked media -- left untouched) ===\n")
+		for _, code := range protectedCodes {
+			fmt.Printf("  %s (%s)\n", taxMap[code].CommonName, code)
+		}
 	}
 
 	if len(missingMedia) > 0 {

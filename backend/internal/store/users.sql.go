@@ -7,12 +7,18 @@ package store
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const getUserByGoogleID = `-- name: GetUserByGoogleID :one
-SELECT id, google_id, email, name, picture, is_admin, created_at FROM users WHERE google_id = $1
+
+SELECT id, google_id, email, name, picture, is_admin, created_at
+FROM users WHERE google_id = $1
 `
 
+// Columns are enumerated (no SELECT */RETURNING *) so that adding a column to
+// users is an explicit decision per query, not a silent change to API output.
 func (q *Queries) GetUserByGoogleID(ctx context.Context, googleID string) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByGoogleID, googleID)
 	var i User
@@ -29,7 +35,8 @@ func (q *Queries) GetUserByGoogleID(ctx context.Context, googleID string) (User,
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, google_id, email, name, picture, is_admin, created_at FROM users WHERE id = $1
+SELECT id, google_id, email, name, picture, is_admin, created_at
+FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
@@ -48,21 +55,31 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 }
 
 const getUsers = `-- name: GetUsers :many
-SELECT id, google_id, email, name, picture, is_admin, created_at FROM users
+SELECT id, email, name, picture, is_admin, created_at FROM users
 `
 
-func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
+type GetUsersRow struct {
+	ID        int64              `db:"id" json:"id"`
+	Email     string             `db:"email" json:"email"`
+	Name      string             `db:"name" json:"name"`
+	Picture   string             `db:"picture" json:"picture"`
+	IsAdmin   bool               `db:"is_admin" json:"is_admin"`
+	CreatedAt pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+// GetUsers feeds the admin users API: google_id is deliberately excluded so
+// third-party identifiers never reach the client.
+func (q *Queries) GetUsers(ctx context.Context) ([]GetUsersRow, error) {
 	rows, err := q.db.Query(ctx, getUsers)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []User
+	var items []GetUsersRow
 	for rows.Next() {
-		var i User
+		var i GetUsersRow
 		if err := rows.Scan(
 			&i.ID,
-			&i.GoogleID,
 			&i.Email,
 			&i.Name,
 			&i.Picture,

@@ -14,6 +14,9 @@
   --text-secondary: #94a3b8;
   --accent: #2563eb;
   --accent-hover: #1d4ed8;
+  --danger: #ef4444;
+  --error: #f87171;
+  --success: #4ade80;
   --shadow: none;
 }
 
@@ -27,6 +30,9 @@
   --text-secondary: #526452;
   --accent: #4f7942;
   --accent-hover: #3d6133;
+  --danger: #dc2626;
+  --error: #b91c1c;
+  --success: #15803d;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
@@ -41,6 +47,9 @@
     --text-secondary: #526452;
     --accent: #4f7942;
     --accent-hover: #3d6133;
+    --danger: #dc2626;
+    --error: #b91c1c;
+    --success: #15803d;
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 }
