@@ -1,10 +1,11 @@
 -- name: ListUserDecks :many
 SELECT d.id, d.name, d.description, d.owner_id, d.created_at,
-    COUNT(CASE WHEN c.lane = 'audio' AND c.due <= NOW() THEN 1 END) AS audio_due,
-    COUNT(CASE WHEN c.lane = 'image' AND c.due <= NOW() THEN 1 END) AS image_due
+    COUNT(CASE WHEN c.lane = 'audio' AND c.due <= NOW() AND COALESCE(usp.audio_enabled, true) THEN 1 END) AS audio_due,
+    COUNT(CASE WHEN c.lane = 'image' AND c.due <= NOW() AND COALESCE(usp.image_enabled, true) THEN 1 END) AS image_due
 FROM decks d
 LEFT JOIN deck_species ds ON ds.deck_id = d.id
 LEFT JOIN cards c ON c.species_code = ds.species_code AND c.user_id = $1
+LEFT JOIN user_species_preferences usp ON usp.species_code = ds.species_code AND usp.user_id = $1
 WHERE d.owner_id = $1
 GROUP BY d.id
 ORDER BY d.name;
@@ -16,11 +17,12 @@ WHERE id = $1;
 
 -- name: GetDeckWithDue :one
 SELECT d.id, d.name, d.description, d.owner_id, d.created_at,
-    COUNT(CASE WHEN c.lane = 'audio' AND c.due <= NOW() THEN 1 END) AS audio_due,
-    COUNT(CASE WHEN c.lane = 'image' AND c.due <= NOW() THEN 1 END) AS image_due
+    COUNT(CASE WHEN c.lane = 'audio' AND c.due <= NOW() AND COALESCE(usp.audio_enabled, true) THEN 1 END) AS audio_due,
+    COUNT(CASE WHEN c.lane = 'image' AND c.due <= NOW() AND COALESCE(usp.image_enabled, true) THEN 1 END) AS image_due
 FROM decks d
 LEFT JOIN deck_species ds ON ds.deck_id = d.id
 LEFT JOIN cards c ON c.species_code = ds.species_code AND c.user_id = $2
+LEFT JOIN user_species_preferences usp ON usp.species_code = ds.species_code AND usp.user_id = $2
 WHERE d.id = $1
 GROUP BY d.id;
 

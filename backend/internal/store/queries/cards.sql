@@ -6,10 +6,17 @@ SELECT c.id, c.user_id, c.species_code, c.lane,
 FROM cards c
 JOIN species s ON s.ebird_code = c.species_code
 JOIN deck_species ds ON ds.species_code = c.species_code
+LEFT JOIN user_species_preferences usp
+       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
 WHERE c.user_id = $1
   AND ds.deck_id = $2
   AND c.lane = $3
   AND c.due <= NOW()
+  AND (
+    ($3 = 'audio' AND COALESCE(usp.audio_enabled, true))
+    OR
+    ($3 = 'image' AND COALESCE(usp.image_enabled, true))
+  )
 ORDER BY c.due
 LIMIT 1;
 
@@ -23,10 +30,17 @@ LIMIT 1;
 SELECT COUNT(*)
 FROM cards c
 JOIN deck_species ds ON ds.species_code = c.species_code
+LEFT JOIN user_species_preferences usp
+       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
 WHERE c.user_id = $1
   AND ds.deck_id = $2
   AND c.lane = $3
-  AND c.due <= NOW();
+  AND c.due <= NOW()
+  AND (
+    ($3 = 'audio' AND COALESCE(usp.audio_enabled, true))
+    OR
+    ($3 = 'image' AND COALESCE(usp.image_enabled, true))
+  );
 
 -- name: GetRandomImage :one
 SELECT file_path, credit FROM species_images
