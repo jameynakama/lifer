@@ -7,6 +7,14 @@ test args='':
     cd backend && go vet ./... && gotestsum ./... -- {{ args }}
     cd frontend && npx svelte-check --tsconfig tsconfig.json && npm test
 
+# Run backend tests and checks
+test-be args='':
+    cd backend && go vet ./... && gotestsum ./... -- {{ args }}
+
+# Run frontend tests and checks
+test-fe:
+    cd frontend && npx svelte-check --tsconfig tsconfig.json && npm test
+
 # Run regular tests with certain args that gotestsum seems to ignore
 gotest args='':
     cd backend && go test ./... {{ args }}
