@@ -79,3 +79,29 @@ WHERE deck_id = $1 AND species_code = $2;
 INSERT INTO deck_species (deck_id, species_code)
 SELECT $1, code FROM unnest($2::text[]) AS code
 ON CONFLICT DO NOTHING;
+
+-- name: ListAllUserDecks :many
+SELECT d.id, d.name, d.description, d.created_at,
+    u.id AS owner_id, u.name AS owner_name, u.email AS owner_email,
+    COUNT(ds.species_code) AS species_count
+FROM decks d
+JOIN users u ON u.id = d.owner_id
+LEFT JOIN deck_species ds ON ds.deck_id = d.id
+WHERE d.owner_id IS NOT NULL
+GROUP BY d.id, u.id
+ORDER BY u.email, d.name;
+
+-- name: GetDeckWithOwner :one
+SELECT d.id, d.name, d.description, d.owner_id,
+    COALESCE(u.name, '') AS owner_name,
+    COALESCE(u.email, '') AS owner_email
+FROM decks d
+LEFT JOIN users u ON u.id = d.owner_id
+WHERE d.id = $1;
+
+-- name: ListDeckSpeciesSimple :many
+SELECT s.ebird_code, s.common_name, s.scientific_name
+FROM species s
+JOIN deck_species ds ON ds.species_code = s.ebird_code
+WHERE ds.deck_id = $1
+ORDER BY s.common_name;

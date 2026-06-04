@@ -180,6 +180,124 @@ func (q *Queries) GetDeckWithDue(ctx context.Context, arg GetDeckWithDueParams) 
 	return i, err
 }
 
+const getDeckWithOwner = `-- name: GetDeckWithOwner :one
+SELECT d.id, d.name, d.description, d.owner_id,
+    COALESCE(u.name, '') AS owner_name,
+    COALESCE(u.email, '') AS owner_email
+FROM decks d
+LEFT JOIN users u ON u.id = d.owner_id
+WHERE d.id = $1
+`
+
+type GetDeckWithOwnerRow struct {
+	ID          int64       `db:"id" json:"id"`
+	Name        string      `db:"name" json:"name"`
+	Description string      `db:"description" json:"description"`
+	OwnerID     pgtype.Int8 `db:"owner_id" json:"owner_id"`
+	OwnerName   string      `db:"owner_name" json:"owner_name"`
+	OwnerEmail  string      `db:"owner_email" json:"owner_email"`
+}
+
+func (q *Queries) GetDeckWithOwner(ctx context.Context, id int64) (GetDeckWithOwnerRow, error) {
+	row := q.db.QueryRow(ctx, getDeckWithOwner, id)
+	var i GetDeckWithOwnerRow
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.OwnerID,
+		&i.OwnerName,
+		&i.OwnerEmail,
+	)
+	return i, err
+}
+
+const listAllUserDecks = `-- name: ListAllUserDecks :many
+SELECT d.id, d.name, d.description, d.created_at,
+    u.id AS owner_id, u.name AS owner_name, u.email AS owner_email,
+    COUNT(ds.species_code) AS species_count
+FROM decks d
+JOIN users u ON u.id = d.owner_id
+LEFT JOIN deck_species ds ON ds.deck_id = d.id
+WHERE d.owner_id IS NOT NULL
+GROUP BY d.id, u.id
+ORDER BY u.email, d.name
+`
+
+type ListAllUserDecksRow struct {
+	ID           int64              `db:"id" json:"id"`
+	Name         string             `db:"name" json:"name"`
+	Description  string             `db:"description" json:"description"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	OwnerID      int64              `db:"owner_id" json:"owner_id"`
+	OwnerName    string             `db:"owner_name" json:"owner_name"`
+	OwnerEmail   string             `db:"owner_email" json:"owner_email"`
+	SpeciesCount int64              `db:"species_count" json:"species_count"`
+}
+
+func (q *Queries) ListAllUserDecks(ctx context.Context) ([]ListAllUserDecksRow, error) {
+	rows, err := q.db.Query(ctx, listAllUserDecks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAllUserDecksRow
+	for rows.Next() {
+		var i ListAllUserDecksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.CreatedAt,
+			&i.OwnerID,
+			&i.OwnerName,
+			&i.OwnerEmail,
+			&i.SpeciesCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listDeckSpeciesSimple = `-- name: ListDeckSpeciesSimple :many
+SELECT s.ebird_code, s.common_name, s.scientific_name
+FROM species s
+JOIN deck_species ds ON ds.species_code = s.ebird_code
+WHERE ds.deck_id = $1
+ORDER BY s.common_name
+`
+
+type ListDeckSpeciesSimpleRow struct {
+	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
+	CommonName     string `db:"common_name" json:"common_name"`
+	ScientificName string `db:"scientific_name" json:"scientific_name"`
+}
+
+func (q *Queries) ListDeckSpeciesSimple(ctx context.Context, deckID int64) ([]ListDeckSpeciesSimpleRow, error) {
+	rows, err := q.db.Query(ctx, listDeckSpeciesSimple, deckID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDeckSpeciesSimpleRow
+	for rows.Next() {
+		var i ListDeckSpeciesSimpleRow
+		if err := rows.Scan(&i.EbirdCode, &i.CommonName, &i.ScientificName); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listDeckSpeciesWithPrefs = `-- name: ListDeckSpeciesWithPrefs :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,
        COALESCE(p.audio_enabled, true) AS audio_enabled,
