@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/svelte'
 import AdminDecksPage from './+page.svelte'
 
@@ -43,7 +43,6 @@ function makeFetch(overrides: Record<string, unknown> = {}) {
   })
 }
 
-beforeEach(() => {})
 afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllGlobals()

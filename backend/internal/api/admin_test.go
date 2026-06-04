@@ -688,3 +688,35 @@ func TestAdminGetDeckSpecies_NoSpecies_ReturnsEmptyArray(t *testing.T) {
 	species := body["species"].([]any)
 	assert.Len(t, species, 0)
 }
+
+func TestAdminGetDeckSpecies_InvalidID_Returns400(t *testing.T) {
+	h := makeHandler(&adminStubQuerier{})
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/decks/notanumber/species", nil)
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "notanumber")
+	w := httptest.NewRecorder()
+
+	h.adminGetDeckSpecies(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestAdminGetDeckSpecies_SpeciesStoreError_Returns500(t *testing.T) {
+	q := &adminStubQuerier{
+		getDeckWithOwner: func(_ context.Context, id int64) (store.GetDeckWithOwnerRow, error) {
+			return store.GetDeckWithOwnerRow{ID: 1, Name: "My Deck"}, nil
+		},
+		listDeckSpeciesSimple: func(_ context.Context, deckID int64) ([]store.ListDeckSpeciesSimpleRow, error) {
+			return nil, errors.New("db down")
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/decks/1/species", nil)
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "1")
+	w := httptest.NewRecorder()
+
+	h.adminGetDeckSpecies(w, r)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
