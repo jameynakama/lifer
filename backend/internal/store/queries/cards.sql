@@ -62,6 +62,14 @@ ON CONFLICT (user_id, species_code, lane) DO NOTHING;
 DELETE FROM cards
 WHERE user_id = $1 AND species_code = $2 AND lane = $3;
 
+-- name: UpsertCardsForDeck :exec
+INSERT INTO cards (user_id, species_code, lane)
+SELECT $1, ds.species_code, l.lane
+FROM deck_species ds
+CROSS JOIN (VALUES ('audio'::text), ('image'::text)) AS l(lane)
+WHERE ds.deck_id = $2
+ON CONFLICT (user_id, species_code, lane) DO NOTHING;
+
 -- name: GetDeckPracticeCards :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,
        COALESCE(rec.file_path, '') AS audio_url,

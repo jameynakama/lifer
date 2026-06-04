@@ -25,16 +25,35 @@ WHERE d.id = $1
 GROUP BY d.id;
 
 -- name: CreateDeck :one
-INSERT INTO decks (name, owner_id)
-VALUES ($1, $2)
+INSERT INTO decks (name, description, owner_id)
+VALUES ($1, $2, $3)
 RETURNING id, name, description, owner_id, created_at;
 
--- name: UpdateDeckName :one
-UPDATE decks SET name = $2 WHERE id = $1
+-- name: UpdateDeck :one
+UPDATE decks SET name = $2, description = $3 WHERE id = $1
 RETURNING id, name, description, owner_id, created_at;
 
 -- name: DeleteDeck :exec
 DELETE FROM decks WHERE id = $1;
+
+-- name: ListPresetDecks :many
+SELECT d.id, d.name, d.description, d.created_at,
+    COUNT(ds.species_code) AS species_count
+FROM decks d
+LEFT JOIN deck_species ds ON ds.deck_id = d.id
+WHERE d.owner_id IS NULL
+GROUP BY d.id
+ORDER BY d.name;
+
+-- name: CreatePresetDeck :one
+INSERT INTO decks (name, description)
+VALUES ($1, $2)
+RETURNING id, name, description, owner_id, created_at;
+
+-- name: CloneDeckSpecies :exec
+INSERT INTO deck_species (deck_id, species_code)
+SELECT $2, src.species_code FROM deck_species src WHERE src.deck_id = $1
+ON CONFLICT DO NOTHING;
 
 -- name: ListDeckSpeciesWithPrefs :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,

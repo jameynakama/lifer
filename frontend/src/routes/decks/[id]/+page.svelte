@@ -14,8 +14,11 @@
 
   let deckId = $derived(page.params.id)
   let deckName = $state('')
+  let deckDescription = $state('')
   let editingName = $state(false)
+  let editingDescription = $state(false)
   let nameInput = $state('')
+  let descriptionInput = $state('')
   let deckSpecies: Species[] = $state([])
   let audioDue = $state(0)
   let imageDue = $state(0)
@@ -53,6 +56,7 @@
       if (deckRes.ok) {
         const d = await deckRes.json()
         deckName = d.name ?? ''
+        deckDescription = d.description ?? ''
         audioDue = d.audio_due ?? 0
         imageDue = d.image_due ?? 0
       }
@@ -75,7 +79,7 @@
     const res = await fetch(`/api/v1/decks/${deckId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: trimmed }),
+      body: JSON.stringify({ name: trimmed, description: deckDescription }),
     })
     if (res.ok) deckName = trimmed
     editingName = false
@@ -84,6 +88,28 @@
   function handleNameKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter') saveName()
     else if (e.key === 'Escape') editingName = false
+  }
+
+  function startEditingDescription() {
+    descriptionInput = deckDescription
+    editingDescription = true
+  }
+
+  async function saveDescription() {
+    const trimmed = descriptionInput.trim()
+    if (trimmed === deckDescription) { editingDescription = false; return }
+    const res = await fetch(`/api/v1/decks/${deckId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: deckName, description: trimmed }),
+    })
+    if (res.ok) deckDescription = trimmed
+    editingDescription = false
+  }
+
+  function handleDescriptionKeydown(e: KeyboardEvent) {
+    if (e.key === 'Enter') saveDescription()
+    else if (e.key === 'Escape') editingDescription = false
   }
 
   async function addSpecies(ebirdCode: string) {
@@ -170,6 +196,23 @@
     {:else}
       <h1 class="deck-name">{deckName}</h1>
       <button class="btn-rename" onclick={startEditing} aria-label="Rename deck">✎</button>
+    {/if}
+  </div>
+
+  <div class="description-row">
+    {#if editingDescription}
+      <!-- svelte-ignore a11y_autofocus -->
+      <input
+        class="description-input"
+        bind:value={descriptionInput}
+        onkeydown={handleDescriptionKeydown}
+        onblur={saveDescription}
+        placeholder="Add a description..."
+        autofocus
+      />
+    {:else}
+      <span class="deck-description" class:placeholder={!deckDescription}>{deckDescription || 'Add a description...'}</span>
+      <button class="btn-rename" onclick={startEditingDescription} aria-label="Edit description">✎</button>
     {/if}
   </div>
 
@@ -299,6 +342,30 @@
     padding: 0.125rem 0.375rem;
     font-family: inherit;
     flex: 1;
+  }
+  .description-row {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: -0.5rem;
+  }
+  .deck-description {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+  }
+  .deck-description.placeholder {
+    font-style: italic;
+    opacity: 0.6;
+  }
+  .description-input {
+    flex: 1;
+    font-size: 0.875rem;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    border-radius: 6px;
+    padding: 0.125rem 0.375rem;
+    font-family: inherit;
   }
   .actions {
     display: flex;

@@ -122,6 +122,34 @@ describe('Decks page', () => {
     expect(goto).toHaveBeenCalledWith('/decks/1/practice?lane=audio')
   })
 
+  it('shows description below deck name when provided', async () => {
+    const decksWithDesc = [{ id: 1, name: 'Woodpeckers', description: 'Confusing laughing calls', audio_due: 0, image_due: 0 }]
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true, json: () => Promise.resolve({ decks: decksWithDesc, next_due_at: null }),
+    }))
+    render(DecksPage)
+    await vi.waitFor(() => {
+      expect(screen.getByText(/confusing laughing calls/i)).toBeInTheDocument()
+    })
+  })
+
+  it('sends description to API when creating a deck', async () => {
+    let body: unknown
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === 'POST') {
+        body = JSON.parse(opts.body as string)
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 2, name: 'New Deck', description: 'A description', audio_due: 0, image_due: 0 }) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks, next_due_at: null }) })
+    }))
+    render(DecksPage)
+    await vi.waitFor(() => screen.getByPlaceholderText(/deck name/i))
+    await fireEvent.input(screen.getByPlaceholderText(/deck name/i), { target: { value: 'New Deck' } })
+    await fireEvent.input(screen.getByPlaceholderText(/description/i), { target: { value: 'A description' } })
+    await fireEvent.click(screen.getByRole('button', { name: /create/i }))
+    await vi.waitFor(() => { expect((body as Record<string, unknown>).description).toBe('A description') })
+  })
+
   it('hides due badges in practice mode', async () => {
     const deckWithDue = [{ id: 1, name: 'My Warblers', audio_due: 2, image_due: 1 }]
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({

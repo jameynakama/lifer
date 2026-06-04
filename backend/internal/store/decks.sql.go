@@ -27,19 +27,60 @@ func (q *Queries) AddSpeciesToDeck(ctx context.Context, arg AddSpeciesToDeckPara
 	return err
 }
 
+const cloneDeckSpecies = `-- name: CloneDeckSpecies :exec
+INSERT INTO deck_species (deck_id, species_code)
+SELECT $2, src.species_code FROM deck_species src WHERE src.deck_id = $1
+ON CONFLICT DO NOTHING
+`
+
+type CloneDeckSpeciesParams struct {
+	DeckID   int64 `db:"deck_id" json:"deck_id"`
+	DeckID_2 int64 `db:"deck_id_2" json:"deck_id_2"`
+}
+
+func (q *Queries) CloneDeckSpecies(ctx context.Context, arg CloneDeckSpeciesParams) error {
+	_, err := q.db.Exec(ctx, cloneDeckSpecies, arg.DeckID, arg.DeckID_2)
+	return err
+}
+
 const createDeck = `-- name: CreateDeck :one
-INSERT INTO decks (name, owner_id)
-VALUES ($1, $2)
+INSERT INTO decks (name, description, owner_id)
+VALUES ($1, $2, $3)
 RETURNING id, name, description, owner_id, created_at
 `
 
 type CreateDeckParams struct {
-	Name    string      `db:"name" json:"name"`
-	OwnerID pgtype.Int8 `db:"owner_id" json:"owner_id"`
+	Name        string      `db:"name" json:"name"`
+	Description string      `db:"description" json:"description"`
+	OwnerID     pgtype.Int8 `db:"owner_id" json:"owner_id"`
 }
 
 func (q *Queries) CreateDeck(ctx context.Context, arg CreateDeckParams) (Deck, error) {
-	row := q.db.QueryRow(ctx, createDeck, arg.Name, arg.OwnerID)
+	row := q.db.QueryRow(ctx, createDeck, arg.Name, arg.Description, arg.OwnerID)
+	var i Deck
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Description,
+		&i.OwnerID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createPresetDeck = `-- name: CreatePresetDeck :one
+INSERT INTO decks (name, description)
+VALUES ($1, $2)
+RETURNING id, name, description, owner_id, created_at
+`
+
+type CreatePresetDeckParams struct {
+	Name        string `db:"name" json:"name"`
+	Description string `db:"description" json:"description"`
+}
+
+func (q *Queries) CreatePresetDeck(ctx context.Context, arg CreatePresetDeckParams) (Deck, error) {
+	row := q.db.QueryRow(ctx, createPresetDeck, arg.Name, arg.Description)
 	var i Deck
 	err := row.Scan(
 		&i.ID,
@@ -171,6 +212,50 @@ func (q *Queries) ListDeckSpeciesWithPrefs(ctx context.Context, arg ListDeckSpec
 	return items, nil
 }
 
+const listPresetDecks = `-- name: ListPresetDecks :many
+SELECT d.id, d.name, d.description, d.created_at,
+    COUNT(ds.species_code) AS species_count
+FROM decks d
+LEFT JOIN deck_species ds ON ds.deck_id = d.id
+WHERE d.owner_id IS NULL
+GROUP BY d.id
+ORDER BY d.name
+`
+
+type ListPresetDecksRow struct {
+	ID           int64              `db:"id" json:"id"`
+	Name         string             `db:"name" json:"name"`
+	Description  string             `db:"description" json:"description"`
+	CreatedAt    pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	SpeciesCount int64              `db:"species_count" json:"species_count"`
+}
+
+func (q *Queries) ListPresetDecks(ctx context.Context) ([]ListPresetDecksRow, error) {
+	rows, err := q.db.Query(ctx, listPresetDecks)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPresetDecksRow
+	for rows.Next() {
+		var i ListPresetDecksRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Description,
+			&i.CreatedAt,
+			&i.SpeciesCount,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserDecks = `-- name: ListUserDecks :many
 SELECT d.id, d.name, d.description, d.owner_id, d.created_at,
     COUNT(CASE WHEN c.lane = 'audio' AND c.due <= NOW() THEN 1 END) AS audio_due,
@@ -236,18 +321,19 @@ func (q *Queries) RemoveSpeciesFromDeck(ctx context.Context, arg RemoveSpeciesFr
 	return err
 }
 
-const updateDeckName = `-- name: UpdateDeckName :one
-UPDATE decks SET name = $2 WHERE id = $1
+const updateDeck = `-- name: UpdateDeck :one
+UPDATE decks SET name = $2, description = $3 WHERE id = $1
 RETURNING id, name, description, owner_id, created_at
 `
 
-type UpdateDeckNameParams struct {
-	ID   int64  `db:"id" json:"id"`
-	Name string `db:"name" json:"name"`
+type UpdateDeckParams struct {
+	ID          int64  `db:"id" json:"id"`
+	Name        string `db:"name" json:"name"`
+	Description string `db:"description" json:"description"`
 }
 
-func (q *Queries) UpdateDeckName(ctx context.Context, arg UpdateDeckNameParams) (Deck, error) {
-	row := q.db.QueryRow(ctx, updateDeckName, arg.ID, arg.Name)
+func (q *Queries) UpdateDeck(ctx context.Context, arg UpdateDeckParams) (Deck, error) {
+	row := q.db.QueryRow(ctx, updateDeck, arg.ID, arg.Name, arg.Description)
 	var i Deck
 	err := row.Scan(
 		&i.ID,

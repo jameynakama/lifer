@@ -329,3 +329,22 @@ func (q *Queries) UpsertCard(ctx context.Context, arg UpsertCardParams) error {
 	_, err := q.db.Exec(ctx, upsertCard, arg.UserID, arg.SpeciesCode, arg.Lane)
 	return err
 }
+
+const upsertCardsForDeck = `-- name: UpsertCardsForDeck :exec
+INSERT INTO cards (user_id, species_code, lane)
+SELECT $1, ds.species_code, l.lane
+FROM deck_species ds
+CROSS JOIN (VALUES ('audio'::text), ('image'::text)) AS l(lane)
+WHERE ds.deck_id = $2
+ON CONFLICT (user_id, species_code, lane) DO NOTHING
+`
+
+type UpsertCardsForDeckParams struct {
+	UserID int64 `db:"user_id" json:"user_id"`
+	DeckID int64 `db:"deck_id" json:"deck_id"`
+}
+
+func (q *Queries) UpsertCardsForDeck(ctx context.Context, arg UpsertCardsForDeckParams) error {
+	_, err := q.db.Exec(ctx, upsertCardsForDeck, arg.UserID, arg.DeckID)
+	return err
+}

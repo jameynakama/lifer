@@ -16,11 +16,13 @@ import (
 )
 
 type createDeckRequest struct {
-	Name string `json:"name"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
 }
 
 type updateDeckRequest struct {
-	Name string `json:"name"`
+	Name        string  `json:"name"`
+	Description *string `json:"description"`
 }
 
 type addSpeciesRequest struct {
@@ -118,9 +120,14 @@ func (h *Handler) createDeck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	var desc string
+	if req.Description != nil {
+		desc = *req.Description
+	}
 	deck, err := h.queries.CreateDeck(r.Context(), store.CreateDeckParams{
-		Name:    req.Name,
-		OwnerID: pgtype.Int8{Int64: userID, Valid: true},
+		Name:        req.Name,
+		Description: desc,
+		OwnerID:     pgtype.Int8{Int64: userID, Valid: true},
 	})
 	if err != nil {
 		log.Printf("CreateDeck error: %v", err)
@@ -154,12 +161,17 @@ func (h *Handler) updateDeck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	deck, err := h.queries.UpdateDeckName(r.Context(), store.UpdateDeckNameParams{
-		ID:   deckID,
-		Name: req.Name,
+	var desc string
+	if req.Description != nil {
+		desc = *req.Description
+	}
+	deck, err := h.queries.UpdateDeck(r.Context(), store.UpdateDeckParams{
+		ID:          deckID,
+		Name:        req.Name,
+		Description: desc,
 	})
 	if err != nil {
-		log.Printf("UpdateDeckName error: %v", err)
+		log.Printf("UpdateDeck error: %v", err)
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}

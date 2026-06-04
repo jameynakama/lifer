@@ -44,7 +44,19 @@ Species, recordings, images, and decks transfer. Cards are user-scoped and start
 - **Schema:** `magic_link_tokens (email, token, expires_at, used)`
 - Coexists with Google OAuth, matched on email in `users` -- no passwords ever
 
-### 3. Explore -- region filter
+### 3. Recording normalization
+- Some recordings (e.g. American Barn Owl) are startlingly loud compared to others
+- Goal: normalize audio levels to a consistent dB ceiling before storing in R2
+- Options: process at ingest time (ffmpeg loudnorm filter) or run a one-off normalization job after the fact
+- Needs: ffmpeg available in ingest environment, R2 re-upload of normalized files, decision on target loudness (e.g. -16 LUFS)
+
+### 4. Media lock field
+- Add `locked boolean DEFAULT false` to `species_recordings` and `species_images`
+- Locked items are undeletable: ingest cleanup and admin delete both skip/reject locked records
+- Intended for admin-uploaded media that should survive reingestions
+- Needs: migration, `just generate`, ingest cleanup logic update, admin UI toggle, backend delete guards
+
+### 5. Explore -- region filter
 - Region codes are NOT stored in the DB; intersect on demand instead
 - Flow: user picks state → backend proxy → eBird `GET /v2/ref/region/list/subnational2/{stateCode}` → user picks county → `GET /v2/product/spplist/{countyCode}` → intersect species codes with our catalog
 - Must proxy through backend to keep the eBird API key server-side

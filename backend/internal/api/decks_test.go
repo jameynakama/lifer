@@ -22,7 +22,7 @@ type deckStubQuerier struct {
 	listUserDecks            func(ctx context.Context, userID int64) ([]store.ListUserDecksRow, error)
 	createDeck               func(ctx context.Context, arg store.CreateDeckParams) (store.Deck, error)
 	getDeck                  func(ctx context.Context, id int64) (store.Deck, error)
-	updateDeckName           func(ctx context.Context, arg store.UpdateDeckNameParams) (store.Deck, error)
+	updateDeck               func(ctx context.Context, arg store.UpdateDeckParams) (store.Deck, error)
 	deleteDeck               func(ctx context.Context, id int64) error
 	listDeckSpeciesWithPrefs func(ctx context.Context, arg store.ListDeckSpeciesWithPrefsParams) ([]store.ListDeckSpeciesWithPrefsRow, error)
 	addSpeciesToDeck         func(ctx context.Context, arg store.AddSpeciesToDeckParams) error
@@ -40,8 +40,8 @@ func (s *deckStubQuerier) CreateDeck(ctx context.Context, arg store.CreateDeckPa
 func (s *deckStubQuerier) GetDeck(ctx context.Context, id int64) (store.Deck, error) {
 	return s.getDeck(ctx, id)
 }
-func (s *deckStubQuerier) UpdateDeckName(ctx context.Context, arg store.UpdateDeckNameParams) (store.Deck, error) {
-	return s.updateDeckName(ctx, arg)
+func (s *deckStubQuerier) UpdateDeck(ctx context.Context, arg store.UpdateDeckParams) (store.Deck, error) {
+	return s.updateDeck(ctx, arg)
 }
 func (s *deckStubQuerier) DeleteDeck(ctx context.Context, id int64) error {
 	return s.deleteDeck(ctx, id)
@@ -184,7 +184,7 @@ func TestUpdateDeck_RenamesDeck(t *testing.T) {
 		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
 			return store.Deck{ID: id, Name: "Old Name", OwnerID: ownerID(1)}, nil
 		},
-		updateDeckName: func(_ context.Context, arg store.UpdateDeckNameParams) (store.Deck, error) {
+		updateDeck: func(_ context.Context, arg store.UpdateDeckParams) (store.Deck, error) {
 			assert.Equal(t, int64(42), arg.ID)
 			assert.Equal(t, "New Name", arg.Name)
 			return store.Deck{ID: 42, Name: "New Name", OwnerID: ownerID(1)}, nil
@@ -204,6 +204,57 @@ func TestUpdateDeck_RenamesDeck(t *testing.T) {
 	var got store.Deck
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
 	assert.Equal(t, "New Name", got.Name)
+}
+
+func TestUpdateDeck_PassesDescriptionToStore(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, Name: "My Deck", OwnerID: ownerID(1)}, nil
+		},
+		updateDeck: func(_ context.Context, arg store.UpdateDeckParams) (store.Deck, error) {
+			assert.Equal(t, "Updated Name", arg.Name)
+			assert.Equal(t, "Birds that look alike", arg.Description)
+			return store.Deck{ID: 42, Name: "Updated Name", Description: "Birds that look alike", OwnerID: ownerID(1)}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":"Updated Name","description":"Birds that look alike"}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/decks/42", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.updateDeck(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var got store.Deck
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.Equal(t, "Birds that look alike", got.Description)
+}
+
+func TestCreateDeck_PassesDescriptionToStore(t *testing.T) {
+	q := &deckStubQuerier{
+		createDeck: func(_ context.Context, arg store.CreateDeckParams) (store.Deck, error) {
+			assert.Equal(t, "Confusing Woodpeckers", arg.Name)
+			assert.Equal(t, "All with that laughing rattle call", arg.Description)
+			assert.Equal(t, int64(1), arg.OwnerID.Int64)
+			return store.Deck{ID: 7, Name: "Confusing Woodpeckers", Description: "All with that laughing rattle call", OwnerID: ownerID(1)}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":"Confusing Woodpeckers","description":"All with that laughing rattle call"}`
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	w := httptest.NewRecorder()
+
+	h.createDeck(w, r)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	var got store.Deck
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.Equal(t, "All with that laughing rattle call", got.Description)
 }
 
 func TestUpdateDeck_WrongOwner_Returns403(t *testing.T) {

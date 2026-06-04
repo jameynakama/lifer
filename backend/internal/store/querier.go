@@ -12,8 +12,10 @@ import (
 
 type Querier interface {
 	AddSpeciesToDeck(ctx context.Context, arg AddSpeciesToDeckParams) error
+	CloneDeckSpecies(ctx context.Context, arg CloneDeckSpeciesParams) error
 	CountDueCards(ctx context.Context, arg CountDueCardsParams) (int64, error)
 	CreateDeck(ctx context.Context, arg CreateDeckParams) (Deck, error)
+	CreatePresetDeck(ctx context.Context, arg CreatePresetDeckParams) (Deck, error)
 	DeleteCard(ctx context.Context, arg DeleteCardParams) error
 	DeleteDeck(ctx context.Context, id int64) error
 	DeleteImage(ctx context.Context, macaulayID string) error
@@ -42,13 +44,15 @@ type Querier interface {
 	ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, error)
 	ListDeckSpeciesWithPrefs(ctx context.Context, arg ListDeckSpeciesWithPrefsParams) ([]ListDeckSpeciesWithPrefsRow, error)
 	ListIncompleteSpecies(ctx context.Context) ([]string, error)
+	ListPresetDecks(ctx context.Context) ([]ListPresetDecksRow, error)
 	ListSpecies(ctx context.Context, arg ListSpeciesParams) ([]ListSpeciesRow, error)
 	ListUserDecks(ctx context.Context, userID int64) ([]ListUserDecksRow, error)
 	RemoveSpeciesFromDeck(ctx context.Context, arg RemoveSpeciesFromDeckParams) error
 	SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]SearchSpeciesRow, error)
 	UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error)
-	UpdateDeckName(ctx context.Context, arg UpdateDeckNameParams) (Deck, error)
+	UpdateDeck(ctx context.Context, arg UpdateDeckParams) (Deck, error)
 	UpsertCard(ctx context.Context, arg UpsertCardParams) error
+	UpsertCardsForDeck(ctx context.Context, arg UpsertCardsForDeckParams) error
 	UpsertPreferences(ctx context.Context, arg UpsertPreferencesParams) (UserSpeciesPreference, error)
 	UpsertRecording(ctx context.Context, arg UpsertRecordingParams) (SpeciesRecording, error)
 	UpsertSpecies(ctx context.Context, arg UpsertSpeciesParams) (Species, error)

@@ -270,4 +270,40 @@ describe('Deck detail page', () => {
       expect(screen.getByRole('button', { name: /toggle audio/i })).not.toBeDisabled()
     })
   })
+
+  it('shows description returned from API', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === 'DELETE') return Promise.resolve({ ok: true })
+      if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: 'My Deck', description: 'Birds that look alike', audio_due: 0, image_due: 0 }) })
+    }))
+    render(DeckDetailPage)
+    await vi.waitFor(() => {
+      expect(screen.getByText(/birds that look alike/i)).toBeInTheDocument()
+    })
+  })
+
+  it('sends updated description in PATCH when description edited', async () => {
+    let patchBody: Record<string, unknown> | null = null
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === 'PATCH') {
+        patchBody = JSON.parse(opts.body as string)
+        return Promise.resolve({ ok: true })
+      }
+      if (opts?.method === 'DELETE') return Promise.resolve({ ok: true })
+      if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: 'My Deck', description: 'Old desc', audio_due: 0, image_due: 0 }) })
+    }))
+    render(DeckDetailPage)
+    await vi.waitFor(() => screen.getByText(/old desc/i))
+    await fireEvent.click(screen.getByRole('button', { name: /edit description/i }))
+    const input = screen.getByDisplayValue('Old desc')
+    await fireEvent.input(input, { target: { value: 'New desc' } })
+    await fireEvent.blur(input)
+    await vi.waitFor(() => { expect(patchBody?.description).toBe('New desc') })
+  })
 })

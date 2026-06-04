@@ -5,6 +5,7 @@
   let decks: Deck[] = $state([])
   let loading = $state(true)
   let newName = $state('')
+  let newDescription = $state('')
   let creating = $state(false)
   let practiceMode = $state(false)
 
@@ -29,12 +30,13 @@
       const res = await fetch('/api/v1/decks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim() }),
+        body: JSON.stringify({ name: newName.trim(), description: newDescription.trim() || undefined }),
       })
       if (res.ok) {
         const created = await res.json()
         decks = [...decks, { ...created, audio_due: 0, image_due: 0 }]
         newName = ''
+        newDescription = ''
       }
     } finally {
       creating = false
@@ -75,12 +77,20 @@
   {/if}
 
   <form class="create-form" onsubmit={(e) => { e.preventDefault(); createDeck() }}>
-    <input
-      type="text"
-      bind:value={newName}
-      placeholder="Deck name"
-      disabled={creating}
-    />
+    <div class="create-fields">
+      <input
+        type="text"
+        bind:value={newName}
+        placeholder="Deck name"
+        disabled={creating}
+      />
+      <input
+        type="text"
+        bind:value={newDescription}
+        placeholder="Description (optional)"
+        disabled={creating}
+      />
+    </div>
     <button type="submit" disabled={creating || !newName.trim()}>Create</button>
   </form>
 
@@ -92,7 +102,12 @@
     <ul class="deck-list">
       {#each decks as deck (deck.id)}
         <li class="deck-row">
-          <a href="/decks/{deck.id}" class="deck-name">{deck.name}</a>
+          <div class="deck-info">
+            <a href="/decks/{deck.id}" class="deck-name">{deck.name}</a>
+            {#if deck.description}
+              <span class="deck-description">{deck.description}</span>
+            {/if}
+          </div>
           <div class="deck-meta">
             {#if practiceMode}
               <button
@@ -173,9 +188,16 @@
   .create-form {
     display: flex;
     gap: 0.5rem;
+    align-items: flex-start;
+  }
+  .create-fields {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.375rem;
   }
   .create-form input {
-    flex: 1;
+    width: 100%;
     background: var(--surface);
     border: 1px solid var(--border);
     color: var(--text);
@@ -183,6 +205,7 @@
     padding: 0.5rem 0.75rem;
     font-size: 0.9375rem;
     font-family: inherit;
+    box-sizing: border-box;
   }
   .create-form button {
     background: var(--accent);
@@ -222,12 +245,25 @@
       -3px 5px 0 1px var(--border),
       var(--shadow);
   }
+  .deck-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.125rem;
+    flex: 1;
+    min-width: 0;
+  }
   .deck-name {
     color: var(--text);
     font-weight: 600;
     text-decoration: none;
     font-size: 0.9375rem;
-    flex: 1;
+  }
+  .deck-description {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .deck-meta {
     display: flex;

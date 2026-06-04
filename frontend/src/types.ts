@@ -19,6 +19,7 @@ export interface BirdCard {
 export interface Deck {
     id: number;
     name: string;
+    description?: string;
     audio_due: number;
     image_due: number;
 }
