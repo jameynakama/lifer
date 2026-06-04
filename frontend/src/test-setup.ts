@@ -4,3 +4,6 @@ Object.defineProperty(window, 'matchMedia', {
   writable: true,
   value: (query: string) => ({ matches: false, media: query }),
 })
+
+window.HTMLMediaElement.prototype.pause = () => {}
+window.HTMLMediaElement.prototype.play = () => Promise.resolve()
