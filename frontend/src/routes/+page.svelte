@@ -34,7 +34,7 @@
   {#if loading}
     <p class="status">Loading...</p>
   {:else if decks.length === 0}
-    <p class="empty">No decks yet. <a href="/decks">Create one</a> to get started.</p>
+    <p class="empty">No decks yet. <a href="/decks">Create one or clone a Starter Deck</a> to get started.</p>
   {:else}
     <DashboardStats {audioDue} {imageDue} {nextDueAt} />
     <DeckList {decks} onPractice={startPractice} />

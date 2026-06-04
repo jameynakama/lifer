@@ -150,6 +150,43 @@ describe('Decks page', () => {
     await vi.waitFor(() => { expect((body as Record<string, unknown>).description).toBe('A description') })
   })
 
+  it('shows starter decks section with preset decks', async () => {
+    const presets = [
+      { id: 10, name: 'Confusing Woodpeckers', description: 'Rattle calls', species_count: 5 },
+    ]
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/presets')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(presets) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks: [], next_due_at: null }) })
+    }))
+    render(DecksPage)
+    await vi.waitFor(() => {
+      expect(screen.getByText(/starter decks/i)).toBeInTheDocument()
+      expect(screen.getByText(/confusing woodpeckers/i)).toBeInTheDocument()
+      expect(screen.getByText(/5 species/i)).toBeInTheDocument()
+    })
+  })
+
+  it('clones a preset deck and navigates to the new deck', async () => {
+    const presets = [{ id: 10, name: 'Confusing Woodpeckers', description: '', species_count: 3 }]
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === 'POST' && url.includes('/clone')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 99, name: 'Confusing Woodpeckers', audio_due: 0, image_due: 0 }) })
+      }
+      if (url.includes('/presets')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(presets) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks: [], next_due_at: null }) })
+    }))
+    render(DecksPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /clone/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /clone/i }))
+    await vi.waitFor(() => {
+      expect(goto).toHaveBeenCalledWith('/decks/99')
+    })
+  })
+
   it('hides due badges in practice mode', async () => {
     const deckWithDue = [{ id: 1, name: 'My Warblers', audio_due: 2, image_due: 1 }]
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({

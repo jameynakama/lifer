@@ -29,6 +29,13 @@ export interface DecksResponse {
     next_due_at: string | null;
 }
 
+export interface PresetDeck {
+    id: number;
+    name: string;
+    description: string;
+    species_count: number;
+}
+
 export interface Species {
     ebird_code: string;
     common_name: string;

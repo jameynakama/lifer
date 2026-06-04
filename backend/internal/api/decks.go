@@ -30,7 +30,7 @@ type addSpeciesRequest struct {
 }
 
 // deckOwnerCheck fetches the deck, writes 404/403 and returns false if the
-// requesting user does not own it.
+// requesting user does not own it. Admins bypass the ownership check.
 func (h *Handler) deckOwnerCheck(w http.ResponseWriter, r *http.Request, deckID, userID int64) bool {
 	deck, err := h.queries.GetDeck(r.Context(), deckID)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -42,11 +42,81 @@ func (h *Handler) deckOwnerCheck(w http.ResponseWriter, r *http.Request, deckID,
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return false
 	}
-	if !deck.OwnerID.Valid || deck.OwnerID.Int64 != userID {
+	isAdmin := auth.IsAdminFromCtx(r.Context())
+	if !isAdmin && (!deck.OwnerID.Valid || deck.OwnerID.Int64 != userID) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return false
 	}
 	return true
+}
+
+func (h *Handler) listPresetDecks(w http.ResponseWriter, r *http.Request) {
+	decks, err := h.queries.ListPresetDecks(r.Context())
+	if err != nil {
+		log.Printf("ListPresetDecks error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	if decks == nil {
+		decks = []store.ListPresetDecksRow{}
+	}
+	writeJSON(w, http.StatusOK, decks)
+}
+
+func (h *Handler) cloneDeck(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+
+	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid deck id", http.StatusBadRequest)
+		return
+	}
+
+	src, err := h.queries.GetDeck(r.Context(), deckID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("GetDeck error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	if src.OwnerID.Valid {
+		http.Error(w, "can only clone preset decks", http.StatusBadRequest)
+		return
+	}
+
+	newDeck, err := h.queries.CreateDeck(r.Context(), store.CreateDeckParams{
+		Name:        src.Name,
+		Description: src.Description,
+		OwnerID:     pgtype.Int8{Int64: userID, Valid: true},
+	})
+	if err != nil {
+		log.Printf("CreateDeck (clone) error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.queries.CloneDeckSpecies(r.Context(), store.CloneDeckSpeciesParams{
+		DeckID:   deckID,
+		DeckID_2: newDeck.ID,
+	}); err != nil {
+		log.Printf("CloneDeckSpecies error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.queries.UpsertCardsForDeck(r.Context(), store.UpsertCardsForDeckParams{
+		UserID: userID,
+		DeckID: newDeck.ID,
+	}); err != nil {
+		log.Printf("UpsertCardsForDeck error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, newDeck)
 }
 
 func (h *Handler) getDeckDetail(w http.ResponseWriter, r *http.Request) {

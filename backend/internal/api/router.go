@@ -49,6 +49,8 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		r.Get("/auth/google/callback", h.googleCallback)
 		r.Post("/auth/logout", h.logout)
 
+		r.Get("/decks/presets", h.listPresetDecks)
+
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth(cfg.JWTSecret))
 			r.Get("/me", h.getMe)
@@ -58,6 +60,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			r.Get("/decks/{id}", h.getDeckDetail)
 			r.Patch("/decks/{id}", h.updateDeck)
 			r.Delete("/decks/{id}", h.deleteDeck)
+			r.Post("/decks/{id}/clone", h.cloneDeck)
 
 			r.Get("/decks/{id}/species", h.listDeckSpecies)
 			r.Post("/decks/{id}/species", h.addSpeciesToDeck)
@@ -80,6 +83,10 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			r.Post("/species/{ebird_code}/recordings", h.adminUploadRecording)
 			r.Delete("/species/{ebird_code}/images/{macaulay_id}", h.adminDeleteImage)
 			r.Delete("/species/{ebird_code}/recordings/{xeno_canto_id}", h.adminDeleteRecording)
+
+			r.Post("/decks", h.adminCreatePresetDeck)
+			r.Patch("/decks/{id}", h.adminUpdatePresetDeck)
+			r.Delete("/decks/{id}", h.adminDeletePresetDeck)
 		})
 	})
 

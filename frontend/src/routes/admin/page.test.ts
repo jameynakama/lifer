@@ -9,4 +9,11 @@ describe('Admin landing page', () => {
     expect(link).toBeInTheDocument()
     expect(link).toHaveAttribute('href', '/admin/species')
   })
+
+  it('renders a link to preset decks admin', () => {
+    render(Page)
+    const link = screen.getByRole('link', { name: /preset decks/i })
+    expect(link).toBeInTheDocument()
+    expect(link).toHaveAttribute('href', '/admin/decks')
+  })
 })

@@ -2,11 +2,13 @@ package api
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
@@ -176,6 +178,110 @@ func (h *Handler) adminDeleteImage(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.queries.DeleteImage(r.Context(), id); err != nil {
 		log.Printf("admin: delete image DB %s: %v", id, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) adminCreatePresetDeck(w http.ResponseWriter, r *http.Request) {
+	var req createDeckRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+	var desc string
+	if req.Description != nil {
+		desc = *req.Description
+	}
+	deck, err := h.queries.CreatePresetDeck(r.Context(), store.CreatePresetDeckParams{
+		Name:        req.Name,
+		Description: desc,
+	})
+	if err != nil {
+		log.Printf("adminCreatePresetDeck error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusCreated, deck)
+}
+
+func (h *Handler) adminUpdatePresetDeck(w http.ResponseWriter, r *http.Request) {
+	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid deck id", http.StatusBadRequest)
+		return
+	}
+
+	deck, err := h.queries.GetDeck(r.Context(), deckID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("adminUpdatePresetDeck GetDeck error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	if deck.OwnerID.Valid {
+		http.Error(w, "not a preset deck", http.StatusBadRequest)
+		return
+	}
+
+	var req updateDeckRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if req.Name == "" {
+		http.Error(w, "name is required", http.StatusBadRequest)
+		return
+	}
+	var desc string
+	if req.Description != nil {
+		desc = *req.Description
+	}
+	updated, err := h.queries.UpdateDeck(r.Context(), store.UpdateDeckParams{
+		ID:          deckID,
+		Name:        req.Name,
+		Description: desc,
+	})
+	if err != nil {
+		log.Printf("adminUpdatePresetDeck UpdateDeck error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, updated)
+}
+
+func (h *Handler) adminDeletePresetDeck(w http.ResponseWriter, r *http.Request) {
+	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid deck id", http.StatusBadRequest)
+		return
+	}
+
+	deck, err := h.queries.GetDeck(r.Context(), deckID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("adminDeletePresetDeck GetDeck error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	if deck.OwnerID.Valid {
+		http.Error(w, "not a preset deck", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.queries.DeleteDeck(r.Context(), deckID); err != nil {
+		log.Printf("adminDeletePresetDeck DeleteDeck error: %v", err)
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}

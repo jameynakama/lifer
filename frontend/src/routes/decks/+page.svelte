@@ -1,13 +1,16 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
-  import type { Deck, DecksResponse } from '../../types'
+  import type { Deck, DecksResponse, PresetDeck } from '../../types'
 
   let decks: Deck[] = $state([])
+  let presetDecks: PresetDeck[] = $state([])
   let loading = $state(true)
+  let presetsLoading = $state(true)
   let newName = $state('')
   let newDescription = $state('')
   let creating = $state(false)
   let practiceMode = $state(false)
+  let cloning: Set<number> = $state(new Set())
 
   async function loadDecks() {
     try {
@@ -20,6 +23,30 @@
       // network error, loading still ends
     } finally {
       loading = false
+    }
+  }
+
+  async function loadPresetDecks() {
+    try {
+      const res = await fetch('/api/v1/decks/presets')
+      if (res.ok) presetDecks = await res.json()
+    } catch {
+      // network error
+    } finally {
+      presetsLoading = false
+    }
+  }
+
+  async function cloneDeck(id: number) {
+    cloning = new Set([...cloning, id])
+    try {
+      const res = await fetch(`/api/v1/decks/${id}/clone`, { method: 'POST' })
+      if (res.ok) {
+        const created = await res.json()
+        goto(`/decks/${created.id}`)
+      }
+    } finally {
+      cloning = new Set([...cloning].filter((c) => c !== id))
     }
   }
 
@@ -56,6 +83,7 @@
   }
 
   loadDecks()
+  loadPresetDecks()
 </script>
 
 <div class="decks-page">
@@ -97,7 +125,7 @@
   {#if loading}
     <p class="status">Loading...</p>
   {:else if decks.length === 0}
-    <p class="empty">No decks yet. Create your first one above.</p>
+    <p class="empty">No decks yet. Create one to get started, or clone a Starter Deck below.</p>
   {:else}
     <ul class="deck-list">
       {#each decks as deck (deck.id)}
@@ -136,6 +164,31 @@
               {/if}
             {/if}
             <button class="btn-delete" onclick={() => deleteDeck(deck.id)}>Delete</button>
+          </div>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+  {#if !presetsLoading && presetDecks.length > 0}
+    <hr class="section-divider" />
+    <h2 class="section-heading">Starter Decks</h2>
+    <p class="section-subheading">Clone one to get started instantly</p>
+    <ul class="deck-list">
+      {#each presetDecks as preset (preset.id)}
+        <li class="deck-row">
+          <div class="deck-info">
+            <span class="deck-name">{preset.name}</span>
+            {#if preset.description}
+              <span class="deck-description">{preset.description}</span>
+            {/if}
+            <span class="species-count">{preset.species_count} species</span>
+          </div>
+          <div class="deck-meta">
+            <button
+              class="btn-clone"
+              disabled={cloning.has(preset.id)}
+              onclick={() => cloneDeck(preset.id)}
+            >Clone</button>
           </div>
         </li>
       {/each}
@@ -301,5 +354,40 @@
     text-align: center;
     color: var(--text-muted);
     padding: 2rem 0;
+  }
+  .section-divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 0;
+  }
+  .section-heading {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+  .section-subheading {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin: -0.75rem 0 0;
+  }
+  .species-count {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+  .btn-clone {
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 8px;
+    padding: 0.375rem 0.75rem;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .btn-clone:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>

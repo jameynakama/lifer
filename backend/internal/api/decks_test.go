@@ -21,6 +21,7 @@ type deckStubQuerier struct {
 	store.Querier
 	listUserDecks            func(ctx context.Context, userID int64) ([]store.ListUserDecksRow, error)
 	createDeck               func(ctx context.Context, arg store.CreateDeckParams) (store.Deck, error)
+	createPresetDeck         func(ctx context.Context, arg store.CreatePresetDeckParams) (store.Deck, error)
 	getDeck                  func(ctx context.Context, id int64) (store.Deck, error)
 	updateDeck               func(ctx context.Context, arg store.UpdateDeckParams) (store.Deck, error)
 	deleteDeck               func(ctx context.Context, id int64) error
@@ -29,6 +30,9 @@ type deckStubQuerier struct {
 	removeSpeciesFromDeck    func(ctx context.Context, arg store.RemoveSpeciesFromDeckParams) error
 	upsertCard               func(ctx context.Context, arg store.UpsertCardParams) error
 	getNextDueAt             func(ctx context.Context, userID int64) (pgtype.Timestamptz, error)
+	listPresetDecks          func(ctx context.Context) ([]store.ListPresetDecksRow, error)
+	cloneDeckSpecies         func(ctx context.Context, arg store.CloneDeckSpeciesParams) error
+	upsertCardsForDeck       func(ctx context.Context, arg store.UpsertCardsForDeckParams) error
 }
 
 func (s *deckStubQuerier) ListUserDecks(ctx context.Context, userID int64) ([]store.ListUserDecksRow, error) {
@@ -63,6 +67,18 @@ func (s *deckStubQuerier) GetNextDueAt(ctx context.Context, userID int64) (pgtyp
 		return s.getNextDueAt(ctx, userID)
 	}
 	return pgtype.Timestamptz{}, nil
+}
+func (s *deckStubQuerier) ListPresetDecks(ctx context.Context) ([]store.ListPresetDecksRow, error) {
+	return s.listPresetDecks(ctx)
+}
+func (s *deckStubQuerier) CreatePresetDeck(ctx context.Context, arg store.CreatePresetDeckParams) (store.Deck, error) {
+	return s.createPresetDeck(ctx, arg)
+}
+func (s *deckStubQuerier) CloneDeckSpecies(ctx context.Context, arg store.CloneDeckSpeciesParams) error {
+	return s.cloneDeckSpecies(ctx, arg)
+}
+func (s *deckStubQuerier) UpsertCardsForDeck(ctx context.Context, arg store.UpsertCardsForDeckParams) error {
+	return s.upsertCardsForDeck(ctx, arg)
 }
 
 func ownerID(id int64) pgtype.Int8 {
@@ -479,4 +495,125 @@ func TestRemoveSpeciesFromDeck_RemovesEntry(t *testing.T) {
 
 	assert.Equal(t, http.StatusNoContent, w.Code)
 	assert.True(t, removed)
+}
+
+func TestListPresetDecks_ReturnsList(t *testing.T) {
+	q := &deckStubQuerier{
+		listPresetDecks: func(_ context.Context) ([]store.ListPresetDecksRow, error) {
+			return []store.ListPresetDecksRow{
+				{ID: 1, Name: "Confusing Woodpeckers", Description: "Those rattle calls", SpeciesCount: 5},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/presets", nil)
+	w := httptest.NewRecorder()
+
+	h.listPresetDecks(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []store.ListPresetDecksRow
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Len(t, body, 1)
+	assert.Equal(t, "Confusing Woodpeckers", body[0].Name)
+	assert.Equal(t, int64(5), body[0].SpeciesCount)
+}
+
+func TestCloneDeck_ClonesPresetForUser(t *testing.T) {
+	var clonedFrom, clonedTo int64
+	var cardsForDeck store.UpsertCardsForDeckParams
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			// preset: no owner
+			return store.Deck{ID: id, Name: "Confusing Woodpeckers", Description: "Rattle calls"}, nil
+		},
+		createDeck: func(_ context.Context, arg store.CreateDeckParams) (store.Deck, error) {
+			assert.Equal(t, "Confusing Woodpeckers", arg.Name)
+			assert.Equal(t, "Rattle calls", arg.Description)
+			assert.Equal(t, int64(1), arg.OwnerID.Int64)
+			return store.Deck{ID: 99, Name: arg.Name, Description: arg.Description, OwnerID: ownerID(1)}, nil
+		},
+		cloneDeckSpecies: func(_ context.Context, arg store.CloneDeckSpeciesParams) error {
+			clonedFrom = arg.DeckID
+			clonedTo = arg.DeckID_2
+			return nil
+		},
+		upsertCardsForDeck: func(_ context.Context, arg store.UpsertCardsForDeckParams) error {
+			cardsForDeck = arg
+			return nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks/7/clone", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "7")
+	w := httptest.NewRecorder()
+
+	h.cloneDeck(w, r)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	var got store.Deck
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.Equal(t, int64(99), got.ID)
+	assert.Equal(t, int64(7), clonedFrom)
+	assert.Equal(t, int64(99), clonedTo)
+	assert.Equal(t, int64(1), cardsForDeck.UserID)
+	assert.Equal(t, int64(99), cardsForDeck.DeckID)
+}
+
+func TestCloneDeck_UserOwnedDeck_Returns400(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(1)}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks/7/clone", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "7")
+	w := httptest.NewRecorder()
+
+	h.cloneDeck(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestCloneDeck_NotFound_Returns404(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, _ int64) (store.Deck, error) {
+			return store.Deck{}, pgx.ErrNoRows
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks/99/clone", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "99")
+	w := httptest.NewRecorder()
+
+	h.cloneDeck(w, r)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestUpdateDeck_AdminCanUpdatePresetDeck(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			// preset: no owner
+			return store.Deck{ID: id, Name: "Old Name"}, nil
+		},
+		updateDeck: func(_ context.Context, arg store.UpdateDeckParams) (store.Deck, error) {
+			return store.Deck{ID: 7, Name: arg.Name}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":"New Name"}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/decks/7", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "7")
+	w := httptest.NewRecorder()
+
+	h.updateDeck(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
 }

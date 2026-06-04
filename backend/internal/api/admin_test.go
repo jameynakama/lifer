@@ -264,3 +264,112 @@ func TestAdminUploadRecording_UploadsToR2AndInsertsDB(t *testing.T) {
 	assert.Equal(t, "song", insertedParams.Type)
 	assert.True(t, strings.HasPrefix(insertedParams.XenoCantoID, "admin-"))
 }
+
+func TestAdminCreatePresetDeck_CreatesAndReturns(t *testing.T) {
+	q := &deckStubQuerier{
+		createPresetDeck: func(_ context.Context, arg store.CreatePresetDeckParams) (store.Deck, error) {
+			assert.Equal(t, "Confusing Woodpeckers", arg.Name)
+			assert.Equal(t, "Those rattle calls", arg.Description)
+			return store.Deck{ID: 1, Name: arg.Name, Description: arg.Description}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":"Confusing Woodpeckers","description":"Those rattle calls"}`
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/admin/decks", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectAdmin(r, 1)
+	w := httptest.NewRecorder()
+
+	h.adminCreatePresetDeck(w, r)
+
+	assert.Equal(t, http.StatusCreated, w.Code)
+	var got store.Deck
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.Equal(t, "Confusing Woodpeckers", got.Name)
+}
+
+func TestAdminUpdatePresetDeck_Updates(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, Name: "Old Name"}, nil // preset: no owner
+		},
+		updateDeck: func(_ context.Context, arg store.UpdateDeckParams) (store.Deck, error) {
+			return store.Deck{ID: arg.ID, Name: arg.Name, Description: arg.Description}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":"New Name","description":"Updated desc"}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/decks/1", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "1")
+	w := httptest.NewRecorder()
+
+	h.adminUpdatePresetDeck(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var got store.Deck
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.Equal(t, "New Name", got.Name)
+	assert.Equal(t, "Updated desc", got.Description)
+}
+
+func TestAdminUpdatePresetDeck_UserOwnedDeck_Returns400(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(99)}, nil // user-owned
+		},
+	}
+	h := makeHandler(q)
+	body := `{"name":"New Name"}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/decks/1", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "1")
+	w := httptest.NewRecorder()
+
+	h.adminUpdatePresetDeck(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestAdminDeletePresetDeck_Deletes(t *testing.T) {
+	deleted := false
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, Name: "Preset"}, nil // preset: no owner
+		},
+		deleteDeck: func(_ context.Context, id int64) error {
+			assert.Equal(t, int64(1), id)
+			deleted = true
+			return nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/decks/1", nil)
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "1")
+	w := httptest.NewRecorder()
+
+	h.adminDeletePresetDeck(w, r)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.True(t, deleted)
+}
+
+func TestAdminDeletePresetDeck_UserOwnedDeck_Returns400(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(99)}, nil // user-owned
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodDelete, "/api/v1/admin/decks/1", nil)
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "1")
+	w := httptest.NewRecorder()
+
+	h.adminDeletePresetDeck(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
