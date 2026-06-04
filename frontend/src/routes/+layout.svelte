@@ -43,7 +43,7 @@
   {:else}
     <div class="app-container">
       <header>
-        <a href="/" class="wordmark">FlockDeck</a>
+        <a href="/" class="wordmark">🐦‍🔥 FlockDeck</a>
         <nav>
           <a href="/decks">Decks</a>
           <a href="/explore">Explore</a>
