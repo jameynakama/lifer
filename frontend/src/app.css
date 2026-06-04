@@ -19,12 +19,12 @@
 
 /* Light theme tokens (explicit override) */
 :root[data-theme="light"] {
-  --bg: #f8f7f4;
-  --surface: #ffffff;
-  --border: #e2e8f0;
-  --text: #1c1917;
-  --text-muted: #78716c;
-  --text-secondary: #57534e;
+  --bg: #f1f5f1;
+  --surface: #f8fbf8;
+  --border: #cddacd;
+  --text: #1a201a;
+  --text-muted: #6b7a6b;
+  --text-secondary: #526452;
   --accent: #4f7942;
   --accent-hover: #3d6133;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
@@ -33,12 +33,12 @@
 /* Respect OS light preference unless user has overridden to dark */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --bg: #f8f7f4;
-    --surface: #ffffff;
-    --border: #e2e8f0;
-    --text: #1c1917;
-    --text-muted: #a8a29e;
-    --text-secondary: #78716c;
+    --bg: #f1f5f1;
+    --surface: #f8fbf8;
+    --border: #cddacd;
+    --text: #1a201a;
+    --text-muted: #6b7a6b;
+    --text-secondary: #526452;
     --accent: #4f7942;
     --accent-hover: #3d6133;
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
