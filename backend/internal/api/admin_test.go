@@ -32,6 +32,9 @@ type adminStubQuerier struct {
 	setRecordingLocked   func(ctx context.Context, arg store.SetRecordingLockedParams) error
 	getUsers             func(ctx context.Context) ([]store.User, error)
 	setUserIsAdmin       func(ctx context.Context, arg store.SetUserIsAdminParams) error
+	listAllUserDecks     func(ctx context.Context) ([]store.ListAllUserDecksRow, error)
+	getDeckWithOwner     func(ctx context.Context, id int64) (store.GetDeckWithOwnerRow, error)
+	listDeckSpeciesSimple func(ctx context.Context, deckID int64) ([]store.ListDeckSpeciesSimpleRow, error)
 }
 
 func (s *adminStubQuerier) GetImageByID(ctx context.Context, macaulayID string) (store.GetImageByIDRow, error) {
@@ -78,6 +81,21 @@ func (s *adminStubQuerier) SetUserIsAdmin(ctx context.Context, arg store.SetUser
 		return s.setUserIsAdmin(ctx, arg)
 	}
 	return nil
+}
+func (s *adminStubQuerier) ListAllUserDecks(ctx context.Context) ([]store.ListAllUserDecksRow, error) {
+	if s.listAllUserDecks != nil {
+		return s.listAllUserDecks(ctx)
+	}
+	return nil, nil
+}
+func (s *adminStubQuerier) GetDeckWithOwner(ctx context.Context, id int64) (store.GetDeckWithOwnerRow, error) {
+	return s.getDeckWithOwner(ctx, id)
+}
+func (s *adminStubQuerier) ListDeckSpeciesSimple(ctx context.Context, deckID int64) ([]store.ListDeckSpeciesSimpleRow, error) {
+	if s.listDeckSpeciesSimple != nil {
+		return s.listDeckSpeciesSimple(ctx, deckID)
+	}
+	return nil, nil
 }
 
 // injectAdmin sets userID and isAdmin=true in the request context.
@@ -527,6 +545,65 @@ func TestAdminSetUserIsAdmin_StoreError_Returns500(t *testing.T) {
 	w := httptest.NewRecorder()
 
 	h.adminSetUserIsAdmin(w, r)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestAdminListUserDecks_ReturnsList(t *testing.T) {
+	q := &adminStubQuerier{
+		listAllUserDecks: func(_ context.Context) ([]store.ListAllUserDecksRow, error) {
+			return []store.ListAllUserDecksRow{
+				{ID: 1, Name: "My Warblers", OwnerName: "Alice", OwnerEmail: "alice@example.com", SpeciesCount: 12},
+				{ID: 2, Name: "Shore Birds", OwnerName: "Bob", OwnerEmail: "bob@example.com", SpeciesCount: 7},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/decks", nil)
+	r = injectAdmin(r, 1)
+	w := httptest.NewRecorder()
+
+	h.adminListUserDecks(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var got []store.ListAllUserDecksRow
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.Len(t, got, 2)
+	assert.Equal(t, "Alice", got[0].OwnerName)
+}
+
+func TestAdminListUserDecks_Empty_ReturnsEmptyArray(t *testing.T) {
+	q := &adminStubQuerier{
+		listAllUserDecks: func(_ context.Context) ([]store.ListAllUserDecksRow, error) {
+			return nil, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/decks", nil)
+	r = injectAdmin(r, 1)
+	w := httptest.NewRecorder()
+
+	h.adminListUserDecks(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var got []store.ListAllUserDecksRow
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.NotNil(t, got)
+	assert.Len(t, got, 0)
+}
+
+func TestAdminListUserDecks_StoreError_Returns500(t *testing.T) {
+	q := &adminStubQuerier{
+		listAllUserDecks: func(_ context.Context) ([]store.ListAllUserDecksRow, error) {
+			return nil, errors.New("db down")
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/decks", nil)
+	r = injectAdmin(r, 1)
+	w := httptest.NewRecorder()
+
+	h.adminListUserDecks(w, r)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }

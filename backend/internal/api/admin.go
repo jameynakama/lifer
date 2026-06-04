@@ -362,6 +362,19 @@ func (h *Handler) adminSetRecordingLocked(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func (h *Handler) adminListUserDecks(w http.ResponseWriter, r *http.Request) {
+	decks, err := h.queries.ListAllUserDecks(r.Context())
+	if err != nil {
+		log.Printf("admin: list user decks: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	if decks == nil {
+		decks = []store.ListAllUserDecksRow{}
+	}
+	writeJSON(w, http.StatusOK, decks)
+}
+
 func (h *Handler) adminGetUsers(w http.ResponseWriter, r *http.Request) {
 	users, err := h.queries.GetUsers(r.Context())
 	if err != nil {
