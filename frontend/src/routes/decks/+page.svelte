@@ -205,7 +205,7 @@
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
+    gap: 1rem;
   }
   .deck-row {
     background: var(--surface);
@@ -215,7 +215,12 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    box-shadow: var(--shadow);
+    box-shadow:
+      -1px 2px 0 0 var(--surface),
+      -1px 2px 0 1px var(--border),
+      -3px 5px 0 0 var(--surface),
+      -3px 5px 0 1px var(--border),
+      var(--shadow);
   }
   .deck-name {
     color: var(--text);

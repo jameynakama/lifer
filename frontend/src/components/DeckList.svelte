@@ -53,7 +53,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: var(--shadow);
+    box-shadow:
+      -1px 2px 0 0 var(--surface),
+      -1px 2px 0 1px var(--border),
+      -3px 5px 0 0 var(--surface),
+      -3px 5px 0 1px var(--border),
+      var(--shadow);
   }
   .deck-name {
     flex: 1;
