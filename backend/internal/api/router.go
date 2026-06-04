@@ -88,6 +88,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			r.Patch("/species/{ebird_code}/recordings/{xeno_canto_id}/locked", h.adminSetRecordingLocked)
 
 			r.Get("/decks", h.adminListUserDecks)
+			r.Get("/decks/{id}/species", h.adminGetDeckSpecies)
 			r.Post("/decks", h.adminCreatePresetDeck)
 			r.Patch("/decks/{id}", h.adminUpdatePresetDeck)
 			r.Delete("/decks/{id}", h.adminDeletePresetDeck)

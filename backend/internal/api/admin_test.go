@@ -11,6 +11,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jameynakama/flockdeck/internal/auth"
 	"github.com/jameynakama/flockdeck/internal/r2"
 	"github.com/jameynakama/flockdeck/internal/store"
@@ -609,4 +610,81 @@ func TestAdminListUserDecks_StoreError_Returns500(t *testing.T) {
 	h.adminListUserDecks(w, r)
 
 	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestAdminGetDeckSpecies_ReturnsDetailAndSpecies(t *testing.T) {
+	q := &adminStubQuerier{
+		getDeckWithOwner: func(_ context.Context, id int64) (store.GetDeckWithOwnerRow, error) {
+			assert.Equal(t, int64(5), id)
+			return store.GetDeckWithOwnerRow{
+				ID:         5,
+				Name:       "My Warblers",
+				OwnerName:  "Alice",
+				OwnerEmail: "alice@example.com",
+			}, nil
+		},
+		listDeckSpeciesSimple: func(_ context.Context, deckID int64) ([]store.ListDeckSpeciesSimpleRow, error) {
+			assert.Equal(t, int64(5), deckID)
+			return []store.ListDeckSpeciesSimpleRow{
+				{EbirdCode: "yewwar", CommonName: "Yellow Warbler", ScientificName: "Spinus tristis"},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/decks/5/species", nil)
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "5")
+	w := httptest.NewRecorder()
+
+	h.adminGetDeckSpecies(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	deck := body["deck"].(map[string]any)
+	assert.Equal(t, "My Warblers", deck["name"])
+	assert.Equal(t, "alice@example.com", deck["owner_email"])
+	species := body["species"].([]any)
+	assert.Len(t, species, 1)
+}
+
+func TestAdminGetDeckSpecies_UnknownDeck_Returns404(t *testing.T) {
+	q := &adminStubQuerier{
+		getDeckWithOwner: func(_ context.Context, id int64) (store.GetDeckWithOwnerRow, error) {
+			return store.GetDeckWithOwnerRow{}, pgx.ErrNoRows
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/decks/99/species", nil)
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "99")
+	w := httptest.NewRecorder()
+
+	h.adminGetDeckSpecies(w, r)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestAdminGetDeckSpecies_NoSpecies_ReturnsEmptyArray(t *testing.T) {
+	q := &adminStubQuerier{
+		getDeckWithOwner: func(_ context.Context, id int64) (store.GetDeckWithOwnerRow, error) {
+			return store.GetDeckWithOwnerRow{ID: 3, Name: "Empty Preset"}, nil
+		},
+		listDeckSpeciesSimple: func(_ context.Context, deckID int64) ([]store.ListDeckSpeciesSimpleRow, error) {
+			return nil, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/decks/3/species", nil)
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "3")
+	w := httptest.NewRecorder()
+
+	h.adminGetDeckSpecies(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	species := body["species"].([]any)
+	assert.Len(t, species, 0)
 }

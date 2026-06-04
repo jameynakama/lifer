@@ -21,6 +21,18 @@ type adminSpeciesDetailResponse struct {
 	Recordings any `json:"recordings"`
 }
 
+type adminDeckInfo struct {
+	ID         int64  `json:"id"`
+	Name       string `json:"name"`
+	OwnerName  string `json:"owner_name"`
+	OwnerEmail string `json:"owner_email"`
+}
+
+type adminDeckDetailResponse struct {
+	Deck    adminDeckInfo                    `json:"deck"`
+	Species []store.ListDeckSpeciesSimpleRow `json:"species"`
+}
+
 var extContentType = map[string]string{
 	".jpg":  "image/jpeg",
 	".jpeg": "image/jpeg",
@@ -373,6 +385,42 @@ func (h *Handler) adminListUserDecks(w http.ResponseWriter, r *http.Request) {
 		decks = []store.ListAllUserDecksRow{}
 	}
 	writeJSON(w, http.StatusOK, decks)
+}
+
+func (h *Handler) adminGetDeckSpecies(w http.ResponseWriter, r *http.Request) {
+	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid deck id", http.StatusBadRequest)
+		return
+	}
+	deck, err := h.queries.GetDeckWithOwner(r.Context(), deckID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("admin: get deck with owner %d: %v", deckID, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	species, err := h.queries.ListDeckSpeciesSimple(r.Context(), deckID)
+	if err != nil {
+		log.Printf("admin: list deck species %d: %v", deckID, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	if species == nil {
+		species = []store.ListDeckSpeciesSimpleRow{}
+	}
+	writeJSON(w, http.StatusOK, adminDeckDetailResponse{
+		Deck: adminDeckInfo{
+			ID:         deck.ID,
+			Name:       deck.Name,
+			OwnerName:  deck.OwnerName,
+			OwnerEmail: deck.OwnerEmail,
+		},
+		Species: species,
+	})
 }
 
 func (h *Handler) adminGetUsers(w http.ResponseWriter, r *http.Request) {
