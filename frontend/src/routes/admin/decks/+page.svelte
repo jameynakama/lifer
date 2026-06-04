@@ -125,7 +125,7 @@
     {:else if userDecks.length === 0}
       <p class="empty">No user decks yet.</p>
     {:else}
-      <ul>
+      <ul class="user-deck-list">
         {#each userDecks as deck (deck.id)}
           <li>
             <div class="deck-main">
@@ -260,12 +260,12 @@
     cursor: pointer;
     font-family: inherit;
   }
-  ul {
+  .user-deck-list {
     list-style: none;
     padding: 0;
     margin: 0;
   }
-  li {
+  .user-deck-list li {
     display: flex;
     flex-direction: column;
     gap: 0.1rem;
@@ -277,11 +277,11 @@
     align-items: baseline;
     gap: 0.5rem;
   }
-  a {
+  .user-deck-list a {
     color: var(--text);
     text-decoration: none;
   }
-  a:hover { color: var(--accent); }
+  .user-deck-list a:hover { color: var(--accent); }
   .muted {
     color: var(--text-muted);
     font-size: 0.8125rem;
