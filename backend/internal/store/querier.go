@@ -42,6 +42,7 @@ type Querier interface {
 	GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]GetSpeciesRecordingsRow, error)
 	GetUserByGoogleID(ctx context.Context, googleID string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
+	GetUsers(ctx context.Context) ([]User, error)
 	ListAllSpecies(ctx context.Context) ([]ListAllSpeciesRow, error)
 	ListCompleteSpeciesEbirdCodes(ctx context.Context) ([]string, error)
 	ListDeckSpeciesWithPrefs(ctx context.Context, arg ListDeckSpeciesWithPrefsParams) ([]ListDeckSpeciesWithPrefsRow, error)
@@ -53,6 +54,7 @@ type Querier interface {
 	SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]SearchSpeciesRow, error)
 	SetImageLocked(ctx context.Context, arg SetImageLockedParams) error
 	SetRecordingLocked(ctx context.Context, arg SetRecordingLockedParams) error
+	SetUserIsAdmin(ctx context.Context, arg SetUserIsAdminParams) error
 	UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error)
 	UpdateDeck(ctx context.Context, arg UpdateDeckParams) (Deck, error)
 	UpsertCard(ctx context.Context, arg UpsertCardParams) error

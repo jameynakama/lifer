@@ -47,6 +47,52 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 	return i, err
 }
 
+const getUsers = `-- name: GetUsers :many
+SELECT id, google_id, email, name, picture, is_admin, created_at FROM users
+`
+
+func (q *Queries) GetUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.Query(ctx, getUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.GoogleID,
+			&i.Email,
+			&i.Name,
+			&i.Picture,
+			&i.IsAdmin,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const setUserIsAdmin = `-- name: SetUserIsAdmin :exec
+UPDATE users SET is_admin = $2 WHERE id = $1
+`
+
+type SetUserIsAdminParams struct {
+	ID      int64 `db:"id" json:"id"`
+	IsAdmin bool  `db:"is_admin" json:"is_admin"`
+}
+
+func (q *Queries) SetUserIsAdmin(ctx context.Context, arg SetUserIsAdminParams) error {
+	_, err := q.db.Exec(ctx, setUserIsAdmin, arg.ID, arg.IsAdmin)
+	return err
+}
+
 const upsertUser = `-- name: UpsertUser :one
 INSERT INTO users (google_id, email, name, picture)
 VALUES ($1, $2, $3, $4)

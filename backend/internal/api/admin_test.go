@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -29,6 +30,8 @@ type adminStubQuerier struct {
 	upsertRecording      func(ctx context.Context, arg store.UpsertRecordingParams) (store.SpeciesRecording, error)
 	setImageLocked       func(ctx context.Context, arg store.SetImageLockedParams) error
 	setRecordingLocked   func(ctx context.Context, arg store.SetRecordingLockedParams) error
+	getUsers             func(ctx context.Context) ([]store.User, error)
+	setUserIsAdmin       func(ctx context.Context, arg store.SetUserIsAdminParams) error
 }
 
 func (s *adminStubQuerier) GetImageByID(ctx context.Context, macaulayID string) (store.GetImageByIDRow, error) {
@@ -66,6 +69,15 @@ func (s *adminStubQuerier) UpsertSpeciesImage(ctx context.Context, arg store.Ups
 }
 func (s *adminStubQuerier) UpsertRecording(ctx context.Context, arg store.UpsertRecordingParams) (store.SpeciesRecording, error) {
 	return s.upsertRecording(ctx, arg)
+}
+func (s *adminStubQuerier) GetUsers(ctx context.Context) ([]store.User, error) {
+	return s.getUsers(ctx)
+}
+func (s *adminStubQuerier) SetUserIsAdmin(ctx context.Context, arg store.SetUserIsAdminParams) error {
+	if s.setUserIsAdmin != nil {
+		return s.setUserIsAdmin(ctx, arg)
+	}
+	return nil
 }
 
 // injectAdmin sets userID and isAdmin=true in the request context.
@@ -386,4 +398,135 @@ func TestAdminDeletePresetDeck_UserOwnedDeck_Returns400(t *testing.T) {
 	h.adminDeletePresetDeck(w, r)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestAdminGetUsers_ReturnsUsers(t *testing.T) {
+	q := &adminStubQuerier{
+		getUsers: func(_ context.Context) ([]store.User, error) {
+			return []store.User{
+				{ID: 1, Name: "Alice", Email: "alice@example.com", IsAdmin: true},
+				{ID: 2, Name: "Bob", Email: "bob@example.com", IsAdmin: false},
+			}, nil
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
+	r = injectAdmin(r, 1)
+	w := httptest.NewRecorder()
+
+	h.adminGetUsers(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var got []store.User
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&got))
+	assert.Len(t, got, 2)
+	assert.Equal(t, "Alice", got[0].Name)
+	assert.Equal(t, "Bob", got[1].Name)
+}
+
+func TestAdminGetUsers_StoreError_Returns500(t *testing.T) {
+	q := &adminStubQuerier{
+		getUsers: func(_ context.Context) ([]store.User, error) {
+			return nil, errors.New("db down")
+		},
+	}
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/admin/users", nil)
+	r = injectAdmin(r, 1)
+	w := httptest.NewRecorder()
+
+	h.adminGetUsers(w, r)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
+}
+
+func TestAdminSetUserIsAdmin_SetsAdmin(t *testing.T) {
+	var called store.SetUserIsAdminParams
+	q := &adminStubQuerier{
+		setUserIsAdmin: func(_ context.Context, arg store.SetUserIsAdminParams) error {
+			called = arg
+			return nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"is_admin":true}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/users/42", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.adminSetUserIsAdmin(w, r)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.Equal(t, int64(42), called.ID)
+	assert.True(t, called.IsAdmin)
+}
+
+func TestAdminSetUserIsAdmin_RemovesAdmin(t *testing.T) {
+	var called store.SetUserIsAdminParams
+	q := &adminStubQuerier{
+		setUserIsAdmin: func(_ context.Context, arg store.SetUserIsAdminParams) error {
+			called = arg
+			return nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"is_admin":false}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/users/7", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "7")
+	w := httptest.NewRecorder()
+
+	h.adminSetUserIsAdmin(w, r)
+
+	assert.Equal(t, http.StatusNoContent, w.Code)
+	assert.Equal(t, int64(7), called.ID)
+	assert.False(t, called.IsAdmin)
+}
+
+func TestAdminSetUserIsAdmin_InvalidID_Returns400(t *testing.T) {
+	h := makeHandler(&adminStubQuerier{})
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/users/notanid", strings.NewReader(`{"is_admin":true}`))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "notanid")
+	w := httptest.NewRecorder()
+
+	h.adminSetUserIsAdmin(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestAdminSetUserIsAdmin_InvalidBody_Returns400(t *testing.T) {
+	h := makeHandler(&adminStubQuerier{})
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/users/1", strings.NewReader(`not json`))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "1")
+	w := httptest.NewRecorder()
+
+	h.adminSetUserIsAdmin(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestAdminSetUserIsAdmin_StoreError_Returns500(t *testing.T) {
+	q := &adminStubQuerier{
+		setUserIsAdmin: func(_ context.Context, arg store.SetUserIsAdminParams) error {
+			return errors.New("db down")
+		},
+	}
+	h := makeHandler(q)
+	body := `{"is_admin":true}`
+	r := httptest.NewRequest(http.MethodPatch, "/api/v1/admin/users/1", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectAdmin(r, 1)
+	r = withChiParam(r, "id", "1")
+	w := httptest.NewRecorder()
+
+	h.adminSetUserIsAdmin(w, r)
+
+	assert.Equal(t, http.StatusInternalServerError, w.Code)
 }

@@ -90,6 +90,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			r.Post("/decks", h.adminCreatePresetDeck)
 			r.Patch("/decks/{id}", h.adminUpdatePresetDeck)
 			r.Delete("/decks/{id}", h.adminDeletePresetDeck)
+
+			r.Get("/users", h.adminGetUsers)
+			r.Patch("/users/{id}", h.adminSetUserIsAdmin)
 		})
 	})
 

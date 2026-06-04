@@ -361,3 +361,39 @@ func (h *Handler) adminSetRecordingLocked(w http.ResponseWriter, r *http.Request
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *Handler) adminGetUsers(w http.ResponseWriter, r *http.Request) {
+	users, err := h.queries.GetUsers(r.Context())
+	if err != nil {
+		log.Printf("admin: get users: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, users)
+}
+
+func (h *Handler) adminSetUserIsAdmin(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	id, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		http.Error(w, "invalid id", http.StatusBadRequest)
+		return
+	}
+	var req struct {
+		IsAdmin bool `json:"is_admin"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if err := h.queries.SetUserIsAdmin(r.Context(), store.SetUserIsAdminParams{
+		ID:      id,
+		IsAdmin: req.IsAdmin,
+	}); err != nil {
+		log.Printf("admin: set user is_admin %d: %v", id, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}

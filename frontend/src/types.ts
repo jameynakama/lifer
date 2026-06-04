@@ -48,3 +48,12 @@ export interface SpeciesListItem {
     scientific_name: string;
     image_url: string | null;
 }
+
+export interface User {
+  id: number;
+  google_id: string;
+  email: string;
+  name: string;
+  is_admin: boolean;
+  created_at: string;
+}
