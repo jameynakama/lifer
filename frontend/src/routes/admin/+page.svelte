@@ -2,7 +2,7 @@
   <h1>Admin</h1>
   <ul class="section-list">
     <li><a href="/admin/species">Species</a></li>
-    <li><a href="/admin/decks">Preset Decks</a></li>
+    <li><a href="/admin/decks">Decks</a></li>
     <li><a href="/admin/users">Users</a></li>
   </ul>
 </div>

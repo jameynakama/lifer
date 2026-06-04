@@ -12,7 +12,7 @@ describe('Admin landing page', () => {
 
   it('renders a link to preset decks admin', () => {
     render(Page)
-    const link = screen.getByRole('link', { name: /preset decks/i })
+    const link = screen.getByRole('link', { name: /decks/i })
     expect(link).toBeInTheDocument()
     expect(link).toHaveAttribute('href', '/admin/decks')
   })
