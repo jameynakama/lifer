@@ -10,7 +10,7 @@ import (
 )
 
 const deleteRecordingsBySpeciesCode = `-- name: DeleteRecordingsBySpeciesCode :exec
-DELETE FROM species_recordings WHERE species_code = $1
+DELETE FROM species_recordings WHERE species_code = $1 AND NOT locked
 `
 
 func (q *Queries) DeleteRecordingsBySpeciesCode(ctx context.Context, speciesCode string) error {
@@ -28,7 +28,7 @@ func (q *Queries) DeleteSpeciesByCode(ctx context.Context, ebirdCode string) err
 }
 
 const deleteSpeciesImagesBySpeciesCode = `-- name: DeleteSpeciesImagesBySpeciesCode :exec
-DELETE FROM species_images WHERE species_code = $1
+DELETE FROM species_images WHERE species_code = $1 AND NOT locked
 `
 
 func (q *Queries) DeleteSpeciesImagesBySpeciesCode(ctx context.Context, speciesCode string) error {
@@ -97,7 +97,7 @@ ON CONFLICT (xeno_canto_id) DO UPDATE
         quality   = EXCLUDED.quality,
         type      = EXCLUDED.type,
         credit    = EXCLUDED.credit
-RETURNING xeno_canto_id, species_code, file_path, quality, type, created_at, credit
+RETURNING xeno_canto_id, species_code, file_path, quality, type, created_at, credit, locked
 `
 
 type UpsertRecordingParams struct {
@@ -127,6 +127,7 @@ func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams
 		&i.Type,
 		&i.CreatedAt,
 		&i.Credit,
+		&i.Locked,
 	)
 	return i, err
 }
@@ -164,7 +165,7 @@ VALUES ($1, $2, $3, $4)
 ON CONFLICT (macaulay_id) DO UPDATE
     SET file_path = EXCLUDED.file_path,
         credit    = EXCLUDED.credit
-RETURNING macaulay_id, species_code, file_path, credit, created_at
+RETURNING macaulay_id, species_code, file_path, credit, created_at, locked
 `
 
 type UpsertSpeciesImageParams struct {
@@ -188,6 +189,7 @@ func (q *Queries) UpsertSpeciesImage(ctx context.Context, arg UpsertSpeciesImage
 		&i.FilePath,
 		&i.Credit,
 		&i.CreatedAt,
+		&i.Locked,
 	)
 	return i, err
 }

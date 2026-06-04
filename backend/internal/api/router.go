@@ -83,7 +83,9 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			r.Post("/species/{ebird_code}/images", h.adminUploadImage)
 			r.Post("/species/{ebird_code}/recordings", h.adminUploadRecording)
 			r.Delete("/species/{ebird_code}/images/{macaulay_id}", h.adminDeleteImage)
+			r.Patch("/species/{ebird_code}/images/{macaulay_id}/locked", h.adminSetImageLocked)
 			r.Delete("/species/{ebird_code}/recordings/{xeno_canto_id}", h.adminDeleteRecording)
+			r.Patch("/species/{ebird_code}/recordings/{xeno_canto_id}/locked", h.adminSetRecordingLocked)
 
 			r.Post("/decks", h.adminCreatePresetDeck)
 			r.Patch("/decks/{id}", h.adminUpdatePresetDeck)

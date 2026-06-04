@@ -62,41 +62,63 @@ func (q *Queries) GetDecksForSpecies(ctx context.Context, arg GetDecksForSpecies
 }
 
 const getImageByID = `-- name: GetImageByID :one
-SELECT macaulay_id, species_code, file_path, credit, created_at
+SELECT macaulay_id, species_code, file_path, credit, locked, created_at
 FROM species_images
 WHERE macaulay_id = $1
 `
 
-func (q *Queries) GetImageByID(ctx context.Context, macaulayID string) (SpeciesImage, error) {
+type GetImageByIDRow struct {
+	MacaulayID  string             `db:"macaulay_id" json:"macaulay_id"`
+	SpeciesCode string             `db:"species_code" json:"species_code"`
+	FilePath    string             `db:"file_path" json:"file_path"`
+	Credit      string             `db:"credit" json:"credit"`
+	Locked      bool               `db:"locked" json:"locked"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) GetImageByID(ctx context.Context, macaulayID string) (GetImageByIDRow, error) {
 	row := q.db.QueryRow(ctx, getImageByID, macaulayID)
-	var i SpeciesImage
+	var i GetImageByIDRow
 	err := row.Scan(
 		&i.MacaulayID,
 		&i.SpeciesCode,
 		&i.FilePath,
 		&i.Credit,
+		&i.Locked,
 		&i.CreatedAt,
 	)
 	return i, err
 }
 
 const getRecordingByID = `-- name: GetRecordingByID :one
-SELECT xeno_canto_id, species_code, file_path, quality, type, created_at, credit
+SELECT xeno_canto_id, species_code, file_path, quality, type, credit, locked, created_at
 FROM species_recordings
 WHERE xeno_canto_id = $1
 `
 
-func (q *Queries) GetRecordingByID(ctx context.Context, xenoCantoID string) (SpeciesRecording, error) {
+type GetRecordingByIDRow struct {
+	XenoCantoID string             `db:"xeno_canto_id" json:"xeno_canto_id"`
+	SpeciesCode string             `db:"species_code" json:"species_code"`
+	FilePath    string             `db:"file_path" json:"file_path"`
+	Quality     string             `db:"quality" json:"quality"`
+	Type        string             `db:"type" json:"type"`
+	Credit      string             `db:"credit" json:"credit"`
+	Locked      bool               `db:"locked" json:"locked"`
+	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+}
+
+func (q *Queries) GetRecordingByID(ctx context.Context, xenoCantoID string) (GetRecordingByIDRow, error) {
 	row := q.db.QueryRow(ctx, getRecordingByID, xenoCantoID)
-	var i SpeciesRecording
+	var i GetRecordingByIDRow
 	err := row.Scan(
 		&i.XenoCantoID,
 		&i.SpeciesCode,
 		&i.FilePath,
 		&i.Quality,
 		&i.Type,
-		&i.CreatedAt,
 		&i.Credit,
+		&i.Locked,
+		&i.CreatedAt,
 	)
 	return i, err
 }
@@ -121,7 +143,7 @@ func (q *Queries) GetSpeciesByCode(ctx context.Context, ebirdCode string) (GetSp
 }
 
 const getSpeciesImages = `-- name: GetSpeciesImages :many
-SELECT macaulay_id, file_path, credit
+SELECT macaulay_id, file_path, credit, locked
 FROM species_images
 WHERE species_code = $1
 `
@@ -130,6 +152,7 @@ type GetSpeciesImagesRow struct {
 	MacaulayID string `db:"macaulay_id" json:"macaulay_id"`
 	FilePath   string `db:"file_path" json:"file_path"`
 	Credit     string `db:"credit" json:"credit"`
+	Locked     bool   `db:"locked" json:"locked"`
 }
 
 func (q *Queries) GetSpeciesImages(ctx context.Context, speciesCode string) ([]GetSpeciesImagesRow, error) {
@@ -141,7 +164,12 @@ func (q *Queries) GetSpeciesImages(ctx context.Context, speciesCode string) ([]G
 	var items []GetSpeciesImagesRow
 	for rows.Next() {
 		var i GetSpeciesImagesRow
-		if err := rows.Scan(&i.MacaulayID, &i.FilePath, &i.Credit); err != nil {
+		if err := rows.Scan(
+			&i.MacaulayID,
+			&i.FilePath,
+			&i.Credit,
+			&i.Locked,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -153,7 +181,7 @@ func (q *Queries) GetSpeciesImages(ctx context.Context, speciesCode string) ([]G
 }
 
 const getSpeciesRecordings = `-- name: GetSpeciesRecordings :many
-SELECT xeno_canto_id, file_path, quality, type, credit
+SELECT xeno_canto_id, file_path, quality, type, credit, locked
 FROM species_recordings
 WHERE species_code = $1
 ORDER BY quality, type
@@ -165,6 +193,7 @@ type GetSpeciesRecordingsRow struct {
 	Quality     string `db:"quality" json:"quality"`
 	Type        string `db:"type" json:"type"`
 	Credit      string `db:"credit" json:"credit"`
+	Locked      bool   `db:"locked" json:"locked"`
 }
 
 func (q *Queries) GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]GetSpeciesRecordingsRow, error) {
@@ -182,6 +211,7 @@ func (q *Queries) GetSpeciesRecordings(ctx context.Context, speciesCode string) 
 			&i.Quality,
 			&i.Type,
 			&i.Credit,
+			&i.Locked,
 		); err != nil {
 			return nil, err
 		}
@@ -330,4 +360,32 @@ func (q *Queries) SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]Se
 		return nil, err
 	}
 	return items, nil
+}
+
+const setImageLocked = `-- name: SetImageLocked :exec
+UPDATE species_images SET locked = $2 WHERE macaulay_id = $1
+`
+
+type SetImageLockedParams struct {
+	MacaulayID string `db:"macaulay_id" json:"macaulay_id"`
+	Locked     bool   `db:"locked" json:"locked"`
+}
+
+func (q *Queries) SetImageLocked(ctx context.Context, arg SetImageLockedParams) error {
+	_, err := q.db.Exec(ctx, setImageLocked, arg.MacaulayID, arg.Locked)
+	return err
+}
+
+const setRecordingLocked = `-- name: SetRecordingLocked :exec
+UPDATE species_recordings SET locked = $2 WHERE xeno_canto_id = $1
+`
+
+type SetRecordingLockedParams struct {
+	XenoCantoID string `db:"xeno_canto_id" json:"xeno_canto_id"`
+	Locked      bool   `db:"locked" json:"locked"`
+}
+
+func (q *Queries) SetRecordingLocked(ctx context.Context, arg SetRecordingLockedParams) error {
+	_, err := q.db.Exec(ctx, setRecordingLocked, arg.XenoCantoID, arg.Locked)
+	return err
 }

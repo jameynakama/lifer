@@ -5,6 +5,7 @@
     macaulay_id: string
     file_path: string
     credit: string
+    locked: boolean
   }
 
   interface SpeciesRecording {
@@ -13,6 +14,7 @@
     quality: string
     type: string
     credit: string
+    locked: boolean
   }
 
   const ebirdCode = $derived(page.params.ebird_code)
@@ -47,8 +49,21 @@
     const res = await fetch(`/api/v1/admin/species/${ebirdCode}/images/${macaulayID}`, { method: 'DELETE' })
     if (res.ok) {
       images = images.filter(i => i.macaulay_id !== macaulayID)
+    } else if (res.status === 409) {
+      alert('This image is locked and cannot be deleted.')
     } else {
       alert('Delete failed')
+    }
+  }
+
+  async function toggleImageLocked(macaulayID: string, locked: boolean) {
+    const res = await fetch(`/api/v1/admin/species/${ebirdCode}/images/${macaulayID}/locked`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locked }),
+    })
+    if (res.ok) {
+      images = images.map(i => i.macaulay_id === macaulayID ? { ...i, locked } : i)
     }
   }
 
@@ -57,8 +72,21 @@
     const res = await fetch(`/api/v1/admin/species/${ebirdCode}/recordings/${xenoCantoID}`, { method: 'DELETE' })
     if (res.ok) {
       recordings = recordings.filter(r => r.xeno_canto_id !== xenoCantoID)
+    } else if (res.status === 409) {
+      alert('This recording is locked and cannot be deleted.')
     } else {
       alert('Delete failed')
+    }
+  }
+
+  async function toggleRecordingLocked(xenoCantoID: string, locked: boolean) {
+    const res = await fetch(`/api/v1/admin/species/${ebirdCode}/recordings/${xenoCantoID}/locked`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ locked }),
+    })
+    if (res.ok) {
+      recordings = recordings.map(r => r.xeno_canto_id === xenoCantoID ? { ...r, locked } : r)
     }
   }
 
@@ -107,11 +135,22 @@
     <h3>Images ({images.length})</h3>
     <div class="image-grid">
       {#each images as img}
-        <div class="image-card">
+        <div class="image-card" class:locked={img.locked}>
           <img src={img.file_path} alt={img.credit} />
           <p class="credit">{img.credit}</p>
           <p class="id">{img.macaulay_id}</p>
-          <button onclick={() => deleteImage(img.macaulay_id)}>Delete</button>
+          <div class="card-actions">
+            <button
+              class="btn-lock"
+              class:active={img.locked}
+              onclick={() => toggleImageLocked(img.macaulay_id, !img.locked)}
+            >{img.locked ? '🔒 Locked' : '🔓 Lock'}</button>
+            <button
+              class="btn-delete"
+              disabled={img.locked}
+              onclick={() => deleteImage(img.macaulay_id)}
+            >Delete</button>
+          </div>
         </div>
       {/each}
     </div>
@@ -134,14 +173,23 @@
       </thead>
       <tbody>
         {#each recordings as rec}
-          <tr>
+          <tr class:locked={rec.locked}>
             <td>{rec.xeno_canto_id}</td>
             <td>{rec.quality}</td>
             <td>{rec.type}</td>
             <td>{rec.credit}</td>
-            <td>
+            <td class="actions-cell">
               <audio src={rec.file_path} controls></audio>
-              <button onclick={() => deleteRecording(rec.xeno_canto_id)}>Delete</button>
+              <button
+                class="btn-lock"
+                class:active={rec.locked}
+                onclick={() => toggleRecordingLocked(rec.xeno_canto_id, !rec.locked)}
+              >{rec.locked ? '🔒' : '🔓'}</button>
+              <button
+                class="btn-delete"
+                disabled={rec.locked}
+                onclick={() => deleteRecording(rec.xeno_canto_id)}
+              >Delete</button>
             </td>
           </tr>
         {/each}
@@ -178,10 +226,40 @@
   .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin: 1rem 0; }
   .image-card { border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; }
   .image-card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; }
+  .image-card.locked { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
   .credit, .id { font-size: 0.75rem; color: var(--text-muted); margin: 0.25rem 0; }
+  .card-actions { display: flex; gap: 0.25rem; margin-top: 0.25rem; }
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+  tr.locked td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+  .actions-cell { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
   audio { height: 28px; vertical-align: middle; }
+  .btn-lock {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--text-muted);
+  }
+  .btn-lock.active {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn-delete {
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--text-muted);
+  }
+  .btn-delete:hover:not(:disabled) { border-color: #ef4444; color: #ef4444; }
+  .btn-delete:disabled { opacity: 0.4; cursor: not-allowed; }
   details { margin-top: 1rem; }
   summary { cursor: pointer; color: var(--text-secondary); }
   form { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; max-width: 400px; }

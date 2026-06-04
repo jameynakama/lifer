@@ -36,10 +36,10 @@ WHERE EXISTS (SELECT 1 FROM species_recordings r WHERE r.species_code = s.ebird_
   AND EXISTS (SELECT 1 FROM species_images si WHERE si.species_code = s.ebird_code);
 
 -- name: DeleteRecordingsBySpeciesCode :exec
-DELETE FROM species_recordings WHERE species_code = $1;
+DELETE FROM species_recordings WHERE species_code = $1 AND NOT locked;
 
 -- name: DeleteSpeciesImagesBySpeciesCode :exec
-DELETE FROM species_images WHERE species_code = $1;
+DELETE FROM species_images WHERE species_code = $1 AND NOT locked;
 
 -- name: DeleteSpeciesByCode :exec
 DELETE FROM species WHERE ebird_code = $1;

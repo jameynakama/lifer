@@ -28,13 +28,13 @@ FROM species
 WHERE ebird_code = $1;
 
 -- name: GetSpeciesRecordings :many
-SELECT xeno_canto_id, file_path, quality, type, credit
+SELECT xeno_canto_id, file_path, quality, type, credit, locked
 FROM species_recordings
 WHERE species_code = $1
 ORDER BY quality, type;
 
 -- name: GetSpeciesImages :many
-SELECT macaulay_id, file_path, credit
+SELECT macaulay_id, file_path, credit, locked
 FROM species_images
 WHERE species_code = $1;
 
@@ -54,12 +54,12 @@ FROM species
 ORDER BY common_name;
 
 -- name: GetImageByID :one
-SELECT macaulay_id, species_code, file_path, credit, created_at
+SELECT macaulay_id, species_code, file_path, credit, locked, created_at
 FROM species_images
 WHERE macaulay_id = $1;
 
 -- name: GetRecordingByID :one
-SELECT xeno_canto_id, species_code, file_path, quality, type, created_at, credit
+SELECT xeno_canto_id, species_code, file_path, quality, type, credit, locked, created_at
 FROM species_recordings
 WHERE xeno_canto_id = $1;
 
@@ -68,3 +68,9 @@ DELETE FROM species_images WHERE macaulay_id = $1;
 
 -- name: DeleteRecording :exec
 DELETE FROM species_recordings WHERE xeno_canto_id = $1;
+
+-- name: SetRecordingLocked :exec
+UPDATE species_recordings SET locked = $2 WHERE xeno_canto_id = $1;
+
+-- name: SetImageLocked :exec
+UPDATE species_images SET locked = $2 WHERE macaulay_id = $1;

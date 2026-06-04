@@ -49,6 +49,7 @@ type SpeciesImage struct {
 	FilePath    string             `db:"file_path" json:"file_path"`
 	Credit      string             `db:"credit" json:"credit"`
 	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	Locked      bool               `db:"locked" json:"locked"`
 }
 
 type SpeciesRecording struct {
@@ -59,6 +60,7 @@ type SpeciesRecording struct {
 	Type        string             `db:"type" json:"type"`
 	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	Credit      string             `db:"credit" json:"credit"`
+	Locked      bool               `db:"locked" json:"locked"`
 }
 
 type User struct {

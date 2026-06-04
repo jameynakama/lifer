@@ -171,6 +171,10 @@ func (h *Handler) adminDeleteImage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}
+	if img.Locked {
+		http.Error(w, "locked", http.StatusConflict)
+		return
+	}
 	if err := h.r2Client.Delete(r.Context(), h.r2Client.KeyFor(img.FilePath)); err != nil {
 		log.Printf("admin: delete image R2 %s: %v", id, err)
 		http.Error(w, "server error", http.StatusInternalServerError)
@@ -178,6 +182,26 @@ func (h *Handler) adminDeleteImage(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.queries.DeleteImage(r.Context(), id); err != nil {
 		log.Printf("admin: delete image DB %s: %v", id, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) adminSetImageLocked(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "macaulay_id")
+	var req struct {
+		Locked bool `json:"locked"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if err := h.queries.SetImageLocked(r.Context(), store.SetImageLockedParams{
+		MacaulayID: id,
+		Locked:     req.Locked,
+	}); err != nil {
+		log.Printf("admin: set image locked %s: %v", id, err)
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}
@@ -301,6 +325,10 @@ func (h *Handler) adminDeleteRecording(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}
+	if rec.Locked {
+		http.Error(w, "locked", http.StatusConflict)
+		return
+	}
 	if err := h.r2Client.Delete(r.Context(), h.r2Client.KeyFor(rec.FilePath)); err != nil {
 		log.Printf("admin: delete recording R2 %s: %v", id, err)
 		http.Error(w, "server error", http.StatusInternalServerError)
@@ -308,6 +336,26 @@ func (h *Handler) adminDeleteRecording(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := h.queries.DeleteRecording(r.Context(), id); err != nil {
 		log.Printf("admin: delete recording DB %s: %v", id, err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) adminSetRecordingLocked(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "xeno_canto_id")
+	var req struct {
+		Locked bool `json:"locked"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if err := h.queries.SetRecordingLocked(r.Context(), store.SetRecordingLockedParams{
+		XenoCantoID: id,
+		Locked:      req.Locked,
+	}); err != nil {
+		log.Printf("admin: set recording locked %s: %v", id, err)
 		http.Error(w, "server error", http.StatusInternalServerError)
 		return
 	}
