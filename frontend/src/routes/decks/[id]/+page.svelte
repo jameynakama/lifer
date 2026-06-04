@@ -293,6 +293,7 @@
   {:else if deckSpecies.length === 0}
     <p class="empty">No species yet. Search below to add some.</p>
   {:else}
+    <p class="lane-legend">♪ audio &nbsp; ◉ image -- click to include or exclude that media type from your study queue</p>
     <ul class="species-list">
       {#each deckSpecies as s (s.ebird_code)}
         <li class="species-row">
@@ -562,6 +563,11 @@
     font-family: inherit;
     width: 100%;
     box-sizing: border-box;
+  }
+  .lane-legend {
+    font-size: .9rem;
+    color: var(--text-muted);
+    margin: 0;
   }
   .status, .empty {
     text-align: center;
