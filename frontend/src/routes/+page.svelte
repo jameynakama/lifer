@@ -1,13 +1,17 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
-  import type { Deck, DecksResponse } from '../types'
+  import type { Deck, DecksResponse, PresetDeck } from '../types'
   import DashboardStats from '$components/DashboardStats.svelte'
   import DeckList from '$components/DeckList.svelte'
   import InstallPrompt from '$components/InstallPrompt.svelte'
+  import PresetDeckList from '$components/PresetDeckList.svelte'
 
   let decks: Deck[] = $state([])
   let nextDueAt: string | null = $state(null)
   let loading = $state(true)
+  let presetDecks: PresetDeck[] = $state([])
+  let presetsLoading = $state(true)
+  let cloning: Set<number> = $state(new Set())
 
   $effect(() => {
     fetch('/api/v1/decks')
@@ -20,6 +24,25 @@
       })
       .finally(() => { loading = false })
   })
+
+  $effect(() => {
+    fetch('/api/v1/decks/presets')
+      .then(async (res) => { if (res.ok) presetDecks = await res.json() })
+      .finally(() => { presetsLoading = false })
+  })
+
+  async function cloneDeck(id: number) {
+    cloning = new Set([...cloning, id])
+    try {
+      const res = await fetch(`/api/v1/decks/${id}/clone`, { method: 'POST' })
+      if (res.ok) {
+        const created = await res.json()
+        goto(`/decks/${created.id}`)
+      }
+    } finally {
+      cloning = new Set([...cloning].filter((c) => c !== id))
+    }
+  }
 
   const audioDue = $derived(decks.reduce((sum, d) => sum + d.audio_due, 0))
   const imageDue = $derived(decks.reduce((sum, d) => sum + d.image_due, 0))
@@ -34,7 +57,12 @@
   {#if loading}
     <p class="status">Loading...</p>
   {:else if decks.length === 0}
-    <p class="empty">No decks yet. <a href="/decks">Create one or clone a Starter Deck</a> to get started.</p>
+    <p class="empty">No decks yet. <a href="/decks">Create one</a> or clone a Starter Deck below to get started.</p>
+    {#if !presetsLoading && presetDecks.length > 0}
+      <h2 class="section-heading">Starter Decks</h2>
+      <p class="section-subheading">Clone one and start practicing right away</p>
+      <PresetDeckList {presetDecks} {cloning} onClone={cloneDeck} />
+    {/if}
   {:else}
     <DashboardStats {audioDue} {imageDue} {nextDueAt} />
     <DeckList {decks} onPractice={startPractice} />
@@ -54,5 +82,16 @@
   }
   .empty a {
     color: var(--accent);
+  }
+  .section-heading {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0;
+  }
+  .section-subheading {
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    margin: -0.5rem 0 0;
   }
 </style>

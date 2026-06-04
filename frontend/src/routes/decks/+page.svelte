@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
   import type { Deck, DecksResponse, PresetDeck } from '../../types'
+  import PresetDeckList from '$components/PresetDeckList.svelte'
 
   let decks: Deck[] = $state([])
   let presetDecks: PresetDeck[] = $state([])
@@ -173,26 +174,7 @@
     <hr class="section-divider" />
     <h2 class="section-heading">Starter Decks</h2>
     <p class="section-subheading">Clone one to get started instantly</p>
-    <ul class="deck-list">
-      {#each presetDecks as preset (preset.id)}
-        <li class="deck-row">
-          <div class="deck-info">
-            <span class="deck-name">{preset.name}</span>
-            {#if preset.description}
-              <span class="deck-description">{preset.description}</span>
-            {/if}
-            <span class="species-count">{preset.species_count} species</span>
-          </div>
-          <div class="deck-meta">
-            <button
-              class="btn-clone"
-              disabled={cloning.has(preset.id)}
-              onclick={() => cloneDeck(preset.id)}
-            >Clone</button>
-          </div>
-        </li>
-      {/each}
-    </ul>
+    <PresetDeckList {presetDecks} {cloning} onClone={cloneDeck} />
   {/if}
 </div>
 
@@ -370,24 +352,5 @@
     font-size: 0.8125rem;
     color: var(--text-muted);
     margin: -0.75rem 0 0;
-  }
-  .species-count {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-  }
-  .btn-clone {
-    background: var(--surface);
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    border-radius: 8px;
-    padding: 0.375rem 0.75rem;
-    font-size: 0.8125rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .btn-clone:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
 </style>
