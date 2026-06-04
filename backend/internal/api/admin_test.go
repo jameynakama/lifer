@@ -89,7 +89,10 @@ func (s *adminStubQuerier) ListAllUserDecks(ctx context.Context) ([]store.ListAl
 	return nil, nil
 }
 func (s *adminStubQuerier) GetDeckWithOwner(ctx context.Context, id int64) (store.GetDeckWithOwnerRow, error) {
-	return s.getDeckWithOwner(ctx, id)
+	if s.getDeckWithOwner != nil {
+		return s.getDeckWithOwner(ctx, id)
+	}
+	return store.GetDeckWithOwnerRow{}, nil
 }
 func (s *adminStubQuerier) ListDeckSpeciesSimple(ctx context.Context, deckID int64) ([]store.ListDeckSpeciesSimpleRow, error) {
 	if s.listDeckSpeciesSimple != nil {
