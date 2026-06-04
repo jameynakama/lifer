@@ -19,21 +19,35 @@ import (
 
 type adminStubQuerier struct {
 	store.Querier
-	getImageByID         func(ctx context.Context, macaulayID string) (store.SpeciesImage, error)
-	getRecordingByID     func(ctx context.Context, xenoCantoID string) (store.SpeciesRecording, error)
+	getImageByID         func(ctx context.Context, macaulayID string) (store.GetImageByIDRow, error)
+	getRecordingByID     func(ctx context.Context, xenoCantoID string) (store.GetRecordingByIDRow, error)
 	getSpeciesImages     func(ctx context.Context, speciesCode string) ([]store.GetSpeciesImagesRow, error)
 	getSpeciesRecordings func(ctx context.Context, speciesCode string) ([]store.GetSpeciesRecordingsRow, error)
 	deleteImage          func(ctx context.Context, macaulayID string) error
 	deleteRecording      func(ctx context.Context, xenoCantoID string) error
 	upsertSpeciesImage   func(ctx context.Context, arg store.UpsertSpeciesImageParams) (store.SpeciesImage, error)
 	upsertRecording      func(ctx context.Context, arg store.UpsertRecordingParams) (store.SpeciesRecording, error)
+	setImageLocked       func(ctx context.Context, arg store.SetImageLockedParams) error
+	setRecordingLocked   func(ctx context.Context, arg store.SetRecordingLockedParams) error
 }
 
-func (s *adminStubQuerier) GetImageByID(ctx context.Context, macaulayID string) (store.SpeciesImage, error) {
+func (s *adminStubQuerier) GetImageByID(ctx context.Context, macaulayID string) (store.GetImageByIDRow, error) {
 	return s.getImageByID(ctx, macaulayID)
 }
-func (s *adminStubQuerier) GetRecordingByID(ctx context.Context, xenoCantoID string) (store.SpeciesRecording, error) {
+func (s *adminStubQuerier) GetRecordingByID(ctx context.Context, xenoCantoID string) (store.GetRecordingByIDRow, error) {
 	return s.getRecordingByID(ctx, xenoCantoID)
+}
+func (s *adminStubQuerier) SetImageLocked(ctx context.Context, arg store.SetImageLockedParams) error {
+	if s.setImageLocked != nil {
+		return s.setImageLocked(ctx, arg)
+	}
+	return nil
+}
+func (s *adminStubQuerier) SetRecordingLocked(ctx context.Context, arg store.SetRecordingLockedParams) error {
+	if s.setRecordingLocked != nil {
+		return s.setRecordingLocked(ctx, arg)
+	}
+	return nil
 }
 func (s *adminStubQuerier) GetSpeciesImages(ctx context.Context, speciesCode string) ([]store.GetSpeciesImagesRow, error) {
 	return s.getSpeciesImages(ctx, speciesCode)
@@ -107,8 +121,8 @@ func TestAdminDeleteImage_DeletesFromR2AndDB(t *testing.T) {
 	require.NoError(t, err)
 
 	q := &adminStubQuerier{
-		getImageByID: func(_ context.Context, id string) (store.SpeciesImage, error) {
-			return store.SpeciesImage{
+		getImageByID: func(_ context.Context, id string) (store.GetImageByIDRow, error) {
+			return store.GetImageByIDRow{
 				MacaulayID: id,
 				FilePath:   "https://pub.example.com/images/sonspa/img1.jpg",
 			}, nil
@@ -147,8 +161,8 @@ func TestAdminDeleteRecording_DeletesFromR2AndDB(t *testing.T) {
 	require.NoError(t, err)
 
 	q := &adminStubQuerier{
-		getRecordingByID: func(_ context.Context, id string) (store.SpeciesRecording, error) {
-			return store.SpeciesRecording{
+		getRecordingByID: func(_ context.Context, id string) (store.GetRecordingByIDRow, error) {
+			return store.GetRecordingByIDRow{
 				XenoCantoID: id,
 				FilePath:    "https://pub.example.com/recordings/sonspa/rec1.mp3",
 			}, nil
