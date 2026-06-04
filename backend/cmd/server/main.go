@@ -2,10 +2,15 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jameynakama/flockdeck/internal/api"
@@ -57,16 +62,52 @@ func loadConfig() config {
 	}
 }
 
+// newServer returns an http.Server with timeouts set so slow or stalled
+// clients cannot hold connections open indefinitely. ReadTimeout is generous
+// because admin media uploads (multipart, up to ~32MB) ride through it.
+func newServer(addr string, h http.Handler) *http.Server {
+	return &http.Server{
+		Addr:              addr,
+		Handler:           h,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       2 * time.Minute,
+		WriteTimeout:      2 * time.Minute,
+		IdleTimeout:       2 * time.Minute,
+	}
+}
+
+// runServer serves on ln until ctx is cancelled, then shuts down gracefully.
+// A clean shutdown returns nil.
+func runServer(ctx context.Context, srv *http.Server, ln net.Listener) error {
+	errCh := make(chan error, 1)
+	go func() { errCh <- srv.Serve(ln) }()
+
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return srv.Shutdown(shutdownCtx)
+	case err := <-errCh:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	}
+}
+
 func main() {
 	cfg := loadConfig()
 
-	pool, err := pgxpool.New(context.Background(), cfg.databaseURL)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	pool, err := pgxpool.New(ctx, cfg.databaseURL)
 	if err != nil {
 		log.Fatalf("unable to connect to database: %v", err)
 	}
 	defer pool.Close()
 
-	if err := pool.Ping(context.Background()); err != nil {
+	if err := pool.Ping(ctx); err != nil {
 		log.Fatalf("database ping failed: %v", err)
 	}
 	log.Println("database connected")
@@ -88,8 +129,13 @@ func main() {
 	})
 
 	addr := fmt.Sprintf(":%s", cfg.port)
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		log.Fatalf("listen: %v", err)
+	}
 	log.Printf("server listening on %s", addr)
-	if err := http.ListenAndServe(addr, router); err != nil {
+	if err := runServer(ctx, newServer(addr, router), ln); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+	log.Println("server shut down cleanly")
 }

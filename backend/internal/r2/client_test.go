@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jameynakama/flockdeck/internal/r2"
 	"github.com/stretchr/testify/assert"
@@ -40,6 +41,8 @@ func TestUpload_PutsObjectAndReturnsPublicURL(t *testing.T) {
 }
 
 func TestUpload_R2ErrorReturnsError(t *testing.T) {
+	t.Cleanup(r2.SetUploadRetryDelaysForTest([]time.Duration{0, 0, 0}))
+
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `<?xml version="1.0"?><Error><Code>InternalError</Code><Message>oops</Message></Error>`, http.StatusInternalServerError)
 	}))
