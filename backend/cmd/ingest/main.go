@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"sort"
@@ -21,6 +22,7 @@ import (
 )
 
 func main() {
+	dryRun := flag.Bool("dry-run", false, "Show how many species will be ingested")
 	maxRecordings := flag.Int("max-recordings", 4, "max recordings per species (split evenly between song and call)")
 	maxImages := flag.Int("max-images", 3, "max images per species")
 	maxRecordingSecs := flag.Int("max-recording-secs", 180, "max recording length in seconds (0 = no cap)")
@@ -178,6 +180,10 @@ func main() {
 	total := len(processable)
 	fmt.Fprintf(os.Stderr, "total unique species to process: %d\n\n", total)
 
+	if *dryRun {
+		dryRunExit(os.Stderr, os.Exit)
+	}
+
 	failedSpecies := map[string][]string{}
 	missingMedia := map[string]ingestStats{}
 
@@ -318,6 +324,11 @@ func main() {
 			fmt.Printf("  missing codes: %s\n", strings.Join(xcMisses, ","))
 		}
 	}
+}
+
+func dryRunExit(w io.Writer, exitFn func(int)) {
+	fmt.Fprintln(w, "Dry run complete.")
+	exitFn(0)
 }
 
 func loadOverrides(path string) (map[string][2]string, error) {

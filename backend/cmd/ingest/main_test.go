@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -392,5 +394,21 @@ func TestFetchAndUpload_SendsMessageSequence(t *testing.T) {
 	}
 	if done.workerID != 2 {
 		t.Errorf("Should carry workerID 2, got %d", done.workerID)
+	}
+}
+
+func TestDryRunExit_ExitsZero(t *testing.T) {
+	exitCode := -1
+	dryRunExit(io.Discard, func(code int) { exitCode = code })
+	if exitCode != 0 {
+		t.Errorf("Should exit 0, got %d", exitCode)
+	}
+}
+
+func TestDryRunExit_PrintsDryRunMessage(t *testing.T) {
+	var buf bytes.Buffer
+	dryRunExit(&buf, func(int) {})
+	if !strings.Contains(strings.ToLower(buf.String()), "dry run") {
+		t.Errorf("Should mention dry run in output, got %q", buf.String())
 	}
 }
