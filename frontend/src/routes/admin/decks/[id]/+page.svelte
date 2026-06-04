@@ -64,7 +64,7 @@
     <p class="empty">No species in this deck.</p>
   {:else}
     <ul>
-      {#each species as sp}
+      {#each species as sp (sp.ebird_code)}
         <li>
           <span class="name">{sp.common_name}</span>
           <span class="muted">{sp.ebird_code}</span>
