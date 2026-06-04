@@ -170,6 +170,12 @@
     }
   }
 
+  async function deleteDeck() {
+    if (!confirm(`Delete "${deckName}"? This cannot be undone.`)) return
+    const res = await fetch(`/api/v1/decks/${deckId}`, { method: 'DELETE' })
+    if (res.ok) goto('/decks')
+  }
+
   async function removeSpecies(ebirdCode: string) {
     const res = await fetch(`/api/v1/decks/${deckId}/species/${ebirdCode}`, {
       method: 'DELETE',
@@ -279,6 +285,7 @@
     <button class="btn-practice-outline" onclick={() => goto(`/decks/${deckId}/practice?lane=image`)}>
       Practice Image
     </button>
+    <button class="btn-delete-deck" onclick={deleteDeck}>Delete deck</button>
   </div>
 
   {#if loading}
@@ -446,6 +453,22 @@
     cursor: pointer;
     font-family: inherit;
   }
+  .btn-delete-deck {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: 10px;
+    padding: 0.625rem 1.25rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+    margin-left: auto;
+  }
+  .btn-delete-deck:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
   .species-list {
     list-style: none;
     padding: 0;
@@ -519,6 +542,10 @@
     font-size: 0.75rem;
     cursor: pointer;
     font-family: inherit;
+  }
+  .btn-remove:hover {
+    border-color: #ef4444;
+    color: #ef4444;
   }
   .search-section {
     display: flex;

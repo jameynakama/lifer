@@ -332,6 +332,10 @@
     cursor: pointer;
     font-family: inherit;
   }
+  .btn-delete:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
   .status, .empty {
     text-align: center;
     color: var(--text-muted);
