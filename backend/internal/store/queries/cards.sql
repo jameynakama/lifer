@@ -91,6 +91,13 @@ LEFT JOIN LATERAL (
 WHERE ds.deck_id = $1
 ORDER BY s.common_name;
 
+-- name: BulkUpsertCards :exec
+INSERT INTO cards (user_id, species_code, lane)
+SELECT $1, s.code, l.lane
+FROM unnest($2::text[]) AS s(code)
+CROSS JOIN (VALUES ('audio'::text), ('image'::text)) AS l(lane)
+ON CONFLICT (user_id, species_code, lane) DO NOTHING;
+
 -- name: GetNextDueAt :one
 SELECT due AS next_due_at
 FROM cards

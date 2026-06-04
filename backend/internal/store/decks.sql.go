@@ -27,6 +27,25 @@ func (q *Queries) AddSpeciesToDeck(ctx context.Context, arg AddSpeciesToDeckPara
 	return err
 }
 
+const bulkAddSpeciesToDeck = `-- name: BulkAddSpeciesToDeck :execrows
+INSERT INTO deck_species (deck_id, species_code)
+SELECT $1, code FROM unnest($2::text[]) AS code
+ON CONFLICT DO NOTHING
+`
+
+type BulkAddSpeciesToDeckParams struct {
+	DeckID  int64    `db:"deck_id" json:"deck_id"`
+	Column2 []string `db:"column_2" json:"column_2"`
+}
+
+func (q *Queries) BulkAddSpeciesToDeck(ctx context.Context, arg BulkAddSpeciesToDeckParams) (int64, error) {
+	result, err := q.db.Exec(ctx, bulkAddSpeciesToDeck, arg.DeckID, arg.Column2)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const cloneDeckSpecies = `-- name: CloneDeckSpecies :exec
 INSERT INTO deck_species (deck_id, species_code)
 SELECT $2, src.species_code FROM deck_species src WHERE src.deck_id = $1

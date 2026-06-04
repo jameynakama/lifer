@@ -285,6 +285,87 @@ describe('Deck detail page', () => {
     })
   })
 
+  it('shows checkboxes in search results', async () => {
+    const foxSparrow = { ebird_code: 'foxspa', common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', image_url: null }
+    const { createQuery } = await import('@tanstack/svelte-query')
+    vi.mocked(createQuery).mockReturnValue({ data: [foxSparrow], isPending: false, isError: false } as any)
+    vi.stubGlobal('fetch', makeFetch())
+    render(DeckDetailPage)
+    await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
+    await fireEvent.input(screen.getByPlaceholderText(/search species/i), { target: { value: 'fox' } })
+    await vi.waitFor(() => {
+      expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0)
+    })
+  })
+
+  it('shows bulk add bar when search results are checked', async () => {
+    const foxSparrow = { ebird_code: 'foxspa', common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', image_url: null }
+    const { createQuery } = await import('@tanstack/svelte-query')
+    vi.mocked(createQuery).mockReturnValue({ data: [foxSparrow], isPending: false, isError: false } as any)
+    vi.stubGlobal('fetch', makeFetch())
+    render(DeckDetailPage)
+    await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
+    await fireEvent.input(screen.getByPlaceholderText(/search species/i), { target: { value: 'fox' } })
+    await vi.waitFor(() => screen.getByRole('checkbox', { name: /fox sparrow/i }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: /fox sparrow/i }))
+    await vi.waitFor(() => {
+      expect(screen.getByRole('toolbar')).toBeInTheDocument()
+      expect(screen.getByText(/1 selected/i)).toBeInTheDocument()
+    })
+  })
+
+  it('checked species stay visible when search query changes', async () => {
+    const foxSparrow = { ebird_code: 'foxspa', common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', image_url: null }
+    const junco = { ebird_code: 'daejun', common_name: 'Dark-eyed Junco', scientific_name: 'Junco hyemalis', image_url: null }
+    const { createQuery } = await import('@tanstack/svelte-query')
+    vi.mocked(createQuery).mockReturnValue({ data: [foxSparrow, junco], isPending: false, isError: false } as any)
+    vi.stubGlobal('fetch', makeFetch())
+    render(DeckDetailPage)
+    const input = screen.getByPlaceholderText(/search species/i)
+    await fireEvent.input(input, { target: { value: 'fox' } })
+    await vi.waitFor(() => screen.getAllByRole('checkbox'))
+    await fireEvent.click(screen.getAllByRole('checkbox')[0])
+    // Now search for junco -- fox sparrow no longer in search results but should stay pinned
+    await fireEvent.input(input, { target: { value: 'junco' } })
+    await vi.waitFor(() => {
+      expect(screen.getAllByText(/fox sparrow/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/dark-eyed junco/i).length).toBeGreaterThan(0)
+    })
+  })
+
+  it('bulk add posts species_codes to bulk endpoint and clears selection', async () => {
+    const foxSparrow = { ebird_code: 'foxspa', common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', image_url: null }
+    const { createQuery } = await import('@tanstack/svelte-query')
+    vi.mocked(createQuery).mockReturnValue({ data: [foxSparrow], isPending: false, isError: false } as any)
+    let bulkCalled = false
+    let bulkBody: unknown = null
+    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (opts?.method === 'POST' && url.includes('/bulk')) {
+        bulkCalled = true
+        bulkBody = JSON.parse(opts.body as string)
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ added: 1 }) })
+      }
+      if (url.match(/\/api\/v1\/decks\/\d+\/species$/)) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
+      }
+      return Promise.resolve({ ok: true, json: () => Promise.resolve({ audio_due: 0, image_due: 0 }) })
+    }))
+    render(DeckDetailPage)
+    await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
+    await fireEvent.input(screen.getByPlaceholderText(/search species/i), { target: { value: 'fox' } })
+    await vi.waitFor(() => screen.getByRole('checkbox', { name: /fox sparrow/i }))
+    await fireEvent.click(screen.getByRole('checkbox', { name: /fox sparrow/i }))
+    await vi.waitFor(() => screen.getByRole('button', { name: /add 1 species/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /add 1 species/i }))
+    await vi.waitFor(() => {
+      expect(bulkCalled).toBe(true)
+      expect((bulkBody as Record<string, unknown>).species_codes).toContain('foxspa')
+    })
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('toolbar')).toBeNull()
+    })
+  })
+
   it('sends updated description in PATCH when description edited', async () => {
     let patchBody: Record<string, unknown> | null = null
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {

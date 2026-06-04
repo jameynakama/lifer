@@ -12,6 +12,8 @@ import (
 
 type Querier interface {
 	AddSpeciesToDeck(ctx context.Context, arg AddSpeciesToDeckParams) error
+	BulkAddSpeciesToDeck(ctx context.Context, arg BulkAddSpeciesToDeckParams) (int64, error)
+	BulkUpsertCards(ctx context.Context, arg BulkUpsertCardsParams) error
 	CloneDeckSpecies(ctx context.Context, arg CloneDeckSpeciesParams) error
 	CountDueCards(ctx context.Context, arg CountDueCardsParams) (int64, error)
 	CreateDeck(ctx context.Context, arg CreateDeckParams) (Deck, error)

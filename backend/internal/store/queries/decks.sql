@@ -74,3 +74,8 @@ ON CONFLICT DO NOTHING;
 -- name: RemoveSpeciesFromDeck :exec
 DELETE FROM deck_species
 WHERE deck_id = $1 AND species_code = $2;
+
+-- name: BulkAddSpeciesToDeck :execrows
+INSERT INTO deck_species (deck_id, species_code)
+SELECT $1, code FROM unnest($2::text[]) AS code
+ON CONFLICT DO NOTHING;

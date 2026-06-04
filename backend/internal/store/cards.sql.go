@@ -11,6 +11,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const bulkUpsertCards = `-- name: BulkUpsertCards :exec
+INSERT INTO cards (user_id, species_code, lane)
+SELECT $1, s.code, l.lane
+FROM unnest($2::text[]) AS s(code)
+CROSS JOIN (VALUES ('audio'::text), ('image'::text)) AS l(lane)
+ON CONFLICT (user_id, species_code, lane) DO NOTHING
+`
+
+type BulkUpsertCardsParams struct {
+	UserID  int64    `db:"user_id" json:"user_id"`
+	Column2 []string `db:"column_2" json:"column_2"`
+}
+
+func (q *Queries) BulkUpsertCards(ctx context.Context, arg BulkUpsertCardsParams) error {
+	_, err := q.db.Exec(ctx, bulkUpsertCards, arg.UserID, arg.Column2)
+	return err
+}
+
 const countDueCards = `-- name: CountDueCards :one
 SELECT COUNT(*)
 FROM cards c

@@ -346,6 +346,55 @@ func (h *Handler) addSpeciesToDeck(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 }
 
+type bulkAddSpeciesRequest struct {
+	SpeciesCodes []string `json:"species_codes"`
+}
+
+func (h *Handler) bulkAddSpeciesToDeck(w http.ResponseWriter, r *http.Request) {
+	userID := auth.UserIDFromCtx(r.Context())
+
+	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
+	if err != nil {
+		http.Error(w, "invalid deck id", http.StatusBadRequest)
+		return
+	}
+
+	if !h.deckOwnerCheck(w, r, deckID, userID) {
+		return
+	}
+
+	var req bulkAddSpeciesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	if len(req.SpeciesCodes) == 0 {
+		http.Error(w, "species_codes must not be empty", http.StatusBadRequest)
+		return
+	}
+
+	added, err := h.queries.BulkAddSpeciesToDeck(r.Context(), store.BulkAddSpeciesToDeckParams{
+		DeckID:  deckID,
+		Column2: req.SpeciesCodes,
+	})
+	if err != nil {
+		log.Printf("BulkAddSpeciesToDeck error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	if err := h.queries.BulkUpsertCards(r.Context(), store.BulkUpsertCardsParams{
+		UserID:  userID,
+		Column2: req.SpeciesCodes,
+	}); err != nil {
+		log.Printf("BulkUpsertCards error: %v", err)
+		http.Error(w, "server error", http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]int64{"added": added})
+}
+
 func (h *Handler) removeSpeciesFromDeck(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 

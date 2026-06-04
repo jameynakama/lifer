@@ -33,6 +33,8 @@ type deckStubQuerier struct {
 	listPresetDecks          func(ctx context.Context) ([]store.ListPresetDecksRow, error)
 	cloneDeckSpecies         func(ctx context.Context, arg store.CloneDeckSpeciesParams) error
 	upsertCardsForDeck       func(ctx context.Context, arg store.UpsertCardsForDeckParams) error
+	bulkAddSpeciesToDeck     func(ctx context.Context, arg store.BulkAddSpeciesToDeckParams) (int64, error)
+	bulkUpsertCards          func(ctx context.Context, arg store.BulkUpsertCardsParams) error
 }
 
 func (s *deckStubQuerier) ListUserDecks(ctx context.Context, userID int64) ([]store.ListUserDecksRow, error) {
@@ -79,6 +81,12 @@ func (s *deckStubQuerier) CloneDeckSpecies(ctx context.Context, arg store.CloneD
 }
 func (s *deckStubQuerier) UpsertCardsForDeck(ctx context.Context, arg store.UpsertCardsForDeckParams) error {
 	return s.upsertCardsForDeck(ctx, arg)
+}
+func (s *deckStubQuerier) BulkAddSpeciesToDeck(ctx context.Context, arg store.BulkAddSpeciesToDeckParams) (int64, error) {
+	return s.bulkAddSpeciesToDeck(ctx, arg)
+}
+func (s *deckStubQuerier) BulkUpsertCards(ctx context.Context, arg store.BulkUpsertCardsParams) error {
+	return s.bulkUpsertCards(ctx, arg)
 }
 
 func ownerID(id int64) pgtype.Int8 {
@@ -616,4 +624,78 @@ func TestUpdateDeck_AdminCanUpdatePresetDeck(t *testing.T) {
 	h.updateDeck(w, r)
 
 	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+func TestBulkAddSpeciesToDeck_AddsAllSpeciesAndCreatesCards(t *testing.T) {
+	var bulkArg store.BulkAddSpeciesToDeckParams
+	var cardsArg store.BulkUpsertCardsParams
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(1)}, nil
+		},
+		bulkAddSpeciesToDeck: func(_ context.Context, arg store.BulkAddSpeciesToDeckParams) (int64, error) {
+			bulkArg = arg
+			return 2, nil
+		},
+		bulkUpsertCards: func(_ context.Context, arg store.BulkUpsertCardsParams) error {
+			cardsArg = arg
+			return nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"species_codes":["amcro","sonspa"]}`
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks/42/species/bulk", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.bulkAddSpeciesToDeck(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, int64(42), bulkArg.DeckID)
+	assert.ElementsMatch(t, []string{"amcro", "sonspa"}, bulkArg.Column2)
+	assert.Equal(t, int64(1), cardsArg.UserID)
+	assert.ElementsMatch(t, []string{"amcro", "sonspa"}, cardsArg.Column2)
+	var resp map[string]int64
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, int64(2), resp["added"])
+}
+
+func TestBulkAddSpeciesToDeck_EmptyList_Returns400(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(1)}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"species_codes":[]}`
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks/42/species/bulk", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.bulkAddSpeciesToDeck(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestBulkAddSpeciesToDeck_WrongOwner_Returns403(t *testing.T) {
+	q := &deckStubQuerier{
+		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
+			return store.Deck{ID: id, OwnerID: ownerID(999)}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"species_codes":["amcro"]}`
+	r := httptest.NewRequest(http.MethodPost, "/api/v1/decks/42/species/bulk", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.bulkAddSpeciesToDeck(w, r)
+
+	assert.Equal(t, http.StatusForbidden, w.Code)
 }

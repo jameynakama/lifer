@@ -3,6 +3,8 @@
   import { page } from '$app/state'
   import { createQuery } from '@tanstack/svelte-query'
   import type { SpeciesListItem } from '../../../types'
+  import BulkAddBar from '$components/BulkAddBar.svelte'
+  import SpeciesSearchList from '$components/SpeciesSearchList.svelte'
 
   interface Species {
     ebird_code: string
@@ -27,6 +29,7 @@
 
   let addedCodes = $derived(new Set(deckSpecies.map((s) => s.ebird_code)))
   let togglingCodes: Set<string> = $state(new Set())
+  let selectedSearchCodes: Set<string> = $state(new Set())
 
   const allSpeciesQuery = createQuery(() => ({
     queryKey: ['species', 'all'],
@@ -45,6 +48,14 @@
             s.scientific_name.toLowerCase().includes(lq)
           )
         })
+  )
+
+  const pinnedSearchSpecies = $derived(
+    (allSpeciesQuery.data ?? []).filter((s) => selectedSearchCodes.has(s.ebird_code))
+  )
+
+  const unpinnedSearchResults = $derived(
+    searchResults.filter((s) => !selectedSearchCodes.has(s.ebird_code))
   )
 
   async function loadDeck() {
@@ -110,6 +121,35 @@
   function handleDescriptionKeydown(e: KeyboardEvent) {
     if (e.key === 'Enter') saveDescription()
     else if (e.key === 'Escape') editingDescription = false
+  }
+
+  function toggleSearchSelected(code: string) {
+    const next = new Set(selectedSearchCodes)
+    if (next.has(code)) next.delete(code)
+    else next.add(code)
+    selectedSearchCodes = next
+  }
+
+  async function bulkAddToThisDeck() {
+    const codes = [...selectedSearchCodes]
+    const res = await fetch(`/api/v1/decks/${deckId}/species/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ species_codes: codes }),
+    })
+    if (res.ok) {
+      const newSpecies = codes
+        .filter((c) => !addedCodes.has(c))
+        .map((c) => {
+          const s = (allSpeciesQuery.data ?? []).find((sp) => sp.ebird_code === c)
+          return s
+            ? { ebird_code: s.ebird_code, common_name: s.common_name, scientific_name: s.scientific_name, audio_enabled: true, image_enabled: true }
+            : null
+        })
+        .filter((s): s is Species => s !== null)
+      deckSpecies = [...deckSpecies, ...newSpecies]
+      selectedSearchCodes = new Set()
+    }
   }
 
   async function addSpecies(ebirdCode: string) {
@@ -283,24 +323,22 @@
       placeholder="Search species to add..."
       bind:value={searchQuery}
     />
-    {#if searchResults.length > 0}
-      <ul class="search-results">
-        {#each searchResults as s (s.ebird_code)}
-          <li class="search-row">
-            <span>
-              <strong>{s.common_name}</strong>
-              <em>{s.scientific_name}</em>
-            </span>
-            {#if addedCodes.has(s.ebird_code)}
-              <span class="added-indicator">Added</span>
-            {:else}
-              <button class="btn-add" onclick={() => addSpecies(s.ebird_code)}>Add</button>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
+    <SpeciesSearchList
+      results={unpinnedSearchResults}
+      pinned={pinnedSearchSpecies}
+      {addedCodes}
+      selectedCodes={selectedSearchCodes}
+      onAdd={addSpecies}
+      onToggle={toggleSearchSelected}
+      onSelectAll={(codes) => { selectedSearchCodes = new Set([...selectedSearchCodes, ...codes]) }}
+    />
   </div>
+
+  <BulkAddBar
+    selectedCount={selectedSearchCodes.size}
+    onAdd={bulkAddToThisDeck}
+    onClear={() => { selectedSearchCodes = new Set() }}
+  />
 </div>
 
 <style>
@@ -408,7 +446,7 @@
     cursor: pointer;
     font-family: inherit;
   }
-  .species-list, .search-results {
+  .species-list {
     list-style: none;
     padding: 0;
     margin: 0;
@@ -416,14 +454,14 @@
     flex-direction: column;
     gap: 0.5rem;
   }
-  .species-row, .search-row {
+  .species-row {
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 10px;
     padding: 0.75rem 1rem;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 0.625rem;
     box-shadow: var(--shadow);
   }
   .species-names {
@@ -432,16 +470,11 @@
     gap: 0.125rem;
     text-decoration: none;
   }
-  .search-row span {
-    display: flex;
-    flex-direction: column;
-    gap: 0.125rem;
-  }
-  .species-row strong, .search-row strong {
+  .species-row strong {
     font-size: 0.9375rem;
     color: var(--text);
   }
-  .species-row em, .search-row em {
+  .species-row em {
     font-size: 0.8125rem;
     color: var(--text-muted);
     font-style: italic;
@@ -450,6 +483,8 @@
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    margin-left: auto;
+    flex-shrink: 0;
   }
   .lane-toggles {
     display: flex;
@@ -484,22 +519,6 @@
     font-size: 0.75rem;
     cursor: pointer;
     font-family: inherit;
-  }
-  .btn-add {
-    background: var(--surface);
-    border: 1px solid var(--accent);
-    color: var(--accent);
-    border-radius: 6px;
-    padding: 0.25rem 0.625rem;
-    font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .added-indicator {
-    font-size: 0.75rem;
-    color: var(--text-muted);
-    padding: 0.25rem 0.5rem;
   }
   .search-section {
     display: flex;

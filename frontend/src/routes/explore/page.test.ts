@@ -137,4 +137,70 @@ describe('Explore page', () => {
     render(ExplorePage)
     expect(screen.getByText(/couldn't load species/i)).toBeTruthy()
   })
+
+  it('shows a checkbox for each species row', async () => {
+    render(ExplorePage)
+    await vi.waitFor(() => {
+      const checkboxes = screen.getAllByRole('checkbox')
+      expect(checkboxes).toHaveLength(2)
+    })
+  })
+
+  it('shows bulk add bar when a species is checked', async () => {
+    render(ExplorePage)
+    await vi.waitFor(() => screen.getAllByRole('checkbox'))
+    const [firstCheckbox] = screen.getAllByRole('checkbox')
+    await fireEvent.click(firstCheckbox)
+    await vi.waitFor(() => {
+      expect(screen.getByRole('toolbar')).toBeInTheDocument()
+      expect(screen.getByText(/1 selected/i)).toBeInTheDocument()
+    })
+  })
+
+  it('pinned species remain visible when search changes', async () => {
+    render(ExplorePage)
+    await vi.waitFor(() => screen.getAllByRole('checkbox'))
+    // Check American Robin
+    const checkboxes = screen.getAllByRole('checkbox')
+    await fireEvent.click(checkboxes[0]) // American Robin
+    // Now search for chickadee -- Robin no longer in filtered but stays pinned
+    const input = screen.getByPlaceholderText(/search species/i)
+    await fireEvent.input(input, { target: { value: 'chickadee' } })
+    await vi.waitFor(() => {
+      expect(screen.getAllByText(/american robin/i).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/black-capped chickadee/i).length).toBeGreaterThan(0)
+    })
+  })
+
+  it('shows select-all button when search is active', async () => {
+    render(ExplorePage)
+    const input = screen.getByPlaceholderText(/search species/i)
+    await fireEvent.input(input, { target: { value: 'ro' } })
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /select all/i })).toBeInTheDocument()
+    })
+  })
+
+  it('select-all selects all displayed non-pinned species', async () => {
+    render(ExplorePage)
+    const input = screen.getByPlaceholderText(/search species/i)
+    await fireEvent.input(input, { target: { value: 'ro' } })
+    await vi.waitFor(() => screen.getByRole('button', { name: /select all/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /select all/i }))
+    await vi.waitFor(() => {
+      expect(screen.getByRole('toolbar')).toBeInTheDocument()
+    })
+  })
+
+  it('clears selection when clear button clicked', async () => {
+    render(ExplorePage)
+    await vi.waitFor(() => screen.getAllByRole('checkbox'))
+    const [firstCheckbox] = screen.getAllByRole('checkbox')
+    await fireEvent.click(firstCheckbox)
+    await vi.waitFor(() => screen.getByRole('toolbar'))
+    await fireEvent.click(screen.getByRole('button', { name: /clear/i }))
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('toolbar')).toBeNull()
+    })
+  })
 })

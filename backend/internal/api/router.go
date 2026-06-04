@@ -64,6 +64,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 
 			r.Get("/decks/{id}/species", h.listDeckSpecies)
 			r.Post("/decks/{id}/species", h.addSpeciesToDeck)
+			r.Post("/decks/{id}/species/bulk", h.bulkAddSpeciesToDeck)
 			r.Delete("/decks/{id}/species/{ebird_code}", h.removeSpeciesFromDeck)
 
 			r.Get("/decks/{id}/next", h.getNextCard)
