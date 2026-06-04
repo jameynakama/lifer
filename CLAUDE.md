@@ -11,7 +11,8 @@ Spaced repetition web app for bird song/call and image ID practice. Hear a recor
 - **Cloudflare R2** for all media -- full public URLs (`https://media.flockdeck.com/...`) stored in `file_path`; every environment shares one bucket
 
 ## Working on it
-- Task runner: `Justfile` -- `just` (all tests: go vet + gotestsum + svelte-check + vitest), `just run` (backend via air + frontend via vite), `just generate` (sqlc -- run after ANY schema change), `just migration name=foo`, `just migrate-up`/`migrate-down`
+- Task runner: read `Justfile` for all commands. Key: `just generate` (sqlc) must run after any schema change
+- After making changes, review this file: remove anything completed or now derivable from the code; add only what's non-obvious or future work
 - `go.mod` is in `backend/`, not repo root (monorepo with `frontend/` alongside)
 - Generated sqlc files (`backend/internal/store/*.go` except `queries/`) are committed -- don't `.gitignore` them
 - Docker Compose postgres on port **5435**; backend on `$PORT` (8081 in `.env.example`)
@@ -21,8 +22,8 @@ Spaced repetition web app for bird song/call and image ID practice. Hear a recor
 ## Data model
 - `users` -- google_id, email, name, picture, is_admin; BIGSERIAL PK
 - `species` -- **`ebird_code TEXT PRIMARY KEY`**, common_name, scientific_name
-- `species_recordings` -- **`xeno_canto_id TEXT PK`**, species_code FK, file_path (R2 URL), quality (A-E), type ("song"/"call"), credit
-- `species_images` -- **`macaulay_id TEXT PK`**, species_code FK, file_path (R2 URL), credit
+- `species_recordings` -- **`xeno_canto_id TEXT PK`**, species_code FK, file_path (R2 URL), quality (A-E), type ("song"/"call"), credit, locked
+- `species_images` -- **`macaulay_id TEXT PK`**, species_code FK, file_path (R2 URL), credit, locked
 - `decks` -- preset (eBird-sourced, `owner_id IS NULL`) or user-created; BIGSERIAL PK
 - `deck_species` -- join table; PK `(deck_id, species_code)`
 - `cards` -- user × species × lane with FSRS fields; UNIQUE `(user_id, species_code, lane)`
@@ -70,42 +71,19 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - TanStack Query v6: `createQuery(() => ({...}))` -- options wrapped in a function so Svelte 5 rune reads are tracked. Returns a reactive object (not a store) -- access `.data`/`.isPending` without `$`. Same pattern for `createMutation`
 - `GET /api/v1/species` pagination: `next`/`previous` are absolute URLs built from `r.Host` + `X-Forwarded-Proto`; `count` via `COUNT(*) OVER()` window function
 - `GET /api/v1/species/all` (unpaginated) feeds all client-side filtering: TanStack key `['species', 'all']`, `staleTime: Infinity`, fetched once per session, shared by Explore and deck typeahead. If the catalog outgrows regional scale, revert to the server-side paginated search (still in place)
+- Admin routes: backend `requireAdmin` middleware + `/admin/+layout.svelte` redirects to `/` if `!$auth?.is_admin`. Toggle admin via `PATCH /api/v1/admin/users/{id}`
 
 ## Known issues (deferred)
 - **OAuth "invalid state" with installed Chrome PWA** -- logging in from both a Chrome tab and the shortcut app white-screens on the callback state check. `site.webmanifest` has no `scope`, so Chrome link-capturing pulls the Google redirect into the app window. Unconfirmed: (H1) same-profile clobbering of the single fixed-name `oauth_state` cookie vs (H2) PWA in a different Chrome profile = different cookie jar = cookie missing. Discriminator: log whether the cookie is *missing* (H2) or *mismatched* (H1) in the callback. Fixes: H1 → per-flow `oauth_state_<state>` cookies deleted after use (also closes the 5-min replay window); H2 → HMAC-signed state or manifest `scope` change. Deferred as an extreme edge case.
 
 ## Ingest workflow
-```bash
-just ingest US-OR                          # ingest a region (media → R2, metadata → local DB)
-just ingest --species busti US-OR          # single species
-just ingest --skip-complete US-OR US-WA    # skip already-ingested species
-just ingest --max-recordings 2 US-OR       # fewer recordings per species
+Ingest locally (writes to shared R2 bucket) → `pg_dump $DATABASE_URL | psql $PROD_DATABASE_URL`. See `just ingest --help` for flags (`--species`, `--skip-complete`, `--max-recordings`).
 
-# XC taxonomy overrides -- when XC uses a different genus than eBird.
-# Full ingest first; the MISSING MEDIA report lists affected species. Research at xeno-canto.org, then:
-just ingest --xc-override "comrav=Corvus:corax,amgos=Accipiter:gentilis" --skip-complete US-OR
-
-# Then: pg_dump $DATABASE_URL | psql $PROD_DATABASE_URL
-```
+XC taxonomy overrides: when XC uses a different genus than eBird, run full ingest first -- the MISSING MEDIA report lists affected species -- then re-run with `--xc-override "code=Genus:species"`.
 
 ## External APIs
 All three are **ingestion-only** -- never hit at runtime.
 
-### eBird
-- Regional species checklists → preset decks. Free key (ebird.org/api/keygen)
-- `GET /v2/product/spplist/{regionCode}` (e.g. `US-OR`)
-- Docs: https://documenter.getpostman.com/view/664302/S1ENwy59
-
-### Xeno-canto (recordings)
-- **v3 API, not v2**; key required: `GET https://xeno-canto.org/api/3/recordings?key={key}&query=...`
-- Query `gen:Genus sp:species` parsed from eBird SciName, separately for `type:song` and `type:call`
-- **Do NOT use `en:`** -- XC English names differ from eBird ("Northern Raven" vs "Common Raven") → silent empty results
-- **Do NOT use `q:A`** in the query -- filter quality (A/B) client-side
-- **Encoding:** `url.PathEscape`, not `url.Values.Encode` -- XC needs `%20`, not `+`
-- Taxonomy lag: when `gen:+sp:` returns 0, use `--xc-override code=Genus:species`
-- All CC-licensed -- safe to store and serve
-
-### Macaulay Library (photos)
-- Same eBird key, `X-eBirdApiToken` header; **search.macaulaylibrary.org, not api.ebird.org**
-- `GET /api/v1/search?taxonCode={code}&mediaType=photo&sort=rating_rank_desc&count={n}`
-- Response: `{ results: { content: [ { assetId, userDisplayName, ... } ] } }`
+- **eBird:** regional checklists → preset decks
+- **Xeno-canto (v3, not v2):** query `gen:Genus sp:species` -- **do NOT use `en:`** (XC English names differ from eBird → silent empty results); **do NOT use `q:A`** (filter quality client-side); use `url.PathEscape` not `url.Values.Encode` (XC needs `%20` not `+`)
+- **Macaulay Library:** same eBird key, `X-eBirdApiToken` header; host is **search.macaulaylibrary.org**, not api.ebird.org
