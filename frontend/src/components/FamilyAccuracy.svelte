@@ -2,10 +2,40 @@
   import type { StatsFamily } from '../types'
 
   let { families }: { families: StatsFamily[] } = $props()
+
+  const pct = (f: StatsFamily) => Math.round((f.correct / f.attempts) * 100)
 </script>
 
-<div class="family-accuracy">
-  {#each families as fam (fam.family)}
-    <div class="family-row">{fam.family}</div>
-  {/each}
-</div>
+<section class="card panel">
+  <h3 class="panel-title">By family</h3>
+  {#if families.length === 0}
+    <p class="muted">No reviews logged yet (or families not backfilled — re-run ingest).</p>
+  {:else}
+    <ul class="list-reset">
+      {#each families as f (f.family)}
+        {@const p = pct(f)}
+        <li class="row">
+          <span>{f.family}</span>
+          <span class="pct" class:low={p < 50}>{p}%</span>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+</section>
+
+<style>
+  .row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.3125rem 0;
+    font-size: 0.875rem;
+    color: var(--text);
+  }
+  .pct {
+    font-weight: 700;
+    color: var(--success);
+  }
+  .pct.low {
+    color: var(--error);
+  }
+</style>

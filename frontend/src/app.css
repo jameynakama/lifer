@@ -133,6 +133,18 @@ body {
   margin: 0;
 }
 
+/* Stats-panel chrome (used with .card: class="card panel"). */
+.panel {
+  padding: 0.875rem 1rem;
+}
+.panel-title {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin-bottom: 0.625rem;
+}
+
 /* Centered muted status/empty message. */
 .status {
   text-align: center;
