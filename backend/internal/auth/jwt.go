@@ -11,8 +11,8 @@ import (
 const TokenDuration = 30 * 24 * time.Hour
 
 type Claims struct {
-	UserID  int64  `json:"user_id"`
-	IsAdmin bool   `json:"is_admin"`
+	UserID  int64 `json:"user_id"`
+	IsAdmin bool  `json:"is_admin"`
 	jwt.RegisteredClaims
 }
 

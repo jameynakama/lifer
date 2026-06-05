@@ -21,20 +21,20 @@ import (
 
 type adminStubQuerier struct {
 	store.Querier
-	getImageByID         func(ctx context.Context, macaulayID string) (store.GetImageByIDRow, error)
-	getRecordingByID     func(ctx context.Context, xenoCantoID string) (store.GetRecordingByIDRow, error)
-	getSpeciesImages     func(ctx context.Context, speciesCode string) ([]store.GetSpeciesImagesRow, error)
-	getSpeciesRecordings func(ctx context.Context, speciesCode string) ([]store.GetSpeciesRecordingsRow, error)
-	deleteImage          func(ctx context.Context, macaulayID string) error
-	deleteRecording      func(ctx context.Context, xenoCantoID string) error
-	upsertSpeciesImage   func(ctx context.Context, arg store.UpsertSpeciesImageParams) (store.SpeciesImage, error)
-	upsertRecording      func(ctx context.Context, arg store.UpsertRecordingParams) (store.SpeciesRecording, error)
-	setImageLocked       func(ctx context.Context, arg store.SetImageLockedParams) error
-	setRecordingLocked   func(ctx context.Context, arg store.SetRecordingLockedParams) error
-	getUsers             func(ctx context.Context) ([]store.GetUsersRow, error)
-	setUserIsAdmin       func(ctx context.Context, arg store.SetUserIsAdminParams) error
-	listAllUserDecks     func(ctx context.Context) ([]store.ListAllUserDecksRow, error)
-	getDeckWithOwner     func(ctx context.Context, id int64) (store.GetDeckWithOwnerRow, error)
+	getImageByID          func(ctx context.Context, macaulayID string) (store.GetImageByIDRow, error)
+	getRecordingByID      func(ctx context.Context, xenoCantoID string) (store.GetRecordingByIDRow, error)
+	getSpeciesImages      func(ctx context.Context, speciesCode string) ([]store.GetSpeciesImagesRow, error)
+	getSpeciesRecordings  func(ctx context.Context, speciesCode string) ([]store.GetSpeciesRecordingsRow, error)
+	deleteImage           func(ctx context.Context, macaulayID string) error
+	deleteRecording       func(ctx context.Context, xenoCantoID string) error
+	upsertSpeciesImage    func(ctx context.Context, arg store.UpsertSpeciesImageParams) (store.SpeciesImage, error)
+	upsertRecording       func(ctx context.Context, arg store.UpsertRecordingParams) (store.SpeciesRecording, error)
+	setImageLocked        func(ctx context.Context, arg store.SetImageLockedParams) error
+	setRecordingLocked    func(ctx context.Context, arg store.SetRecordingLockedParams) error
+	getUsers              func(ctx context.Context) ([]store.GetUsersRow, error)
+	setUserIsAdmin        func(ctx context.Context, arg store.SetUserIsAdminParams) error
+	listAllUserDecks      func(ctx context.Context) ([]store.ListAllUserDecksRow, error)
+	getDeckWithOwner      func(ctx context.Context, id int64) (store.GetDeckWithOwnerRow, error)
 	listDeckSpeciesSimple func(ctx context.Context, deckID int64) ([]store.ListDeckSpeciesSimpleRow, error)
 }
 

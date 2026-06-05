@@ -102,11 +102,11 @@ func TestUploadImage_Success_UpsertsWithImageFields(t *testing.T) {
 
 func TestPartitionProtected(t *testing.T) {
 	tests := []struct {
-		name           string
-		codes          []string
-		locked         []string
-		wantDeletable  []string
-		wantProtected  []string
+		name          string
+		codes         []string
+		locked        []string
+		wantDeletable []string
+		wantProtected []string
 	}{
 		{
 			name:          "locked species are split out",

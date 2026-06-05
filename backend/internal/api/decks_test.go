@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jameynakama/flockdeck/internal/store"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jameynakama/flockdeck/internal/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

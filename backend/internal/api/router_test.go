@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/jameynakama/flockdeck/internal/auth"
@@ -107,4 +108,13 @@ func TestRouter_AdminRoute_Admin_200(t *testing.T) {
 	}
 	rec := routerGet(newTestRouter(q), "/api/v1/admin/users", routerCookie(t, 7, true))
 	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestRouter_Reset_NoCookie_401(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/reset",
+		strings.NewReader(`{"scope":"schedule"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	newTestRouter(&stubQuerier{}).ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }

@@ -22,15 +22,15 @@ import (
 // stubQuerier embeds store.Querier (nil) so unimplemented methods panic if called.
 type stubQuerier struct {
 	store.Querier
-	getNextDueCard        func(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error)
-	getRandomMedia        func(ctx context.Context, speciesCode string) (store.GetRandomMediaForSpeciesRow, error)
-	getCard               func(ctx context.Context, arg store.GetCardParams) (store.Card, error)
-	updateCardSchedule    func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
-	createReviewLog       func(ctx context.Context, arg store.CreateReviewLogParams) (store.ReviewLog, error)
-	getDeckPracticeCards  func(ctx context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error)
-	getDeck               func(ctx context.Context, id int64) (store.Deck, error)
-	getUsers              func(ctx context.Context) ([]store.GetUsersRow, error)
-	listPresetDecks       func(ctx context.Context) ([]store.ListPresetDecksRow, error)
+	getNextDueCard       func(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error)
+	getRandomMedia       func(ctx context.Context, speciesCode string) (store.GetRandomMediaForSpeciesRow, error)
+	getCard              func(ctx context.Context, arg store.GetCardParams) (store.Card, error)
+	updateCardSchedule   func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
+	createReviewLog      func(ctx context.Context, arg store.CreateReviewLogParams) (store.ReviewLog, error)
+	getDeckPracticeCards func(ctx context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error)
+	getDeck              func(ctx context.Context, id int64) (store.Deck, error)
+	getUsers             func(ctx context.Context) ([]store.GetUsersRow, error)
+	listPresetDecks      func(ctx context.Context) ([]store.ListPresetDecksRow, error)
 	// stats stubs
 	getCardTotals      func(ctx context.Context, arg store.GetCardTotalsParams) (store.GetCardTotalsRow, error)
 	getCardStateCounts func(ctx context.Context, arg store.GetCardStateCountsParams) ([]store.GetCardStateCountsRow, error)
@@ -41,6 +41,9 @@ type stubQuerier struct {
 	getHardMedia       func(ctx context.Context, arg store.GetHardMediaParams) ([]store.GetHardMediaRow, error)
 	getReviewAccuracy  func(ctx context.Context, arg store.GetReviewAccuracyParams) (store.GetReviewAccuracyRow, error)
 	countReviewsSince  func(ctx context.Context, arg store.CountReviewsSinceParams) (int64, error)
+	// reset stubs
+	deleteAllCardsForUser   func(ctx context.Context, userID int64) (int64, error)
+	deleteAllReviewsForUser func(ctx context.Context, userID int64) (int64, error)
 }
 
 func (s *stubQuerier) GetNextDueCard(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
@@ -96,6 +99,12 @@ func (s *stubQuerier) GetReviewAccuracy(ctx context.Context, arg store.GetReview
 }
 func (s *stubQuerier) CountReviewsSince(ctx context.Context, arg store.CountReviewsSinceParams) (int64, error) {
 	return s.countReviewsSince(ctx, arg)
+}
+func (s *stubQuerier) DeleteAllCardsForUser(ctx context.Context, userID int64) (int64, error) {
+	return s.deleteAllCardsForUser(ctx, userID)
+}
+func (s *stubQuerier) DeleteAllReviewsForUser(ctx context.Context, userID int64) (int64, error) {
+	return s.deleteAllReviewsForUser(ctx, userID)
 }
 
 func makeHandler(q store.Querier) *Handler {
