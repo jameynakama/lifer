@@ -9,7 +9,7 @@
 <section class="card panel">
   <h3 class="panel-title">By family</h3>
   {#if families.length === 0}
-    <p class="muted">No reviews logged yet (or families not backfilled — re-run ingest).</p>
+    <p class="muted">No family stats yet — they build as you review.</p>
   {:else}
     <ul class="list-reset">
       {#each families as f (f.family)}
