@@ -122,6 +122,7 @@ func main() {
 
 	router := api.NewRouter(api.RouterConfig{
 		Queries:     queries,
+		DB:          pool,
 		OAuthConfig: oauthCfg,
 		JWTSecret:   cfg.jwtSecret,
 		FrontendURL: cfg.frontendURL,

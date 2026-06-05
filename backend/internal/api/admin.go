@@ -185,15 +185,15 @@ func (h *Handler) adminDeleteImage(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "locked")
 		return
 	}
-	if err := h.r2Client.Delete(r.Context(), h.r2Client.KeyFor(img.FilePath)); err != nil {
-		log.Printf("admin: delete image R2 %s: %v", id, err)
-		writeError(w, http.StatusInternalServerError, "server error")
-		return
-	}
+	// DB first: an orphaned R2 object is harmless (and logged); a DB row
+	// pointing at a deleted object would break the app.
 	if err := h.queries.DeleteImage(r.Context(), id); err != nil {
 		log.Printf("admin: delete image DB %s: %v", id, err)
 		writeError(w, http.StatusInternalServerError, "server error")
 		return
+	}
+	if err := h.r2Client.Delete(r.Context(), h.r2Client.KeyFor(img.FilePath)); err != nil {
+		log.Printf("admin: delete image R2 %s (orphaned object): %v", id, err)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
@@ -340,15 +340,15 @@ func (h *Handler) adminDeleteRecording(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "locked")
 		return
 	}
-	if err := h.r2Client.Delete(r.Context(), h.r2Client.KeyFor(rec.FilePath)); err != nil {
-		log.Printf("admin: delete recording R2 %s: %v", id, err)
-		writeError(w, http.StatusInternalServerError, "server error")
-		return
-	}
+	// DB first: an orphaned R2 object is harmless (and logged); a DB row
+	// pointing at a deleted object would break the app.
 	if err := h.queries.DeleteRecording(r.Context(), id); err != nil {
 		log.Printf("admin: delete recording DB %s: %v", id, err)
 		writeError(w, http.StatusInternalServerError, "server error")
 		return
+	}
+	if err := h.r2Client.Delete(r.Context(), h.r2Client.KeyFor(rec.FilePath)); err != nil {
+		log.Printf("admin: delete recording R2 %s (orphaned object): %v", id, err)
 	}
 	w.WriteHeader(http.StatusNoContent)
 }

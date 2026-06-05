@@ -23,9 +23,7 @@ import (
 type stubQuerier struct {
 	store.Querier
 	getNextDueCard        func(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error)
-	countDueCards         func(ctx context.Context, arg store.CountDueCardsParams) (int64, error)
-	getRandomRecording    func(ctx context.Context, speciesCode string) (store.GetRandomRecordingRow, error)
-	getRandomImage        func(ctx context.Context, speciesCode string) (store.GetRandomImageRow, error)
+	getRandomMedia        func(ctx context.Context, speciesCode string) (store.GetRandomMediaForSpeciesRow, error)
 	getCard               func(ctx context.Context, arg store.GetCardParams) (store.Card, error)
 	updateCardSchedule    func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
 	getDeckPracticeCards func(ctx context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error)
@@ -35,17 +33,8 @@ type stubQuerier struct {
 func (s *stubQuerier) GetNextDueCard(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
 	return s.getNextDueCard(ctx, arg)
 }
-func (s *stubQuerier) CountDueCards(ctx context.Context, arg store.CountDueCardsParams) (int64, error) {
-	if s.countDueCards != nil {
-		return s.countDueCards(ctx, arg)
-	}
-	return 0, nil
-}
-func (s *stubQuerier) GetRandomRecording(ctx context.Context, speciesCode string) (store.GetRandomRecordingRow, error) {
-	return s.getRandomRecording(ctx, speciesCode)
-}
-func (s *stubQuerier) GetRandomImage(ctx context.Context, speciesCode string) (store.GetRandomImageRow, error) {
-	return s.getRandomImage(ctx, speciesCode)
+func (s *stubQuerier) GetRandomMediaForSpecies(ctx context.Context, speciesCode string) (store.GetRandomMediaForSpeciesRow, error) {
+	return s.getRandomMedia(ctx, speciesCode)
 }
 func (s *stubQuerier) GetCard(ctx context.Context, arg store.GetCardParams) (store.Card, error) {
 	return s.getCard(ctx, arg)
@@ -109,14 +98,16 @@ func TestGetNextCard_Audio_ReturnsDueCard(t *testing.T) {
 				CommonName:     "Spotted Towhee",
 				ScientificName: "Pipilo maculatus",
 				Due:            due,
+				DueRemaining:   3,
 			}, nil
 		},
-		getRandomRecording: func(_ context.Context, speciesCode string) (store.GetRandomRecordingRow, error) {
+		getRandomMedia: func(_ context.Context, speciesCode string) (store.GetRandomMediaForSpeciesRow, error) {
 			assert.Equal(t, "spotto", speciesCode)
-			return store.GetRandomRecordingRow{FilePath: "https://r2.example.com/recordings/spotto/123.mp3", Type: "song"}, nil
-		},
-		getRandomImage: func(_ context.Context, speciesCode string) (store.GetRandomImageRow, error) {
-			return store.GetRandomImageRow{FilePath: "https://r2.example.com/images/spotto/456.jpg"}, nil
+			return store.GetRandomMediaForSpeciesRow{
+				AudioPath: "https://r2.example.com/recordings/spotto/123.mp3",
+				AudioType: "song",
+				ImagePath: "https://r2.example.com/images/spotto/456.jpg",
+			}, nil
 		},
 	}
 
@@ -136,6 +127,7 @@ func TestGetNextCard_Audio_ReturnsDueCard(t *testing.T) {
 	assert.Equal(t, "https://r2.example.com/recordings/spotto/123.mp3", body.MediaURL)
 	assert.Equal(t, "https://r2.example.com/images/spotto/456.jpg", body.PhotoURL)
 	assert.Equal(t, "audio", body.Lane)
+	assert.Equal(t, int64(3), body.DueRemaining)
 }
 
 func TestGetNextCard_NothingDue_Returns204(t *testing.T) {
@@ -259,8 +251,8 @@ func TestGetNextCard_NoMedia_Returns404(t *testing.T) {
 		getNextDueCard: func(_ context.Context, _ store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
 			return store.GetNextDueCardRow{SpeciesCode: "spotto", Lane: "audio", Due: due}, nil
 		},
-		getRandomRecording: func(_ context.Context, _ string) (store.GetRandomRecordingRow, error) {
-			return store.GetRandomRecordingRow{}, pgx.ErrNoRows
+		getRandomMedia: func(_ context.Context, _ string) (store.GetRandomMediaForSpeciesRow, error) {
+			return store.GetRandomMediaForSpeciesRow{}, nil
 		},
 	}
 
@@ -547,11 +539,8 @@ func TestGetNextCard_ForeignDeck_Returns403(t *testing.T) {
 		getNextDueCard: func(_ context.Context, _ store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
 			return store.GetNextDueCardRow{SpeciesCode: "spotto", Lane: "audio", Due: due}, nil
 		},
-		getRandomRecording: func(_ context.Context, _ string) (store.GetRandomRecordingRow, error) {
-			return store.GetRandomRecordingRow{FilePath: "https://r2.example.com/rec.mp3"}, nil
-		},
-		getRandomImage: func(_ context.Context, _ string) (store.GetRandomImageRow, error) {
-			return store.GetRandomImageRow{FilePath: "https://r2.example.com/img.jpg"}, nil
+		getRandomMedia: func(_ context.Context, _ string) (store.GetRandomMediaForSpeciesRow, error) {
+			return store.GetRandomMediaForSpeciesRow{AudioPath: "https://r2.example.com/rec.mp3", ImagePath: "https://r2.example.com/img.jpg"}, nil
 		},
 	}
 

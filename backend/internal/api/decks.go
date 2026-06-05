@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -77,31 +78,33 @@ func (h *Handler) cloneDeck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newDeck, err := h.queries.CreateDeck(r.Context(), store.CreateDeckParams{
-		Name:        src.Name,
-		Description: src.Description,
-		OwnerID:     pgtype.Int8{Int64: userID, Valid: true},
+	var newDeck store.Deck
+	err = h.inTx(r.Context(), func(q store.Querier) error {
+		var err error
+		newDeck, err = q.CreateDeck(r.Context(), store.CreateDeckParams{
+			Name:        src.Name,
+			Description: src.Description,
+			OwnerID:     pgtype.Int8{Int64: userID, Valid: true},
+		})
+		if err != nil {
+			return fmt.Errorf("CreateDeck (clone): %w", err)
+		}
+		if err := q.CloneDeckSpecies(r.Context(), store.CloneDeckSpeciesParams{
+			DeckID:   deckID,
+			DeckID_2: newDeck.ID,
+		}); err != nil {
+			return fmt.Errorf("CloneDeckSpecies: %w", err)
+		}
+		if err := q.UpsertCardsForDeck(r.Context(), store.UpsertCardsForDeckParams{
+			UserID: userID,
+			DeckID: newDeck.ID,
+		}); err != nil {
+			return fmt.Errorf("UpsertCardsForDeck: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
-		log.Printf("CreateDeck (clone) error: %v", err)
-		writeError(w, http.StatusInternalServerError, "server error")
-		return
-	}
-
-	if err := h.queries.CloneDeckSpecies(r.Context(), store.CloneDeckSpeciesParams{
-		DeckID:   deckID,
-		DeckID_2: newDeck.ID,
-	}); err != nil {
-		log.Printf("CloneDeckSpecies error: %v", err)
-		writeError(w, http.StatusInternalServerError, "server error")
-		return
-	}
-
-	if err := h.queries.UpsertCardsForDeck(r.Context(), store.UpsertCardsForDeckParams{
-		UserID: userID,
-		DeckID: newDeck.ID,
-	}); err != nil {
-		log.Printf("UpsertCardsForDeck error: %v", err)
+		log.Printf("clone deck: %v", err)
 		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
@@ -278,25 +281,28 @@ func (h *Handler) addSpeciesToDeck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.queries.AddSpeciesToDeck(r.Context(), store.AddSpeciesToDeckParams{
-		DeckID:      deckID,
-		SpeciesCode: req.EbirdCode,
-	}); err != nil {
-		log.Printf("AddSpeciesToDeck error: %v", err)
+	err := h.inTx(r.Context(), func(q store.Querier) error {
+		if err := q.AddSpeciesToDeck(r.Context(), store.AddSpeciesToDeckParams{
+			DeckID:      deckID,
+			SpeciesCode: req.EbirdCode,
+		}); err != nil {
+			return fmt.Errorf("AddSpeciesToDeck: %w", err)
+		}
+		for _, lane := range []string{"audio", "image"} {
+			if err := q.UpsertCard(r.Context(), store.UpsertCardParams{
+				UserID:      userID,
+				SpeciesCode: req.EbirdCode,
+				Lane:        lane,
+			}); err != nil {
+				return fmt.Errorf("UpsertCard: %w", err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		log.Printf("add species to deck: %v", err)
 		writeError(w, http.StatusInternalServerError, "server error")
 		return
-	}
-
-	for _, lane := range []string{"audio", "image"} {
-		if err := h.queries.UpsertCard(r.Context(), store.UpsertCardParams{
-			UserID:      userID,
-			SpeciesCode: req.EbirdCode,
-			Lane:        lane,
-		}); err != nil {
-			log.Printf("UpsertCard error: %v", err)
-			writeError(w, http.StatusInternalServerError, "server error")
-			return
-		}
 	}
 
 	w.WriteHeader(http.StatusCreated)
@@ -323,21 +329,26 @@ func (h *Handler) bulkAddSpeciesToDeck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	added, err := h.queries.BulkAddSpeciesToDeck(r.Context(), store.BulkAddSpeciesToDeckParams{
-		DeckID:  deckID,
-		Column2: req.SpeciesCodes,
+	var added int64
+	err := h.inTx(r.Context(), func(q store.Querier) error {
+		var err error
+		added, err = q.BulkAddSpeciesToDeck(r.Context(), store.BulkAddSpeciesToDeckParams{
+			DeckID:  deckID,
+			Column2: req.SpeciesCodes,
+		})
+		if err != nil {
+			return fmt.Errorf("BulkAddSpeciesToDeck: %w", err)
+		}
+		if err := q.BulkUpsertCards(r.Context(), store.BulkUpsertCardsParams{
+			UserID:  userID,
+			Column2: req.SpeciesCodes,
+		}); err != nil {
+			return fmt.Errorf("BulkUpsertCards: %w", err)
+		}
+		return nil
 	})
 	if err != nil {
-		log.Printf("BulkAddSpeciesToDeck error: %v", err)
-		writeError(w, http.StatusInternalServerError, "server error")
-		return
-	}
-
-	if err := h.queries.BulkUpsertCards(r.Context(), store.BulkUpsertCardsParams{
-		UserID:  userID,
-		Column2: req.SpeciesCodes,
-	}); err != nil {
-		log.Printf("BulkUpsertCards error: %v", err)
+		log.Printf("bulk add species: %v", err)
 		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}

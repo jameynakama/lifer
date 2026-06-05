@@ -2,9 +2,10 @@ package xenocanto
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/jameynakama/flockdeck/internal/httpx"
 	"net/url"
 	"strconv"
 	"strings"
@@ -37,7 +38,7 @@ func newWithBaseURL(apiKey, baseURL string) *Client {
 	return &Client{
 		apiKey:     apiKey,
 		baseURL:    baseURL,
-		httpClient: &http.Client{},
+		httpClient: httpx.DefaultClient,
 	}
 }
 
@@ -52,20 +53,8 @@ func (c *Client) Search(ctx context.Context, genus, species, recType string, max
 		url.QueryEscape(c.apiKey),
 		url.PathEscape(queryStr),
 	)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("xeno-canto search: status %d", resp.StatusCode)
-	}
 	var r apiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+	if err := httpx.GetJSON(ctx, c.httpClient, endpoint, nil, &r); err != nil {
 		return nil, err
 	}
 	return filterAndNormalize(r.Recordings, maxLenSecs), nil

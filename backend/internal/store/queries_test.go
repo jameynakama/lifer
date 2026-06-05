@@ -225,54 +225,85 @@ func TestGetNextDueCard_NonQuizQualityRecording_SkipsCard(t *testing.T) {
 		"want ErrNoRows when the only due species has no A/B recording, got %v", err)
 }
 
-// CountDueCards
+// due_remaining (window count folded into GetNextDueCard)
 
-func TestCountDueCards_NoPreference_CountsCard(t *testing.T) {
+func TestGetNextDueCard_ReportsDueRemaining(t *testing.T) {
 	pool := connectTestDB(t)
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
 
-	count, err := q.CountDueCards(context.Background(), store.CountDueCardsParams{
+	card, err := q.GetNextDueCard(context.Background(), store.GetNextDueCardParams{
 		UserID: f.userID,
 		DeckID: f.deckID,
 		Lane:   "image",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, int64(1), count)
+	assert.Equal(t, int64(1), card.DueRemaining)
 }
 
-func TestCountDueCards_NoMediaForLane_NotCounted(t *testing.T) {
+func TestGetNextDueCard_DueRemaining_ExcludesNoMediaSpecies(t *testing.T) {
 	pool := connectTestDB(t)
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	seedNoMediaSpecies(t, tx, f)
 	q := store.New(tx)
 
-	count, err := q.CountDueCards(context.Background(), store.CountDueCardsParams{
+	card, err := q.GetNextDueCard(context.Background(), store.GetNextDueCardParams{
 		UserID: f.userID,
 		DeckID: f.deckID,
 		Lane:   "image",
 	})
 	require.NoError(t, err)
 	// Only _tst1 (which has an image) counts; _tst2 has no media.
-	assert.Equal(t, int64(1), count)
+	assert.Equal(t, int64(1), card.DueRemaining)
 }
 
-func TestCountDueCards_ImageDisabled_ReturnsZero(t *testing.T) {
+// GetRandomMediaForSpecies
+
+func TestGetRandomMediaForSpecies_ReturnsBothLanes(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	seedFixtures(t, tx)
+	q := store.New(tx)
+
+	media, err := q.GetRandomMediaForSpecies(context.Background(), "_tst1")
+	require.NoError(t, err)
+	assert.Equal(t, "https://r2.example.com/rec.mp3", media.AudioPath)
+	assert.Equal(t, "song", media.AudioType)
+	assert.Equal(t, "tester", media.AudioCredit)
+	assert.Equal(t, "https://r2.example.com/img.jpg", media.ImagePath)
+	assert.Equal(t, "tester", media.ImageCredit)
+}
+
+func TestGetRandomMediaForSpecies_NoMedia_ReturnsEmptyFields(t *testing.T) {
 	pool := connectTestDB(t)
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
-	disableImageLane(t, tx, f.userID)
+	seedNoMediaSpecies(t, tx, f)
 	q := store.New(tx)
 
-	count, err := q.CountDueCards(context.Background(), store.CountDueCardsParams{
-		UserID: f.userID,
-		DeckID: f.deckID,
-		Lane:   "image",
-	})
+	media, err := q.GetRandomMediaForSpecies(context.Background(), "_tst2")
 	require.NoError(t, err)
-	assert.Equal(t, int64(0), count)
+	assert.Empty(t, media.AudioPath)
+	assert.Empty(t, media.ImagePath)
+}
+
+func TestGetRandomMediaForSpecies_LowQualityRecording_Excluded(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	seedNoMediaSpecies(t, tx, f)
+	q := store.New(tx)
+
+	_, err := tx.Exec(context.Background(),
+		`INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type, credit)
+		 VALUES ('_xc_tst2c', '_tst2', 'https://r2.example.com/recC.mp3', 'C', 'call', 'tester')`)
+	require.NoError(t, err)
+
+	media, err := q.GetRandomMediaForSpecies(context.Background(), "_tst2")
+	require.NoError(t, err)
+	assert.Empty(t, media.AudioPath, "C-quality recordings are below the quiz bar")
 }
 
 // Locked media

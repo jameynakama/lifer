@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 
@@ -23,41 +24,42 @@ func (h *Handler) updatePreferences(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pref, err := h.queries.UpsertPreferences(r.Context(), store.UpsertPreferencesParams{
-		UserID:       userID,
-		SpeciesCode:  ebirdCode,
-		AudioEnabled: req.AudioEnabled,
-		ImageEnabled: req.ImageEnabled,
-	})
-	if err != nil {
-		log.Printf("UpsertPreferences error: %v", err)
-		writeError(w, http.StatusInternalServerError, "server error")
-		return
-	}
-
-	for _, lane := range []string{"audio", "image"} {
-		enabled := (lane == "audio" && req.AudioEnabled) || (lane == "image" && req.ImageEnabled)
-		if enabled {
-			if err := h.queries.UpsertCard(r.Context(), store.UpsertCardParams{
+	var pref store.UserSpeciesPreference
+	err := h.inTx(r.Context(), func(q store.Querier) error {
+		var err error
+		pref, err = q.UpsertPreferences(r.Context(), store.UpsertPreferencesParams{
+			UserID:       userID,
+			SpeciesCode:  ebirdCode,
+			AudioEnabled: req.AudioEnabled,
+			ImageEnabled: req.ImageEnabled,
+		})
+		if err != nil {
+			return fmt.Errorf("UpsertPreferences: %w", err)
+		}
+		for _, lane := range []string{"audio", "image"} {
+			enabled := (lane == "audio" && req.AudioEnabled) || (lane == "image" && req.ImageEnabled)
+			if enabled {
+				if err := q.UpsertCard(r.Context(), store.UpsertCardParams{
+					UserID:      userID,
+					SpeciesCode: ebirdCode,
+					Lane:        lane,
+				}); err != nil {
+					return fmt.Errorf("UpsertCard: %w", err)
+				}
+			} else if err := q.DeleteCard(r.Context(), store.DeleteCardParams{
 				UserID:      userID,
 				SpeciesCode: ebirdCode,
 				Lane:        lane,
 			}); err != nil {
-				log.Printf("UpsertCard error: %v", err)
-				writeError(w, http.StatusInternalServerError, "server error")
-				return
-			}
-		} else {
-			if err := h.queries.DeleteCard(r.Context(), store.DeleteCardParams{
-				UserID:      userID,
-				SpeciesCode: ebirdCode,
-				Lane:        lane,
-			}); err != nil {
-				log.Printf("DeleteCard error: %v", err)
-				writeError(w, http.StatusInternalServerError, "server error")
-				return
+				return fmt.Errorf("DeleteCard: %w", err)
 			}
 		}
+		return nil
+	})
+	if err != nil {
+		log.Printf("update preferences: %v", err)
+		writeError(w, http.StatusInternalServerError, "server error")
+		return
 	}
 
 	writeJSON(w, http.StatusOK, pref)

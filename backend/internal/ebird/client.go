@@ -2,10 +2,11 @@ package ebird
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+
+	"github.com/jameynakama/flockdeck/internal/httpx"
 )
 
 type TaxonomyEntry struct {
@@ -29,44 +30,23 @@ func newWithBaseURL(apiKey, baseURL string) *Client {
 	return &Client{
 		apiKey:     apiKey,
 		baseURL:    baseURL,
-		httpClient: &http.Client{},
+		httpClient: httpx.DefaultClient,
 	}
 }
 
+func (c *Client) header() http.Header {
+	return http.Header{"X-eBirdApiToken": {c.apiKey}}
+}
+
 func (c *Client) Taxonomy(ctx context.Context) ([]TaxonomyEntry, error) {
-	url := c.baseURL + "/v2/ref/taxonomy/ebird?fmt=json&cat=species"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("X-eBirdApiToken", c.apiKey)
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ebird taxonomy: status %d", resp.StatusCode)
-	}
 	var entries []TaxonomyEntry
-	return entries, json.NewDecoder(resp.Body).Decode(&entries)
+	err := httpx.GetJSON(ctx, c.httpClient, c.baseURL+"/v2/ref/taxonomy/ebird?fmt=json&cat=species", c.header(), &entries)
+	return entries, err
 }
 
 func (c *Client) SpeciesList(ctx context.Context, regionCode string) ([]string, error) {
 	endpoint := fmt.Sprintf("%s/v2/product/spplist/%s", c.baseURL, url.PathEscape(regionCode))
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("X-eBirdApiToken", c.apiKey)
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("ebird spplist %s: status %d", regionCode, resp.StatusCode)
-	}
 	var codes []string
-	return codes, json.NewDecoder(resp.Body).Decode(&codes)
+	err := httpx.GetJSON(ctx, c.httpClient, endpoint, c.header(), &codes)
+	return codes, err
 }

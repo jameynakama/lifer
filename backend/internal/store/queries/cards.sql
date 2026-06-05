@@ -2,7 +2,8 @@
 SELECT c.id, c.user_id, c.species_code, c.lane,
        c.stability, c.difficulty, c.due, c.last_review,
        c.reps, c.lapses, c.state, c.created_at,
-       s.common_name, s.scientific_name
+       s.common_name, s.scientific_name,
+       COUNT(*) OVER () AS due_remaining
 FROM cards c
 JOIN species s ON s.ebird_code = c.species_code
 JOIN deck_species ds ON ds.species_code = c.species_code
@@ -31,44 +32,26 @@ WHERE c.user_id = $1
 ORDER BY c.due
 LIMIT 1;
 
--- name: GetRandomRecording :one
-SELECT file_path, type, credit FROM species_recordings
-WHERE species_code = $1 AND quality IN ('A', 'B')
-ORDER BY random()
-LIMIT 1;
-
--- name: CountDueCards :one
-SELECT COUNT(*)
-FROM cards c
-JOIN deck_species ds ON ds.species_code = c.species_code
-LEFT JOIN user_species_preferences usp
-       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
-WHERE c.user_id = $1
-  AND ds.deck_id = $2
-  AND c.lane = $3
-  AND c.due <= NOW()
-  AND (
-    ($3 = 'audio' AND COALESCE(usp.audio_enabled, true))
-    OR
-    ($3 = 'image' AND COALESCE(usp.image_enabled, true))
-  )
-  -- Mirror GetNextDueCard's media filter so the due count matches what the
-  -- quiz will actually serve.
-  AND (
-    ($3 = 'audio' AND EXISTS (
-      SELECT 1 FROM species_recordings sr
-      WHERE sr.species_code = c.species_code AND sr.quality IN ('A', 'B')))
-    OR
-    ($3 = 'image' AND EXISTS (
-      SELECT 1 FROM species_images si
-      WHERE si.species_code = c.species_code))
-  );
-
--- name: GetRandomImage :one
-SELECT file_path, credit FROM species_images
-WHERE species_code = $1
-ORDER BY random()
-LIMIT 1;
+-- GetRandomMediaForSpecies picks a random quiz-quality recording and a random
+-- image in one round trip (same LATERAL pattern as GetDeckPracticeCards).
+-- Missing media comes back as empty strings.
+-- name: GetRandomMediaForSpecies :one
+SELECT COALESCE(rec.file_path, '') AS audio_path,
+       COALESCE(rec.type, '')      AS audio_type,
+       COALESCE(rec.credit, '')    AS audio_credit,
+       COALESCE(img.file_path, '') AS image_path,
+       COALESCE(img.credit, '')    AS image_credit
+FROM (SELECT $1::text AS code) sp
+LEFT JOIN LATERAL (
+    SELECT file_path, type, credit FROM species_recordings
+    WHERE species_code = sp.code AND quality IN ('A', 'B')
+    ORDER BY random() LIMIT 1
+) rec ON true
+LEFT JOIN LATERAL (
+    SELECT file_path, credit FROM species_images
+    WHERE species_code = sp.code
+    ORDER BY random() LIMIT 1
+) img ON true;
 
 -- name: GetCard :one
 SELECT id, user_id, species_code, lane, stability, difficulty, due,

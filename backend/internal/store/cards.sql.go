@@ -29,47 +29,6 @@ func (q *Queries) BulkUpsertCards(ctx context.Context, arg BulkUpsertCardsParams
 	return err
 }
 
-const countDueCards = `-- name: CountDueCards :one
-SELECT COUNT(*)
-FROM cards c
-JOIN deck_species ds ON ds.species_code = c.species_code
-LEFT JOIN user_species_preferences usp
-       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
-WHERE c.user_id = $1
-  AND ds.deck_id = $2
-  AND c.lane = $3
-  AND c.due <= NOW()
-  AND (
-    ($3 = 'audio' AND COALESCE(usp.audio_enabled, true))
-    OR
-    ($3 = 'image' AND COALESCE(usp.image_enabled, true))
-  )
-  -- Mirror GetNextDueCard's media filter so the due count matches what the
-  -- quiz will actually serve.
-  AND (
-    ($3 = 'audio' AND EXISTS (
-      SELECT 1 FROM species_recordings sr
-      WHERE sr.species_code = c.species_code AND sr.quality IN ('A', 'B')))
-    OR
-    ($3 = 'image' AND EXISTS (
-      SELECT 1 FROM species_images si
-      WHERE si.species_code = c.species_code))
-  )
-`
-
-type CountDueCardsParams struct {
-	UserID int64  `db:"user_id" json:"user_id"`
-	DeckID int64  `db:"deck_id" json:"deck_id"`
-	Lane   string `db:"lane" json:"lane"`
-}
-
-func (q *Queries) CountDueCards(ctx context.Context, arg CountDueCardsParams) (int64, error) {
-	row := q.db.QueryRow(ctx, countDueCards, arg.UserID, arg.DeckID, arg.Lane)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
 const deleteCard = `-- name: DeleteCard :exec
 DELETE FROM cards
 WHERE user_id = $1 AND species_code = $2 AND lane = $3
@@ -199,7 +158,8 @@ const getNextDueCard = `-- name: GetNextDueCard :one
 SELECT c.id, c.user_id, c.species_code, c.lane,
        c.stability, c.difficulty, c.due, c.last_review,
        c.reps, c.lapses, c.state, c.created_at,
-       s.common_name, s.scientific_name
+       s.common_name, s.scientific_name,
+       COUNT(*) OVER () AS due_remaining
 FROM cards c
 JOIN species s ON s.ebird_code = c.species_code
 JOIN deck_species ds ON ds.species_code = c.species_code
@@ -250,6 +210,7 @@ type GetNextDueCardRow struct {
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	CommonName     string             `db:"common_name" json:"common_name"`
 	ScientificName string             `db:"scientific_name" json:"scientific_name"`
+	DueRemaining   int64              `db:"due_remaining" json:"due_remaining"`
 }
 
 func (q *Queries) GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error) {
@@ -270,46 +231,51 @@ func (q *Queries) GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) 
 		&i.CreatedAt,
 		&i.CommonName,
 		&i.ScientificName,
+		&i.DueRemaining,
 	)
 	return i, err
 }
 
-const getRandomImage = `-- name: GetRandomImage :one
-SELECT file_path, credit FROM species_images
-WHERE species_code = $1
-ORDER BY random()
-LIMIT 1
+const getRandomMediaForSpecies = `-- name: GetRandomMediaForSpecies :one
+SELECT COALESCE(rec.file_path, '') AS audio_path,
+       COALESCE(rec.type, '')      AS audio_type,
+       COALESCE(rec.credit, '')    AS audio_credit,
+       COALESCE(img.file_path, '') AS image_path,
+       COALESCE(img.credit, '')    AS image_credit
+FROM (SELECT $1::text AS code) sp
+LEFT JOIN LATERAL (
+    SELECT file_path, type, credit FROM species_recordings
+    WHERE species_code = sp.code AND quality IN ('A', 'B')
+    ORDER BY random() LIMIT 1
+) rec ON true
+LEFT JOIN LATERAL (
+    SELECT file_path, credit FROM species_images
+    WHERE species_code = sp.code
+    ORDER BY random() LIMIT 1
+) img ON true
 `
 
-type GetRandomImageRow struct {
-	FilePath string `db:"file_path" json:"file_path"`
-	Credit   string `db:"credit" json:"credit"`
+type GetRandomMediaForSpeciesRow struct {
+	AudioPath   string `db:"audio_path" json:"audio_path"`
+	AudioType   string `db:"audio_type" json:"audio_type"`
+	AudioCredit string `db:"audio_credit" json:"audio_credit"`
+	ImagePath   string `db:"image_path" json:"image_path"`
+	ImageCredit string `db:"image_credit" json:"image_credit"`
 }
 
-func (q *Queries) GetRandomImage(ctx context.Context, speciesCode string) (GetRandomImageRow, error) {
-	row := q.db.QueryRow(ctx, getRandomImage, speciesCode)
-	var i GetRandomImageRow
-	err := row.Scan(&i.FilePath, &i.Credit)
-	return i, err
-}
-
-const getRandomRecording = `-- name: GetRandomRecording :one
-SELECT file_path, type, credit FROM species_recordings
-WHERE species_code = $1 AND quality IN ('A', 'B')
-ORDER BY random()
-LIMIT 1
-`
-
-type GetRandomRecordingRow struct {
-	FilePath string `db:"file_path" json:"file_path"`
-	Type     string `db:"type" json:"type"`
-	Credit   string `db:"credit" json:"credit"`
-}
-
-func (q *Queries) GetRandomRecording(ctx context.Context, speciesCode string) (GetRandomRecordingRow, error) {
-	row := q.db.QueryRow(ctx, getRandomRecording, speciesCode)
-	var i GetRandomRecordingRow
-	err := row.Scan(&i.FilePath, &i.Type, &i.Credit)
+// GetRandomMediaForSpecies picks a random quiz-quality recording and a random
+// image in one round trip (same LATERAL pattern as GetDeckPracticeCards).
+// Missing media comes back as empty strings.
+func (q *Queries) GetRandomMediaForSpecies(ctx context.Context, dollar_1 string) (GetRandomMediaForSpeciesRow, error) {
+	row := q.db.QueryRow(ctx, getRandomMediaForSpecies, dollar_1)
+	var i GetRandomMediaForSpeciesRow
+	err := row.Scan(
+		&i.AudioPath,
+		&i.AudioType,
+		&i.AudioCredit,
+		&i.ImagePath,
+		&i.ImageCredit,
+	)
 	return i, err
 }
 

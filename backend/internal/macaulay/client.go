@@ -2,9 +2,10 @@ package macaulay
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/jameynakama/flockdeck/internal/httpx"
 	"net/url"
 	"strconv"
 )
@@ -36,7 +37,7 @@ func newWithBaseURL(apiKey, baseURL string) *Client {
 	return &Client{
 		apiKey:     apiKey,
 		baseURL:    baseURL,
-		httpClient: &http.Client{},
+		httpClient: httpx.DefaultClient,
 	}
 }
 
@@ -48,21 +49,8 @@ func (c *Client) Photos(ctx context.Context, speciesCode string, max int) ([]Pho
 	params.Set("sort", "rating_rank_desc")
 	params.Set("count", strconv.Itoa(max))
 	endpoint := fmt.Sprintf("%s/api/v1/search?%s", c.baseURL, params.Encode())
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("X-eBirdApiToken", c.apiKey)
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("macaulay photos %s: status %d", speciesCode, resp.StatusCode)
-	}
 	var r apiResponse
-	if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
+	if err := httpx.GetJSON(ctx, c.httpClient, endpoint, http.Header{"X-eBirdApiToken": {c.apiKey}}, &r); err != nil {
 		return nil, err
 	}
 	photos := r.Results.Content

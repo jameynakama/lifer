@@ -15,7 +15,6 @@ type Querier interface {
 	BulkAddSpeciesToDeck(ctx context.Context, arg BulkAddSpeciesToDeckParams) (int64, error)
 	BulkUpsertCards(ctx context.Context, arg BulkUpsertCardsParams) error
 	CloneDeckSpecies(ctx context.Context, arg CloneDeckSpeciesParams) error
-	CountDueCards(ctx context.Context, arg CountDueCardsParams) (int64, error)
 	CreateDeck(ctx context.Context, arg CreateDeckParams) (Deck, error)
 	CreatePresetDeck(ctx context.Context, arg CreatePresetDeckParams) (Deck, error)
 	DeleteCard(ctx context.Context, arg DeleteCardParams) error
@@ -35,8 +34,10 @@ type Querier interface {
 	GetNextDueAt(ctx context.Context, userID int64) (pgtype.Timestamptz, error)
 	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
 	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)
-	GetRandomImage(ctx context.Context, speciesCode string) (GetRandomImageRow, error)
-	GetRandomRecording(ctx context.Context, speciesCode string) (GetRandomRecordingRow, error)
+	// GetRandomMediaForSpecies picks a random quiz-quality recording and a random
+	// image in one round trip (same LATERAL pattern as GetDeckPracticeCards).
+	// Missing media comes back as empty strings.
+	GetRandomMediaForSpecies(ctx context.Context, dollar_1 string) (GetRandomMediaForSpeciesRow, error)
 	GetRecordingByID(ctx context.Context, xenoCantoID string) (GetRecordingByIDRow, error)
 	GetSpeciesByCode(ctx context.Context, ebirdCode string) (GetSpeciesByCodeRow, error)
 	GetSpeciesImages(ctx context.Context, speciesCode string) ([]GetSpeciesImagesRow, error)

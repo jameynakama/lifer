@@ -1,19 +1,28 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5"
 	"github.com/jameynakama/flockdeck/internal/auth"
 	"github.com/jameynakama/flockdeck/internal/r2"
 	"github.com/jameynakama/flockdeck/internal/store"
 	"golang.org/x/oauth2"
 )
 
+// txBeginner is the slice of *pgxpool.Pool the handlers need to open
+// transactions; nil in unit tests.
+type txBeginner interface {
+	Begin(ctx context.Context) (pgx.Tx, error)
+}
+
 type RouterConfig struct {
 	Queries     store.Querier
+	DB          txBeginner // optional: enables transactional handlers
 	OAuthConfig *oauth2.Config
 	JWTSecret   []byte
 	FrontendURL string
@@ -22,6 +31,7 @@ type RouterConfig struct {
 
 type Handler struct {
 	queries     store.Querier
+	db          txBeginner
 	oauthConfig *oauth2.Config
 	jwtSecret   []byte
 	frontendURL string
@@ -31,6 +41,7 @@ type Handler struct {
 func NewRouter(cfg RouterConfig) http.Handler {
 	h := &Handler{
 		queries:     cfg.Queries,
+		db:          cfg.DB,
 		oauthConfig: cfg.OAuthConfig,
 		jwtSecret:   cfg.JWTSecret,
 		frontendURL: cfg.FrontendURL,

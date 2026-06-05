@@ -1,12 +1,14 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jameynakama/flockdeck/internal/auth"
+	"github.com/jameynakama/flockdeck/internal/store"
 )
 
 // maxBodyBytes caps JSON request bodies (multipart uploads are separate).
@@ -55,6 +57,24 @@ func decodeJSON[T any](w http.ResponseWriter, r *http.Request) (T, bool) {
 		return v, false
 	}
 	return v, true
+}
+
+// inTx runs fn atomically when a DB pool is configured. Without one (unit
+// tests with a stub querier) it falls back to the plain querier,
+// non-atomically.
+func (h *Handler) inTx(ctx context.Context, fn func(store.Querier) error) error {
+	if h.db == nil {
+		return fn(h.queries)
+	}
+	tx, err := h.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck
+	if err := fn(store.New(tx)); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // orEmpty turns a nil slice into an empty one so writeJSON emits [] not null.

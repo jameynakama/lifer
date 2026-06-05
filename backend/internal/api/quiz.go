@@ -56,63 +56,35 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	dueRemaining, err := h.queries.CountDueCards(r.Context(), store.CountDueCardsParams{
-		UserID: userID,
-		DeckID: deckID,
-		Lane:   lane,
-	})
+	media, err := h.queries.GetRandomMediaForSpecies(r.Context(), card.SpeciesCode)
 	if err != nil {
-		log.Printf("CountDueCards error: %v", err)
+		log.Printf("GetRandomMediaForSpecies error: %v", err)
 		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
-	var mediaURL, recordingType, recordingCredit string
+	var mediaURL, recordingType, recordingCredit, photoURL, photoCredit string
 	if lane == "audio" {
-		rec, recErr := h.queries.GetRandomRecording(r.Context(), card.SpeciesCode)
-		if errors.Is(recErr, pgx.ErrNoRows) {
+		if media.AudioPath == "" {
+			// Defensive: GetNextDueCard's media filter should prevent this.
 			log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
 			writeError(w, http.StatusNotFound, "no media available")
 			return
 		}
-		if recErr != nil {
-			log.Printf("GetRandom media error: %v", recErr)
-			writeError(w, http.StatusInternalServerError, "server error")
-			return
-		}
-		mediaURL = rec.FilePath
-		recordingType = rec.Type
-		recordingCredit = rec.Credit
+		mediaURL = media.AudioPath
+		recordingType = media.AudioType
+		recordingCredit = media.AudioCredit
+		photoURL = media.ImagePath
+		photoCredit = media.ImageCredit
 	} else {
-		img, imgErr := h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
-		if errors.Is(imgErr, pgx.ErrNoRows) {
+		if media.ImagePath == "" {
 			log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
 			writeError(w, http.StatusNotFound, "no media available")
 			return
 		}
-		if imgErr != nil {
-			log.Printf("GetRandom media error: %v", imgErr)
-			writeError(w, http.StatusInternalServerError, "server error")
-			return
-		}
-		mediaURL = img.FilePath
-	}
-
-	var photoURL, photoCredit string
-	if lane == "audio" {
-		img, imgErr := h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
-		if errors.Is(imgErr, pgx.ErrNoRows) {
-			photoURL = ""
-		} else if imgErr != nil {
-			log.Printf("GetRandomImage error: %v", imgErr)
-			writeError(w, http.StatusInternalServerError, "server error")
-			return
-		} else {
-			photoURL = img.FilePath
-			photoCredit = img.Credit
-		}
-	} else {
-		photoURL = mediaURL
+		mediaURL = media.ImagePath
+		photoURL = media.ImagePath
+		photoCredit = media.ImageCredit
 	}
 
 	writeJSON(w, http.StatusOK, nextCardResponse{
@@ -125,7 +97,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		RecordingType:   recordingType,
 		RecordingCredit: recordingCredit,
 		PhotoCredit:     photoCredit,
-		DueRemaining:    dueRemaining,
+		DueRemaining:    card.DueRemaining,
 	})
 }
 
