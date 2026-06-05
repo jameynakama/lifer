@@ -65,6 +65,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 		r.Group(func(r chi.Router) {
 			r.Use(auth.RequireAuth(cfg.JWTSecret))
 			r.Get("/me", h.getMe)
+			r.Get("/stats", h.getStats)
 
 			r.Get("/decks", h.listDecks)
 			r.Post("/decks", h.createDeck)

@@ -94,6 +94,11 @@ func TestRouter_AdminRoute_NoCookie_401(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
 }
 
+func TestRouter_Stats_RequiresAuth(t *testing.T) {
+	rec := routerGet(newTestRouter(&stubQuerier{}), "/api/v1/stats", nil)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
 func TestRouter_AdminRoute_Admin_200(t *testing.T) {
 	q := &stubQuerier{
 		getUsers: func(context.Context) ([]store.GetUsersRow, error) {

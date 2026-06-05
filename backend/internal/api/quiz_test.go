@@ -27,10 +27,20 @@ type stubQuerier struct {
 	getCard               func(ctx context.Context, arg store.GetCardParams) (store.Card, error)
 	updateCardSchedule    func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
 	createReviewLog       func(ctx context.Context, arg store.CreateReviewLogParams) (store.ReviewLog, error)
-	getDeckPracticeCards func(ctx context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error)
-	getDeck              func(ctx context.Context, id int64) (store.Deck, error)
-	getUsers             func(ctx context.Context) ([]store.GetUsersRow, error)
-	listPresetDecks      func(ctx context.Context) ([]store.ListPresetDecksRow, error)
+	getDeckPracticeCards  func(ctx context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error)
+	getDeck               func(ctx context.Context, id int64) (store.Deck, error)
+	getUsers              func(ctx context.Context) ([]store.GetUsersRow, error)
+	listPresetDecks       func(ctx context.Context) ([]store.ListPresetDecksRow, error)
+	// stats stubs
+	getCardTotals      func(ctx context.Context, arg store.GetCardTotalsParams) (store.GetCardTotalsRow, error)
+	getCardStateCounts func(ctx context.Context, arg store.GetCardStateCountsParams) ([]store.GetCardStateCountsRow, error)
+	getKnownCards      func(ctx context.Context, arg store.GetKnownCardsParams) ([]store.GetKnownCardsRow, error)
+	getLaneGaps        func(ctx context.Context, userID int64) ([]store.GetLaneGapsRow, error)
+	getConfusionPairs  func(ctx context.Context, arg store.GetConfusionPairsParams) ([]store.GetConfusionPairsRow, error)
+	getFamilyAccuracy  func(ctx context.Context, arg store.GetFamilyAccuracyParams) ([]store.GetFamilyAccuracyRow, error)
+	getHardMedia       func(ctx context.Context, arg store.GetHardMediaParams) ([]store.GetHardMediaRow, error)
+	getReviewAccuracy  func(ctx context.Context, arg store.GetReviewAccuracyParams) (store.GetReviewAccuracyRow, error)
+	countReviewsSince  func(ctx context.Context, arg store.CountReviewsSinceParams) (int64, error)
 }
 
 func (s *stubQuerier) GetNextDueCard(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
@@ -59,6 +69,33 @@ func (s *stubQuerier) GetUsers(ctx context.Context) ([]store.GetUsersRow, error)
 }
 func (s *stubQuerier) ListPresetDecks(ctx context.Context) ([]store.ListPresetDecksRow, error) {
 	return s.listPresetDecks(ctx)
+}
+func (s *stubQuerier) GetCardTotals(ctx context.Context, arg store.GetCardTotalsParams) (store.GetCardTotalsRow, error) {
+	return s.getCardTotals(ctx, arg)
+}
+func (s *stubQuerier) GetCardStateCounts(ctx context.Context, arg store.GetCardStateCountsParams) ([]store.GetCardStateCountsRow, error) {
+	return s.getCardStateCounts(ctx, arg)
+}
+func (s *stubQuerier) GetKnownCards(ctx context.Context, arg store.GetKnownCardsParams) ([]store.GetKnownCardsRow, error) {
+	return s.getKnownCards(ctx, arg)
+}
+func (s *stubQuerier) GetLaneGaps(ctx context.Context, userID int64) ([]store.GetLaneGapsRow, error) {
+	return s.getLaneGaps(ctx, userID)
+}
+func (s *stubQuerier) GetConfusionPairs(ctx context.Context, arg store.GetConfusionPairsParams) ([]store.GetConfusionPairsRow, error) {
+	return s.getConfusionPairs(ctx, arg)
+}
+func (s *stubQuerier) GetFamilyAccuracy(ctx context.Context, arg store.GetFamilyAccuracyParams) ([]store.GetFamilyAccuracyRow, error) {
+	return s.getFamilyAccuracy(ctx, arg)
+}
+func (s *stubQuerier) GetHardMedia(ctx context.Context, arg store.GetHardMediaParams) ([]store.GetHardMediaRow, error) {
+	return s.getHardMedia(ctx, arg)
+}
+func (s *stubQuerier) GetReviewAccuracy(ctx context.Context, arg store.GetReviewAccuracyParams) (store.GetReviewAccuracyRow, error) {
+	return s.getReviewAccuracy(ctx, arg)
+}
+func (s *stubQuerier) CountReviewsSince(ctx context.Context, arg store.CountReviewsSinceParams) (int64, error) {
+	return s.countReviewsSince(ctx, arg)
 }
 
 func makeHandler(q store.Querier) *Handler {
