@@ -28,6 +28,8 @@ type stubQuerier struct {
 	updateCardSchedule    func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
 	getDeckPracticeCards func(ctx context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error)
 	getDeck              func(ctx context.Context, id int64) (store.Deck, error)
+	getUsers             func(ctx context.Context) ([]store.GetUsersRow, error)
+	listPresetDecks      func(ctx context.Context) ([]store.ListPresetDecksRow, error)
 }
 
 func (s *stubQuerier) GetNextDueCard(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
@@ -47,6 +49,12 @@ func (s *stubQuerier) GetDeckPracticeCards(ctx context.Context, deckID int64) ([
 }
 func (s *stubQuerier) GetDeck(ctx context.Context, id int64) (store.Deck, error) {
 	return s.getDeck(ctx, id)
+}
+func (s *stubQuerier) GetUsers(ctx context.Context) ([]store.GetUsersRow, error) {
+	return s.getUsers(ctx)
+}
+func (s *stubQuerier) ListPresetDecks(ctx context.Context) ([]store.ListPresetDecksRow, error) {
+	return s.listPresetDecks(ctx)
 }
 
 func makeHandler(q store.Querier) *Handler {
