@@ -707,3 +707,233 @@ func TestGetCardTotals_LaneFilter(t *testing.T) {
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, allTotals.Reviews, int64(1), "Should count the audio review in combined totals")
 }
+
+// logReview is a test helper that inserts a review_log row with optional
+// guessed species and media ID.
+func logReview(t *testing.T, q *store.Queries, ctx context.Context, userID int64, species, lane string, rating int16, guessed, mediaID string) {
+	t.Helper()
+	params := store.CreateReviewLogParams{UserID: userID, SpeciesCode: species, Lane: lane, Rating: rating}
+	if guessed != "" {
+		params.GuessedSpeciesCode = pgtype.Text{String: guessed, Valid: true}
+	}
+	if mediaID != "" {
+		params.MediaID = pgtype.Text{String: mediaID, Valid: true}
+	}
+	_, err := q.CreateReviewLog(ctx, params)
+	require.NoError(t, err)
+}
+
+// GetConfusionPairs
+
+func TestGetConfusionPairs_GroupsAndOrders(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	seedNoMediaSpecies(t, tx, f)
+	q := store.New(tx)
+	ctx := context.Background()
+
+	// 2 misses: actual=_tst1, guessed=_tst2 (count=2, the higher pair)
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 1, "_tst2", "")
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 1, "_tst2", "")
+	// 1 skip: no guess -- should be excluded
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 1, "", "")
+	// 1 correct: guess == actual -- should be excluded
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 3, "_tst1", "")
+	// 1 miss in reverse direction: actual=_tst2, guessed=_tst1 (count=1, lower pair)
+	logReview(t, q, ctx, f.userID, "_tst2", "audio", 1, "_tst1", "")
+
+	pairs, err := q.GetConfusionPairs(ctx, store.GetConfusionPairsParams{UserID: f.userID})
+	require.NoError(t, err)
+	require.Len(t, pairs, 2, "Should return both confusion pairs")
+	assert.Equal(t, "_tst1", pairs[0].SpeciesCode)
+	assert.Equal(t, "_tst2", pairs[0].GuessedSpeciesCode)
+	assert.Equal(t, int64(2), pairs[0].Count)
+	assert.Greater(t, pairs[0].Count, pairs[1].Count, "Should order by count descending")
+}
+
+func TestGetConfusionPairs_LaneFilter(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	seedNoMediaSpecies(t, tx, f)
+	q := store.New(tx)
+	ctx := context.Background()
+
+	// Miss in audio lane
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 1, "_tst2", "")
+
+	// Filter to image lane -- audio miss should not appear
+	pairs, err := q.GetConfusionPairs(ctx, store.GetConfusionPairsParams{
+		UserID: f.userID,
+		Lane:   laneFilter("image"),
+	})
+	require.NoError(t, err)
+	assert.Empty(t, pairs, "Should return no confusion pairs when filtering to image lane")
+}
+
+// GetHardMedia
+
+func TestGetHardMedia_ThresholdAndOrdering(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	ctx := context.Background()
+
+	// 3 audio misses on _xc_tst1 -- threshold met, accuracy 0/3 = 0.0 (worst)
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 1, "", "_xc_tst1")
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 1, "", "_xc_tst1")
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 1, "", "_xc_tst1")
+	// 3 image misses + 1 image correct on _ml_tst1 -- threshold met, accuracy 1/4 = 0.25
+	logReview(t, q, ctx, f.userID, "_tst1", "image", 1, "", "_ml_tst1")
+	logReview(t, q, ctx, f.userID, "_tst1", "image", 1, "", "_ml_tst1")
+	logReview(t, q, ctx, f.userID, "_tst1", "image", 1, "", "_ml_tst1")
+	logReview(t, q, ctx, f.userID, "_tst1", "image", 3, "", "_ml_tst1")
+
+	rows, err := q.GetHardMedia(ctx, store.GetHardMediaParams{UserID: f.userID})
+	require.NoError(t, err)
+	require.Len(t, rows, 2, "Should return both media items that meet the threshold")
+	// Ordered by accuracy ASC: audio (0.0) before image (0.25)
+	assert.Equal(t, "_xc_tst1", rows[0].MediaID, "Should place worst accuracy (audio) first")
+	assert.Equal(t, int64(0), rows[0].Correct)
+	assert.NotEmpty(t, rows[0].MediaUrl, "Should resolve media URL from seeded recording")
+	assert.Equal(t, "https://r2.example.com/rec.mp3", rows[0].MediaUrl)
+	assert.Equal(t, "_ml_tst1", rows[1].MediaID, "Should place better accuracy (image) second")
+	assert.Equal(t, int64(1), rows[1].Correct)
+	assert.Equal(t, "https://r2.example.com/img.jpg", rows[1].MediaUrl)
+}
+
+// GetFamilyAccuracy
+
+func TestGetFamilyAccuracy_OmitsNullFamily(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	ctx := context.Background()
+
+	// _tst1 has NULL family -- log a correct review
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 3, "_tst1", "")
+
+	// With NULL family the row should be omitted
+	rows, err := q.GetFamilyAccuracy(ctx, store.GetFamilyAccuracyParams{UserID: f.userID})
+	require.NoError(t, err)
+	assert.Empty(t, rows, "Should return no rows when species has NULL family")
+
+	// Backfill the family
+	_, err = q.UpsertSpecies(ctx, store.UpsertSpeciesParams{
+		EbirdCode:      "_tst1",
+		CommonName:     "Test Species",
+		ScientificName: "Testus specius",
+		Family:         pgtype.Text{String: "Test Family", Valid: true},
+	})
+	require.NoError(t, err)
+
+	rows, err = q.GetFamilyAccuracy(ctx, store.GetFamilyAccuracyParams{UserID: f.userID})
+	require.NoError(t, err)
+	require.Len(t, rows, 1, "Should return one row after family is set")
+	assert.Equal(t, "Test Family", rows[0].Family)
+	assert.Equal(t, int64(1), rows[0].Attempts)
+	assert.Equal(t, int64(1), rows[0].Correct)
+}
+
+// TestReviewLog_GuessSetNullOnSpeciesDelete
+
+func TestReviewLog_GuessSetNullOnSpeciesDelete(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	seedNoMediaSpecies(t, tx, f)
+	q := store.New(tx)
+	ctx := context.Background()
+
+	// Miss: actual=_tst1, guessed=_tst2
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 1, "_tst2", "")
+
+	// Delete the guessed species -- ON DELETE SET NULL should null out guessed_species_code
+	require.NoError(t, q.DeleteSpeciesByCode(ctx, "_tst2"))
+
+	// Confusion pairs should be empty: nulled guess is not a valid confusion
+	pairs, err := q.GetConfusionPairs(ctx, store.GetConfusionPairsParams{UserID: f.userID})
+	require.NoError(t, err)
+	assert.Empty(t, pairs, "Should return no pairs when guessed species was deleted (null FK)")
+
+	// The log row itself still exists
+	acc, err := q.GetReviewAccuracy(ctx, store.GetReviewAccuracyParams{UserID: f.userID})
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, acc.Attempts, int64(1), "Should still have the log row after species deletion")
+}
+
+// GetReviewAccuracy
+
+func TestGetReviewAccuracy(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	ctx := context.Background()
+
+	// 2 correct, 1 wrong -- total 3 attempts
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 3, "_tst1", "")
+	logReview(t, q, ctx, f.userID, "_tst1", "image", 3, "_tst1", "")
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 1, "", "")
+
+	acc, err := q.GetReviewAccuracy(ctx, store.GetReviewAccuracyParams{UserID: f.userID})
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), acc.Attempts)
+	assert.Equal(t, int64(2), acc.Correct)
+
+	// Lane filter: only audio (2 rows: 1 correct, 1 wrong)
+	audioAcc, err := q.GetReviewAccuracy(ctx, store.GetReviewAccuracyParams{
+		UserID: f.userID,
+		Lane:   laneFilter("audio"),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), audioAcc.Attempts)
+	assert.Equal(t, int64(1), audioAcc.Correct)
+}
+
+// CountReviewsSince
+
+func TestCountReviewsSince(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	ctx := context.Background()
+
+	logReview(t, q, ctx, f.userID, "_tst1", "audio", 3, "_tst1", "")
+	logReview(t, q, ctx, f.userID, "_tst1", "image", 1, "", "")
+
+	past := pgtype.Timestamptz{}
+	require.NoError(t, past.Scan(time.Now().Add(-time.Minute)))
+
+	// Both reviews are after "past" -- should count 2
+	n, err := q.CountReviewsSince(ctx, store.CountReviewsSinceParams{
+		UserID:     f.userID,
+		ReviewedAt: past,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), n)
+
+	// Future cutoff -- no reviews after it yet
+	future := pgtype.Timestamptz{}
+	require.NoError(t, future.Scan(time.Now().Add(time.Hour)))
+
+	n, err = q.CountReviewsSince(ctx, store.CountReviewsSinceParams{
+		UserID:     f.userID,
+		ReviewedAt: future,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), n)
+
+	// Lane filter: only audio
+	audioN, err := q.CountReviewsSince(ctx, store.CountReviewsSinceParams{
+		UserID:     f.userID,
+		ReviewedAt: past,
+		Lane:       laneFilter("audio"),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), audioN)
+}

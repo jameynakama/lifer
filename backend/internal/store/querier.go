@@ -15,6 +15,7 @@ type Querier interface {
 	BulkAddSpeciesToDeck(ctx context.Context, arg BulkAddSpeciesToDeckParams) (int64, error)
 	BulkUpsertCards(ctx context.Context, arg BulkUpsertCardsParams) error
 	CloneDeckSpecies(ctx context.Context, arg CloneDeckSpeciesParams) error
+	CountReviewsSince(ctx context.Context, arg CountReviewsSinceParams) (int64, error)
 	CreateDeck(ctx context.Context, arg CreateDeckParams) (Deck, error)
 	CreatePresetDeck(ctx context.Context, arg CreatePresetDeckParams) (Deck, error)
 	CreateReviewLog(ctx context.Context, arg CreateReviewLogParams) (ReviewLog, error)
@@ -30,11 +31,18 @@ type Querier interface {
 	// reviewed; known = FSRS Review state; relearning = lapsed; else learning.
 	GetCardStateCounts(ctx context.Context, arg GetCardStateCountsParams) ([]GetCardStateCountsRow, error)
 	GetCardTotals(ctx context.Context, arg GetCardTotalsParams) (GetCardTotalsRow, error)
+	// Stats: actual misidentifications only (skips have NULL guesses).
+	GetConfusionPairs(ctx context.Context, arg GetConfusionPairsParams) ([]GetConfusionPairsRow, error)
 	GetDeck(ctx context.Context, id int64) (Deck, error)
 	GetDeckPracticeCards(ctx context.Context, deckID int64) ([]GetDeckPracticeCardsRow, error)
 	GetDeckWithDue(ctx context.Context, arg GetDeckWithDueParams) (GetDeckWithDueRow, error)
 	GetDeckWithOwner(ctx context.Context, id int64) (GetDeckWithOwnerRow, error)
 	GetDecksForSpecies(ctx context.Context, arg GetDecksForSpeciesParams) ([]int64, error)
+	// Stats: accuracy by eBird family; species without a backfilled family are omitted.
+	GetFamilyAccuracy(ctx context.Context, arg GetFamilyAccuracyParams) ([]GetFamilyAccuracyRow, error)
+	// Stats: specific media the user keeps missing (>=3 looks). media_url resolves
+	// opportunistically -- deleted media yields ''.
+	GetHardMedia(ctx context.Context, arg GetHardMediaParams) ([]GetHardMediaRow, error)
 	GetImageByID(ctx context.Context, macaulayID string) (GetImageByIDRow, error)
 	// Stats: known cards with FSRS fields for retrievability math in Go.
 	// "Known" here (state = 2) is intentionally equivalent to GetCardStateCounts'
@@ -51,6 +59,7 @@ type Querier interface {
 	// Missing media comes back as empty strings.
 	GetRandomMediaForSpecies(ctx context.Context, dollar_1 string) (GetRandomMediaForSpeciesRow, error)
 	GetRecordingByID(ctx context.Context, xenoCantoID string) (GetRecordingByIDRow, error)
+	GetReviewAccuracy(ctx context.Context, arg GetReviewAccuracyParams) (GetReviewAccuracyRow, error)
 	GetSpeciesByCode(ctx context.Context, ebirdCode string) (GetSpeciesByCodeRow, error)
 	GetSpeciesImages(ctx context.Context, speciesCode string) ([]GetSpeciesImagesRow, error)
 	GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]GetSpeciesRecordingsRow, error)
