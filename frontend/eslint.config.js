@@ -33,6 +33,8 @@ export default ts.config(
       // resolve() guards SvelteKit base-path deployments; this is an SPA
       // served at the domain root, so plain goto('/decks') is correct.
       'svelte/no-navigation-without-resolve': 'off',
+      // Allow the omit-via-rest destructure: const { lanes: _x, ...rest } = obj
+      '@typescript-eslint/no-unused-vars': ['error', { ignoreRestSiblings: true }],
     },
   },
 )

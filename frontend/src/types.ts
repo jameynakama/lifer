@@ -130,3 +130,71 @@ export interface User {
   is_admin: boolean
   created_at: string
 }
+
+/** GET /api/v1/stats */
+export interface StatsSpecies {
+  ebird_code: string
+  common_name: string
+  scientific_name: string
+}
+
+export interface StatsTotals {
+  species: number
+  cards: number
+  known: number
+  reviews: number
+  lapses: number
+  attempts: number
+  correct: number
+  reviews_last_7d: number
+}
+
+export interface StatsProgress {
+  not_seen: number
+  learning: number
+  known: number
+  relearning: number
+}
+
+export interface StatsLanes {
+  audio: { cards: number; known: number }
+  image: { cards: number; known: number }
+  gaps: (StatsSpecies & { known_lane: 'audio' | 'image'; weak_lane: 'audio' | 'image' })[]
+}
+
+export interface StatsConfusion {
+  actual: StatsSpecies
+  guessed: StatsSpecies
+  count: number
+}
+
+export interface StatsFamily {
+  family: string
+  attempts: number
+  correct: number
+}
+
+export type StatsFading = StatsSpecies & {
+  lane: 'audio' | 'image'
+  retrievability: number
+  due_in_days: number
+}
+
+export type StatsHardMedia = StatsSpecies & {
+  lane: 'audio' | 'image'
+  media_id: string
+  media_url: string
+  attempts: number
+  correct: number
+}
+
+export interface StatsResponse {
+  totals: StatsTotals
+  progress: StatsProgress
+  lanes?: StatsLanes
+  confusions: StatsConfusion[]
+  families: StatsFamily[]
+  fading: StatsFading[]
+  remember: { now: number; in_a_week: number; in_a_month: number }
+  hard_media: StatsHardMedia[]
+}

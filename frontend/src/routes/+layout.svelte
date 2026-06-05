@@ -49,6 +49,7 @@
         <nav>
           <a href="/decks">Decks</a>
           <a href="/explore">Explore</a>
+          <a href="/stats">Stats</a>
           {#if $auth?.is_admin}
             <a href="/admin">Admin</a>
           {/if}
