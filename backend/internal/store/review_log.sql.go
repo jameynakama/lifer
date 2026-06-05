@@ -70,6 +70,19 @@ func (q *Queries) CreateReviewLog(ctx context.Context, arg CreateReviewLogParams
 	return i, err
 }
 
+const deleteAllReviewsForUser = `-- name: DeleteAllReviewsForUser :execrows
+DELETE FROM review_log
+WHERE user_id = $1
+`
+
+func (q *Queries) DeleteAllReviewsForUser(ctx context.Context, userID int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAllReviewsForUser, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getConfusionPairs = `-- name: GetConfusionPairs :many
 SELECT rl.species_code,
        a.common_name     AS actual_common_name,

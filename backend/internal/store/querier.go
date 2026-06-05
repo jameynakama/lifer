@@ -19,6 +19,8 @@ type Querier interface {
 	CreateDeck(ctx context.Context, arg CreateDeckParams) (Deck, error)
 	CreatePresetDeck(ctx context.Context, arg CreatePresetDeckParams) (Deck, error)
 	CreateReviewLog(ctx context.Context, arg CreateReviewLogParams) (ReviewLog, error)
+	DeleteAllCardsForUser(ctx context.Context, userID int64) (int64, error)
+	DeleteAllReviewsForUser(ctx context.Context, userID int64) (int64, error)
 	DeleteCard(ctx context.Context, arg DeleteCardParams) error
 	DeleteDeck(ctx context.Context, id int64) error
 	DeleteImage(ctx context.Context, macaulayID string) error

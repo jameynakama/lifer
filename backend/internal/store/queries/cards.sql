@@ -184,3 +184,7 @@ WHERE a.user_id = $1
   AND ((a.state = 2 AND i.state <> 2) OR (i.state = 2 AND a.state <> 2))
 ORDER BY stability_gap DESC
 LIMIT 10;
+
+-- name: DeleteAllCardsForUser :execrows
+DELETE FROM cards
+WHERE user_id = $1;

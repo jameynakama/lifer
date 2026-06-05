@@ -29,6 +29,19 @@ func (q *Queries) BulkUpsertCards(ctx context.Context, arg BulkUpsertCardsParams
 	return err
 }
 
+const deleteAllCardsForUser = `-- name: DeleteAllCardsForUser :execrows
+DELETE FROM cards
+WHERE user_id = $1
+`
+
+func (q *Queries) DeleteAllCardsForUser(ctx context.Context, userID int64) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAllCardsForUser, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const deleteCard = `-- name: DeleteCard :exec
 DELETE FROM cards
 WHERE user_id = $1 AND species_code = $2 AND lane = $3

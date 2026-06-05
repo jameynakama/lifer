@@ -74,3 +74,7 @@ FROM review_log
 WHERE user_id = $1
   AND reviewed_at > $2
   AND lane = COALESCE(sqlc.narg('lane'), lane);
+
+-- name: DeleteAllReviewsForUser :execrows
+DELETE FROM review_log
+WHERE user_id = $1;
