@@ -57,10 +57,6 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Credit/attribution for eBird, Xeno-canto (CC-licensed recordings), Macaulay Library photos
 - Link to source repos / contact
 
-### 5. species.family backfill in prod
-- `species.family` (eBird `familyComName`, feeds the stats "By family" panel) is populated by ingest's `UpsertSpecies` -- but only for species that get processed, and `--skip-complete` filters species out BEFORE the upsert runs
-- Backfill = run `just ingest US-OR` WITHOUT `--skip-complete` (R2 `Exists` checks make media work cheap) against each DB that needs it. **Order matters in prod: deploy (migration 004) must land before ingesting** -- the new upsert writes `family` and errors on an unmigrated DB. Until then the family panel is empty
-
 ## Key non-obvious choices
 - OAuth state stored as short-lived cookie (5min) to prevent CSRF -- verified on callback
 - `UpsertUser` updates name/picture on every login so Google profile changes sync
@@ -78,7 +74,7 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - **OAuth + installed Chrome PWA (mostly fixed)** -- per-flow `oauth_state_<state>` cookies (deleted on first use) fixed same-profile clobbering, and state failures now redirect to `/?error=auth_state` instead of white-screening. Remaining edge: PWA in a *different* Chrome profile (different cookie jar) still fails the state check, but lands on the login page, which displays a "sign-in didn't complete" notice from the `error` param. If it resurfaces: the callback logs whether the cookie was missing (different profile) vs mismatched.
 
 ## Ingest workflow
-Run from the laptop with `DATABASE_URL` pointed at the target DB (commonly prod directly; the old `pg_dump | psql` dump→restore also works). Media lands in the shared R2 bucket regardless. See `just ingest --help` for flags (`--species`, `--skip-complete`, `--max-recordings`). Ctrl+c cancels in-flight work cleanly.
+Run from the laptop with `DATABASE_URL` pointed at the target DB (commonly prod directly; the old `pg_dump | psql` dump→restore also works). Media lands in the shared R2 bucket regardless. See `just ingest --help` for flags (`--species`, `--skip-complete`, `--max-recordings`). Ctrl+c cancels in-flight work cleanly. Note: `--skip-complete` filters species BEFORE `UpsertSpecies` runs, so backfilling new species metadata columns requires a no-skip run per region (cheap -- R2 `Exists` skips re-uploads).
 
 XC taxonomy overrides: when XC uses a different genus than eBird, run full ingest first -- the MISSING MEDIA report lists affected species -- then re-run with `--xc-override "code=Genus:species"`.
 
