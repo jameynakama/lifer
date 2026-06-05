@@ -7,7 +7,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-const tokenDuration = 30 * 24 * time.Hour
+// TokenDuration is how long issued tokens (and their cookies) live.
+const TokenDuration = 30 * 24 * time.Hour
 
 type Claims struct {
 	UserID  int64  `json:"user_id"`
@@ -20,7 +21,7 @@ func SignToken(userID int64, isAdmin bool, secret []byte) (string, error) {
 		UserID:  userID,
 		IsAdmin: isAdmin,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(tokenDuration)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(TokenDuration)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}

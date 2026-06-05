@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 
@@ -19,9 +18,8 @@ func (h *Handler) updatePreferences(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 	ebirdCode := chi.URLParam(r, "ebird_code")
 
-	var req preferencesRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	req, ok := decodeJSON[preferencesRequest](w, r)
+	if !ok {
 		return
 	}
 
@@ -33,7 +31,7 @@ func (h *Handler) updatePreferences(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("UpsertPreferences error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -46,7 +44,7 @@ func (h *Handler) updatePreferences(w http.ResponseWriter, r *http.Request) {
 				Lane:        lane,
 			}); err != nil {
 				log.Printf("UpsertCard error: %v", err)
-				http.Error(w, "server error", http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, "server error")
 				return
 			}
 		} else {
@@ -56,7 +54,7 @@ func (h *Handler) updatePreferences(w http.ResponseWriter, r *http.Request) {
 				Lane:        lane,
 			}); err != nil {
 				log.Printf("DeleteCard error: %v", err)
-				http.Error(w, "server error", http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, "server error")
 				return
 			}
 		}

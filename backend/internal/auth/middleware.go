@@ -5,22 +5,33 @@ import (
 	"net/http"
 )
 
+// writeJSONError mirrors the api package's error envelope so middleware
+// rejections parse the same as handler errors.
+func writeJSONError(w http.ResponseWriter, status int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte(`{"error":"` + msg + `"}`))
+}
+
 type contextKey string
 
 const userIDKey contextKey = "userID"
 const isAdminKey contextKey = "isAdmin"
 
+// CookieName is the auth-token cookie, shared with the api package.
+const CookieName = "flockdeck_token"
+
 func RequireAuth(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie("flockdeck_token")
+			cookie, err := r.Cookie(CookieName)
 			if err != nil {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 			claims, err := VerifyToken(cookie.Value, secret)
 			if err != nil {
-				http.Error(w, "unauthorized", http.StatusUnauthorized)
+				writeJSONError(w, http.StatusUnauthorized, "unauthorized")
 				return
 			}
 			ctx := context.WithValue(r.Context(), userIDKey, claims.UserID)
@@ -55,7 +66,7 @@ func IsAdminFromCtx(ctx context.Context) bool {
 func RequireAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !IsAdminFromCtx(r.Context()) {
-			http.Error(w, "forbidden", http.StatusForbidden)
+			writeJSONError(w, http.StatusForbidden, "forbidden")
 			return
 		}
 		next.ServeHTTP(w, r)

@@ -1,14 +1,11 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
@@ -33,19 +30,14 @@ type nextCardResponse struct {
 func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 
-	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid deck id", http.StatusBadRequest)
-		return
-	}
-
 	lane := r.URL.Query().Get("lane")
 	if lane != "audio" && lane != "image" {
-		http.Error(w, "lane must be audio or image", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "lane must be audio or image")
 		return
 	}
 
-	if !h.deckOwnerCheck(w, r, deckID, userID) {
+	deckID, ok := h.ownedDeckID(w, r)
+	if !ok {
 		return
 	}
 
@@ -60,7 +52,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		log.Printf("GetNextDueCard error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -71,7 +63,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("CountDueCards error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -80,12 +72,12 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		rec, recErr := h.queries.GetRandomRecording(r.Context(), card.SpeciesCode)
 		if errors.Is(recErr, pgx.ErrNoRows) {
 			log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
-			http.Error(w, "no media available", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "no media available")
 			return
 		}
 		if recErr != nil {
 			log.Printf("GetRandom media error: %v", recErr)
-			http.Error(w, "server error", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "server error")
 			return
 		}
 		mediaURL = rec.FilePath
@@ -95,12 +87,12 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		img, imgErr := h.queries.GetRandomImage(r.Context(), card.SpeciesCode)
 		if errors.Is(imgErr, pgx.ErrNoRows) {
 			log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
-			http.Error(w, "no media available", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "no media available")
 			return
 		}
 		if imgErr != nil {
 			log.Printf("GetRandom media error: %v", imgErr)
-			http.Error(w, "server error", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "server error")
 			return
 		}
 		mediaURL = img.FilePath
@@ -113,7 +105,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 			photoURL = ""
 		} else if imgErr != nil {
 			log.Printf("GetRandomImage error: %v", imgErr)
-			http.Error(w, "server error", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "server error")
 			return
 		} else {
 			photoURL = img.FilePath
@@ -138,28 +130,21 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromCtx(r.Context())
-
-	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid deck id", http.StatusBadRequest)
-		return
-	}
-
 	lane := r.URL.Query().Get("lane")
 	if lane != "audio" && lane != "image" {
-		http.Error(w, "lane must be audio or image", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "lane must be audio or image")
 		return
 	}
 
-	if !h.deckOwnerCheck(w, r, deckID, userID) {
+	deckID, ok := h.ownedDeckID(w, r)
+	if !ok {
 		return
 	}
 
 	rows, err := h.queries.GetDeckPracticeCards(r.Context(), deckID)
 	if err != nil {
 		log.Printf("GetDeckPracticeCards error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -210,30 +195,24 @@ type rateCardRequest struct {
 func (h *Handler) rateCard(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 
-	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid deck id", http.StatusBadRequest)
-		return
-	}
-	if !h.deckOwnerCheck(w, r, deckID, userID) {
+	if _, ok := h.ownedDeckID(w, r); !ok {
 		return
 	}
 
-	var req rateCardRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	req, ok := decodeJSON[rateCardRequest](w, r)
+	if !ok {
 		return
 	}
 	if req.Rating < 1 || req.Rating > 4 {
-		http.Error(w, "rating must be 1-4", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "rating must be 1-4")
 		return
 	}
 	if req.Lane != "audio" && req.Lane != "image" {
-		http.Error(w, "lane must be audio or image", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "lane must be audio or image")
 		return
 	}
 	if req.EbirdCode == "" {
-		http.Error(w, "ebird_code is required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "ebird_code is required")
 		return
 	}
 
@@ -243,12 +222,12 @@ func (h *Handler) rateCard(w http.ResponseWriter, r *http.Request) {
 		Lane:        req.Lane,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "card not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "card not found")
 		return
 	}
 	if err != nil {
 		log.Printf("GetCard error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -272,7 +251,7 @@ func (h *Handler) rateCard(w http.ResponseWriter, r *http.Request) {
 	due := pgtype.Timestamptz{}
 	if err := due.Scan(result.Due); err != nil {
 		log.Printf("scan due error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -288,7 +267,7 @@ func (h *Handler) rateCard(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("UpdateCardSchedule error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 

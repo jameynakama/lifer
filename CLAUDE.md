@@ -74,7 +74,7 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Admin routes: backend `requireAdmin` middleware + `/admin/+layout.svelte` redirects to `/` if `!$auth?.is_admin`. Toggle admin via `PATCH /api/v1/admin/users/{id}`
 
 ## Known issues (deferred)
-- **OAuth "invalid state" with installed Chrome PWA** -- logging in from both a Chrome tab and the shortcut app white-screens on the callback state check. `site.webmanifest` has no `scope`, so Chrome link-capturing pulls the Google redirect into the app window. Unconfirmed: (H1) same-profile clobbering of the single fixed-name `oauth_state` cookie vs (H2) PWA in a different Chrome profile = different cookie jar = cookie missing. Discriminator: log whether the cookie is *missing* (H2) or *mismatched* (H1) in the callback. Fixes: H1 → per-flow `oauth_state_<state>` cookies deleted after use (also closes the 5-min replay window); H2 → HMAC-signed state or manifest `scope` change. Deferred as an extreme edge case.
+- **OAuth + installed Chrome PWA (mostly fixed)** -- per-flow `oauth_state_<state>` cookies (deleted on first use) fixed same-profile clobbering, and state failures now redirect to `/?error=auth_state` instead of white-screening. Remaining edge: PWA in a *different* Chrome profile (different cookie jar) still fails the state check, but now lands gracefully on the login page. The login page doesn't yet display the `error` param. If it resurfaces: the callback logs whether the cookie was missing (different profile) vs mismatched.
 
 ## Ingest workflow
 Ingest locally (writes to shared R2 bucket) → `pg_dump $DATABASE_URL | psql $PROD_DATABASE_URL`. See `just ingest --help` for flags (`--species`, `--skip-complete`, `--max-recordings`).

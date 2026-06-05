@@ -1,11 +1,9 @@
 package api
 
 import (
-	"encoding/json"
 	"errors"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -15,12 +13,8 @@ import (
 	"github.com/jameynakama/flockdeck/internal/store"
 )
 
-type createDeckRequest struct {
-	Name        string  `json:"name"`
-	Description *string `json:"description"`
-}
-
-type updateDeckRequest struct {
+// deckRequest is the body for both deck create and update.
+type deckRequest struct {
 	Name        string  `json:"name"`
 	Description *string `json:"description"`
 }
@@ -34,17 +28,17 @@ type addSpeciesRequest struct {
 func (h *Handler) deckOwnerCheck(w http.ResponseWriter, r *http.Request, deckID, userID int64) bool {
 	deck, err := h.queries.GetDeck(r.Context(), deckID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "not found")
 		return false
 	}
 	if err != nil {
 		log.Printf("GetDeck error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return false
 	}
 	isAdmin := auth.IsAdminFromCtx(r.Context())
 	if !isAdmin && (!deck.OwnerID.Valid || deck.OwnerID.Int64 != userID) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		writeError(w, http.StatusForbidden, "forbidden")
 		return false
 	}
 	return true
@@ -54,36 +48,32 @@ func (h *Handler) listPresetDecks(w http.ResponseWriter, r *http.Request) {
 	decks, err := h.queries.ListPresetDecks(r.Context())
 	if err != nil {
 		log.Printf("ListPresetDecks error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
-	if decks == nil {
-		decks = []store.ListPresetDecksRow{}
-	}
-	writeJSON(w, http.StatusOK, decks)
+	writeJSON(w, http.StatusOK, orEmpty(decks))
 }
 
 func (h *Handler) cloneDeck(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 
-	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid deck id", http.StatusBadRequest)
+	deckID, ok := parseID(w, r, "id", "deck")
+	if !ok {
 		return
 	}
 
 	src, err := h.queries.GetDeck(r.Context(), deckID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
 	if err != nil {
 		log.Printf("GetDeck error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	if src.OwnerID.Valid {
-		http.Error(w, "can only clone preset decks", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "can only clone preset decks")
 		return
 	}
 
@@ -94,7 +84,7 @@ func (h *Handler) cloneDeck(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("CreateDeck (clone) error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -103,7 +93,7 @@ func (h *Handler) cloneDeck(w http.ResponseWriter, r *http.Request) {
 		DeckID_2: newDeck.ID,
 	}); err != nil {
 		log.Printf("CloneDeckSpecies error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -112,7 +102,7 @@ func (h *Handler) cloneDeck(w http.ResponseWriter, r *http.Request) {
 		DeckID: newDeck.ID,
 	}); err != nil {
 		log.Printf("UpsertCardsForDeck error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -122,9 +112,8 @@ func (h *Handler) cloneDeck(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) getDeckDetail(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 
-	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid deck id", http.StatusBadRequest)
+	deckID, ok := parseID(w, r, "id", "deck")
+	if !ok {
 		return
 	}
 
@@ -133,12 +122,12 @@ func (h *Handler) getDeckDetail(w http.ResponseWriter, r *http.Request) {
 		UserID: userID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		http.Error(w, "not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "not found")
 		return
 	}
 	if err != nil {
 		log.Printf("GetDeckWithDue error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -155,38 +144,34 @@ func (h *Handler) listDecks(w http.ResponseWriter, r *http.Request) {
 	decks, err := h.queries.ListUserDecks(r.Context(), userID)
 	if err != nil {
 		log.Printf("ListUserDecks error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
-	}
-	if decks == nil {
-		decks = []store.ListUserDecksRow{}
 	}
 	nextDue, err := h.queries.GetNextDueAt(r.Context(), userID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		// no future cards -- next_due_at stays nil
 	} else if err != nil {
 		log.Printf("GetNextDueAt error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	} else if nextDue.Valid {
 		t := nextDue.Time.UTC().Format(time.RFC3339)
-		resp := listDecksResponse{Decks: decks, NextDueAt: &t}
+		resp := listDecksResponse{Decks: orEmpty(decks), NextDueAt: &t}
 		writeJSON(w, http.StatusOK, resp)
 		return
 	}
-	writeJSON(w, http.StatusOK, listDecksResponse{Decks: decks})
+	writeJSON(w, http.StatusOK, listDecksResponse{Decks: orEmpty(decks)})
 }
 
 func (h *Handler) createDeck(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 
-	var req createDeckRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	req, ok := decodeJSON[deckRequest](w, r)
+	if !ok {
 		return
 	}
 	if req.Name == "" {
-		http.Error(w, "name is required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "name is required")
 		return
 	}
 
@@ -201,7 +186,7 @@ func (h *Handler) createDeck(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("CreateDeck error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -209,25 +194,17 @@ func (h *Handler) createDeck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) updateDeck(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromCtx(r.Context())
-
-	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid deck id", http.StatusBadRequest)
+	deckID, ok := h.ownedDeckID(w, r)
+	if !ok {
 		return
 	}
 
-	if !h.deckOwnerCheck(w, r, deckID, userID) {
-		return
-	}
-
-	var req updateDeckRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	req, ok := decodeJSON[deckRequest](w, r)
+	if !ok {
 		return
 	}
 	if req.Name == "" {
-		http.Error(w, "name is required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "name is required")
 		return
 	}
 
@@ -242,7 +219,7 @@ func (h *Handler) updateDeck(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("UpdateDeck error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -250,21 +227,14 @@ func (h *Handler) updateDeck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) deleteDeck(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromCtx(r.Context())
-
-	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid deck id", http.StatusBadRequest)
-		return
-	}
-
-	if !h.deckOwnerCheck(w, r, deckID, userID) {
+	deckID, ok := h.ownedDeckID(w, r)
+	if !ok {
 		return
 	}
 
 	if err := h.queries.DeleteDeck(r.Context(), deckID); err != nil {
 		log.Printf("DeleteDeck error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -274,13 +244,8 @@ func (h *Handler) deleteDeck(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) listDeckSpecies(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 
-	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid deck id", http.StatusBadRequest)
-		return
-	}
-
-	if !h.deckOwnerCheck(w, r, deckID, userID) {
+	deckID, ok := h.ownedDeckID(w, r)
+	if !ok {
 		return
 	}
 
@@ -290,35 +255,26 @@ func (h *Handler) listDeckSpecies(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("ListDeckSpeciesWithPrefs error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
-	if species == nil {
-		species = []store.ListDeckSpeciesWithPrefsRow{}
-	}
-	writeJSON(w, http.StatusOK, species)
+	writeJSON(w, http.StatusOK, orEmpty(species))
 }
 
 func (h *Handler) addSpeciesToDeck(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 
-	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid deck id", http.StatusBadRequest)
+	deckID, ok := h.ownedDeckID(w, r)
+	if !ok {
 		return
 	}
 
-	if !h.deckOwnerCheck(w, r, deckID, userID) {
-		return
-	}
-
-	var req addSpeciesRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	req, ok := decodeJSON[addSpeciesRequest](w, r)
+	if !ok {
 		return
 	}
 	if req.EbirdCode == "" {
-		http.Error(w, "ebird_code is required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "ebird_code is required")
 		return
 	}
 
@@ -327,7 +283,7 @@ func (h *Handler) addSpeciesToDeck(w http.ResponseWriter, r *http.Request) {
 		SpeciesCode: req.EbirdCode,
 	}); err != nil {
 		log.Printf("AddSpeciesToDeck error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -338,7 +294,7 @@ func (h *Handler) addSpeciesToDeck(w http.ResponseWriter, r *http.Request) {
 			Lane:        lane,
 		}); err != nil {
 			log.Printf("UpsertCard error: %v", err)
-			http.Error(w, "server error", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "server error")
 			return
 		}
 	}
@@ -353,23 +309,17 @@ type bulkAddSpeciesRequest struct {
 func (h *Handler) bulkAddSpeciesToDeck(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 
-	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid deck id", http.StatusBadRequest)
+	deckID, ok := h.ownedDeckID(w, r)
+	if !ok {
 		return
 	}
 
-	if !h.deckOwnerCheck(w, r, deckID, userID) {
-		return
-	}
-
-	var req bulkAddSpeciesRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+	req, ok := decodeJSON[bulkAddSpeciesRequest](w, r)
+	if !ok {
 		return
 	}
 	if len(req.SpeciesCodes) == 0 {
-		http.Error(w, "species_codes must not be empty", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "species_codes must not be empty")
 		return
 	}
 
@@ -379,7 +329,7 @@ func (h *Handler) bulkAddSpeciesToDeck(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("BulkAddSpeciesToDeck error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -388,7 +338,7 @@ func (h *Handler) bulkAddSpeciesToDeck(w http.ResponseWriter, r *http.Request) {
 		Column2: req.SpeciesCodes,
 	}); err != nil {
 		log.Printf("BulkUpsertCards error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -396,26 +346,19 @@ func (h *Handler) bulkAddSpeciesToDeck(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) removeSpeciesFromDeck(w http.ResponseWriter, r *http.Request) {
-	userID := auth.UserIDFromCtx(r.Context())
-
-	deckID, err := strconv.ParseInt(chi.URLParam(r, "id"), 10, 64)
-	if err != nil {
-		http.Error(w, "invalid deck id", http.StatusBadRequest)
+	deckID, ok := h.ownedDeckID(w, r)
+	if !ok {
 		return
 	}
 
 	ebirdCode := chi.URLParam(r, "ebird_code")
-
-	if !h.deckOwnerCheck(w, r, deckID, userID) {
-		return
-	}
 
 	if err := h.queries.RemoveSpeciesFromDeck(r.Context(), store.RemoveSpeciesFromDeckParams{
 		DeckID:      deckID,
 		SpeciesCode: ebirdCode,
 	}); err != nil {
 		log.Printf("RemoveSpeciesFromDeck error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 

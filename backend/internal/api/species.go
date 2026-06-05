@@ -73,7 +73,7 @@ func (h *Handler) listSpecies(w http.ResponseWriter, r *http.Request) {
 	if l := r.URL.Query().Get("limit"); l != "" {
 		v, err := strconv.Atoi(l)
 		if err != nil || v < 1 || v > 100 {
-			http.Error(w, "invalid limit", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "invalid limit")
 			return
 		}
 		limit = int32(v)
@@ -81,7 +81,7 @@ func (h *Handler) listSpecies(w http.ResponseWriter, r *http.Request) {
 	if o := r.URL.Query().Get("offset"); o != "" {
 		v, err := strconv.Atoi(o)
 		if err != nil || v < 0 {
-			http.Error(w, "invalid offset", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "invalid offset")
 			return
 		}
 		offset = int32(v)
@@ -91,7 +91,7 @@ func (h *Handler) listSpecies(w http.ResponseWriter, r *http.Request) {
 		rows, err := h.queries.SearchSpecies(r.Context(), pgtype.Text{String: q, Valid: true})
 		if err != nil {
 			log.Printf("SearchSpecies error: %v", err)
-			http.Error(w, "server error", http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, "server error")
 			return
 		}
 		results := make([]SpeciesItem, len(rows))
@@ -122,7 +122,7 @@ func (h *Handler) listSpecies(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("ListSpecies error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -180,25 +180,25 @@ func (h *Handler) getSpeciesDetail(w http.ResponseWriter, r *http.Request) {
 	sp, err := h.queries.GetSpeciesByCode(r.Context(), ebirdCode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			http.Error(w, "not found", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "not found")
 			return
 		}
 		log.Printf("GetSpeciesByCode error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
 	recordings, err := h.queries.GetSpeciesRecordings(r.Context(), ebirdCode)
 	if err != nil {
 		log.Printf("GetSpeciesRecordings error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
 	images, err := h.queries.GetSpeciesImages(r.Context(), ebirdCode)
 	if err != nil {
 		log.Printf("GetSpeciesImages error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 
@@ -242,11 +242,8 @@ func (h *Handler) getSpeciesDecks(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Printf("GetDecksForSpecies error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
-	}
-	if deckIDs == nil {
-		deckIDs = []int64{}
 	}
 
 	writeJSON(w, http.StatusOK, SpeciesDecksResponse{DeckIDs: deckIDs})
@@ -258,7 +255,7 @@ func (h *Handler) listAllSpecies(w http.ResponseWriter, r *http.Request) {
 	rows, err := h.queries.ListAllSpecies(r.Context())
 	if err != nil {
 		log.Printf("ListAllSpecies error: %v", err)
-		http.Error(w, "server error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
 	results := make([]SpeciesItem, len(rows))
