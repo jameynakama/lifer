@@ -58,4 +58,12 @@ describe('app.css theme tokens', () => {
       expect(base[1].has(token), `${token} missing from base :root`).toBe(true)
     },
   )
+
+  it('should never set --shadow to the literal none', () => {
+    // --shadow composes into --shadow-stacked's shadow list, and a box-shadow
+    // LIST containing the keyword none is invalid CSS -- the browser drops the
+    // whole declaration (this silently killed the deck-stack effect in dark
+    // mode). Use a no-op shadow like "0 0 #0000" instead.
+    expect(css).not.toMatch(/--shadow:\s*none/)
+  })
 })

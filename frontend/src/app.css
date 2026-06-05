@@ -19,7 +19,10 @@
   --danger: #ef4444;
   --error: #f87171;
   --success: #4ade80;
-  --shadow: none;
+  /* No-op shadow, NOT the keyword none: --shadow composes into
+     --shadow-stacked's list, and a shadow list containing none is invalid
+     CSS (the browser drops the whole declaration). */
+  --shadow: 0 0 #0000;
 
   /* Structural tokens (theme-independent; shadows reference theme vars). */
   --radius-sm: 6px;
