@@ -42,7 +42,6 @@
     <ul class="deck-list list-reset">
       {#each decks as deck (deck.id)}
         <li>
-          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
           <button class="deck-item" onclick={() => onPick(deck.id)}>{deck.name}</button>
         </li>
       {/each}

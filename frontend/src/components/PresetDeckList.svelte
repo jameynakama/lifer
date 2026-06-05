@@ -19,11 +19,9 @@
         {/if}
         <span class="species-count">{preset.species_count} species</span>
       </div>
-      <button
-        class="btn-clone"
-        disabled={cloning.has(preset.id)}
-        onclick={() => onClone(preset.id)}
-      >{cloning.has(preset.id) ? 'Cloning…' : 'Clone'}</button>
+      <button class="btn-clone" disabled={cloning.has(preset.id)} onclick={() => onClone(preset.id)}
+        >{cloning.has(preset.id) ? 'Cloning…' : 'Clone'}</button
+      >
     </li>
   {/each}
 </ul>

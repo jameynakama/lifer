@@ -7,9 +7,9 @@
     imageDue,
     nextDueAt,
   }: {
-    audioDue: number;
-    imageDue: number;
-    nextDueAt: string | null;
+    audioDue: number
+    imageDue: number
+    nextDueAt: string | null
   } = $props()
 
   const totalDue = $derived(audioDue + imageDue)

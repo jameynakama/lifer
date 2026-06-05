@@ -5,7 +5,18 @@
   import RevealCard from './RevealCard.svelte'
   import StatsBar from './StatsBar.svelte'
 
-  let { card, species, stats, showStats = true, loading, error, done, onAdvance, onRetry, doneScreen }: {
+  let {
+    card,
+    species,
+    stats,
+    showStats = true,
+    loading,
+    error,
+    done,
+    onAdvance,
+    onRetry,
+    doneScreen,
+  }: {
     card: BirdCard | null
     species: Species[]
     stats: Stat[]

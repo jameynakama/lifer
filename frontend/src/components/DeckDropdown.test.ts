@@ -21,10 +21,16 @@ function makeFetch() {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ deck_ids: [1] }) })
     }
     if (method === 'GET') {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks, next_due_at: null }) })
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ decks, next_due_at: null }),
+      })
     }
     if (method === 'POST' && url.endsWith('/api/v1/decks')) {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 99, name: 'New Deck' }) })
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ id: 99, name: 'New Deck' }),
+      })
     }
     if (method === 'POST') {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
@@ -52,7 +58,7 @@ describe('DeckDropdown', () => {
     await fireEvent.click(screen.getAllByRole('checkbox')[1])
     await vi.waitFor(() => {
       const posts = fetchMock.mock.calls.filter(
-        (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === 'POST'
+        (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === 'POST',
       )
       expect(posts.some((c: unknown[]) => (c[0] as string).includes('/decks/2/species'))).toBe(true)
     })
@@ -66,10 +72,10 @@ describe('DeckDropdown', () => {
     await fireEvent.click(screen.getAllByRole('checkbox')[0])
     await vi.waitFor(() => {
       const deletes = fetchMock.mock.calls.filter(
-        (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === 'DELETE'
+        (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === 'DELETE',
       )
       expect(
-        deletes.some((c: unknown[]) => (c[0] as string).includes('/decks/1/species/sonspa'))
+        deletes.some((c: unknown[]) => (c[0] as string).includes('/decks/1/species/sonspa')),
       ).toBe(true)
     })
   })
@@ -83,10 +89,12 @@ describe('DeckDropdown', () => {
     await fireEvent.click(screen.getByRole('button', { name: /create deck/i }))
     await vi.waitFor(() => {
       const posts = fetchMock.mock.calls.filter(
-        (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === 'POST'
+        (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === 'POST',
       )
       expect(posts.some((c: unknown[]) => (c[0] as string).endsWith('/api/v1/decks'))).toBe(true)
-      expect(posts.some((c: unknown[]) => (c[0] as string).includes('/decks/99/species'))).toBe(true)
+      expect(posts.some((c: unknown[]) => (c[0] as string).includes('/decks/99/species'))).toBe(
+        true,
+      )
       expect((input as HTMLInputElement).value).toBe('')
     })
   })

@@ -18,7 +18,7 @@
   ])
 
   const selectableCodes = $derived(
-    results.filter((s) => !addedCodes.has(s.ebird_code)).map((s) => s.ebird_code)
+    results.filter((s) => !addedCodes.has(s.ebird_code)).map((s) => s.ebird_code),
   )
 </script>
 

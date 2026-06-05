@@ -30,7 +30,7 @@ describe('app.css theme tokens', () => {
     const [first, ...rest] = overrides
     for (const [selector, tokens] of rest) {
       expect([...tokens].sort(), `tokens in "${selector}" vs "${first[0]}"`).toEqual(
-        [...first[1]].sort()
+        [...first[1]].sort(),
       )
     }
   })
@@ -43,16 +43,19 @@ describe('app.css theme tokens', () => {
     }
   })
 
-  it.each(['--danger', '--error', '--success'])('should define %s in every theme block', (token) => {
-    for (const [selector, tokens] of blocks) {
-      expect(tokens.has(token), `${token} missing from "${selector}"`).toBe(true)
-    }
-  })
+  it.each(['--danger', '--error', '--success'])(
+    'should define %s in every theme block',
+    (token) => {
+      for (const [selector, tokens] of blocks) {
+        expect(tokens.has(token), `${token} missing from "${selector}"`).toBe(true)
+      }
+    },
+  )
 
   it.each(['--radius-sm', '--radius-md', '--radius-lg', '--on-accent', '--shadow-stacked'])(
     'should define structural token %s in the base block',
     (token) => {
       expect(base[1].has(token), `${token} missing from base :root`).toBe(true)
-    }
+    },
   )
 })

@@ -16,8 +16,11 @@
   const limit = 25
 
   $effect(() => {
-    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) })
-    if (q) params.set('q', q)
+    const params = new URLSearchParams({
+      limit: String(limit),
+      offset: String(offset),
+      ...(q ? { q } : {}),
+    })
     loading = true
     error = ''
     apiGet<SpeciesPage>(`/api/v1/species?${params}`)
@@ -49,7 +52,7 @@
   <p class="error">{error}</p>
 {:else}
   <ul class="list-reset">
-    {#each results as sp}
+    {#each results as sp (sp.ebird_code)}
       <li>
         <a href="/admin/species/{sp.ebird_code}">
           {sp.common_name} <span class="muted">({sp.ebird_code})</span>

@@ -66,14 +66,15 @@
   <section>
     <h1>Preset Decks</h1>
 
-    <form class="create-form" onsubmit={(e) => { e.preventDefault(); createPreset() }}>
+    <form
+      class="create-form"
+      onsubmit={(e) => {
+        e.preventDefault()
+        createPreset()
+      }}
+    >
       <div class="create-fields">
-        <input
-          type="text"
-          bind:value={newName}
-          placeholder="Deck name"
-          disabled={creating}
-        />
+        <input type="text" bind:value={newName} placeholder="Deck name" disabled={creating} />
         <input
           type="text"
           bind:value={newDescription}
@@ -81,7 +82,9 @@
           disabled={creating}
         />
       </div>
-      <button type="submit" class="btn-primary" disabled={creating || !newName.trim()}>Create</button>
+      <button type="submit" class="btn-primary" disabled={creating || !newName.trim()}
+        >Create</button
+      >
     </form>
 
     {#if loading}
@@ -101,7 +104,9 @@
             </div>
             <div class="preset-actions">
               <a href="/decks/{preset.id}" class="btn-manage">Manage Species</a>
-              <button class="btn-delete btn-danger-ghost" onclick={() => deletePreset(preset.id)}>Delete</button>
+              <button class="btn-delete btn-danger-ghost" onclick={() => deletePreset(preset.id)}
+                >Delete</button
+              >
             </div>
           </li>
         {/each}
@@ -195,7 +200,9 @@
     color: var(--text);
     text-decoration: none;
   }
-  .preset-name:hover { color: var(--accent); }
+  .preset-name:hover {
+    color: var(--accent);
+  }
   .preset-description {
     font-size: 0.8125rem;
     color: var(--text-muted);
@@ -244,7 +251,9 @@
     color: var(--text);
     text-decoration: none;
   }
-  .user-deck-list a:hover { color: var(--accent); }
+  .user-deck-list a:hover {
+    color: var(--accent);
+  }
   .muted {
     font-size: 0.8125rem;
   }

@@ -20,10 +20,13 @@ afterEach(() => {
 
 describe('Dashboard page', () => {
   it('renders deck names from API', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ decks, next_due_at: null }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ decks, next_due_at: null }),
+      }),
+    )
     renderWithClient(Dashboard)
     await vi.waitFor(() => {
       expect(screen.getAllByText(/pacific northwest/i).length).toBeGreaterThan(0)
@@ -32,10 +35,13 @@ describe('Dashboard page', () => {
   })
 
   it('shows empty state when no decks', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ decks: [], next_due_at: null }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ decks: [], next_due_at: null }),
+      }),
+    )
     renderWithClient(Dashboard)
     await vi.waitFor(() => {
       expect(screen.getByText(/no decks yet/i)).toBeInTheDocument()
@@ -43,10 +49,13 @@ describe('Dashboard page', () => {
   })
 
   it('navigates to quiz when Audio button clicked', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ decks, next_due_at: null }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ decks, next_due_at: null }),
+      }),
+    )
     renderWithClient(Dashboard)
     await vi.waitFor(() => screen.getAllByRole('button', { name: /audio/i }))
     await fireEvent.click(screen.getAllByRole('button', { name: /audio/i })[0])
@@ -54,10 +63,13 @@ describe('Dashboard page', () => {
   })
 
   it('navigates to quiz when Image button clicked', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ decks, next_due_at: null }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ decks, next_due_at: null }),
+      }),
+    )
     renderWithClient(Dashboard)
     await vi.waitFor(() => screen.getAllByRole('button', { name: /image/i }))
     await fireEvent.click(screen.getAllByRole('button', { name: /image/i })[0])

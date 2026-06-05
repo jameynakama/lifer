@@ -15,9 +15,13 @@
 
   $effect(() => {
     apiGet<SessionUser>('/api/v1/me')
-      .then((user) => { $auth = user })
+      .then((user) => {
+        $auth = user
+      })
       .catch(() => {}) // not signed in
-      .finally(() => { checking = false })
+      .finally(() => {
+        checking = false
+      })
   })
 
   function handleToggle() {

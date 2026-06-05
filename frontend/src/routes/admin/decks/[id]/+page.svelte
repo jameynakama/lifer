@@ -14,7 +14,9 @@
   $effect(() => {
     loading = true
     error = ''
-    apiGet<{ deck: AdminDeckInfo; species: Species[] | null }>(`/api/v1/admin/decks/${deckID}/species`)
+    apiGet<{ deck: AdminDeckInfo; species: Species[] | null }>(
+      `/api/v1/admin/decks/${deckID}/species`,
+    )
       .then((data) => {
         deck = data.deck
         species = data.species ?? []
@@ -68,7 +70,9 @@
     font-size: 0.875rem;
     margin-bottom: 1rem;
   }
-  .back:hover { color: var(--text); }
+  .back:hover {
+    color: var(--text);
+  }
   .deck-header {
     display: flex;
     align-items: baseline;

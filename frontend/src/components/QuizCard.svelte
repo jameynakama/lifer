@@ -3,7 +3,11 @@
   import SpeciesTypeahead from './SpeciesTypeahead.svelte'
   import WavePlayer from './WavePlayer.svelte'
 
-  let { card, species, onReveal }: {
+  let {
+    card,
+    species,
+    onReveal,
+  }: {
     card: BirdCard
     species: Species[]
     onReveal: (selected: Species | null) => void
@@ -31,7 +35,15 @@
       <p class="prompt">What bird is this?</p>
     </div>
   {/if}
-  <SpeciesTypeahead {species} onSelect={(s) => { selected = s }} onSubmit={() => { if (selected) reveal(selected) }} />
+  <SpeciesTypeahead
+    {species}
+    onSelect={(s) => {
+      selected = s
+    }}
+    onSubmit={() => {
+      if (selected) reveal(selected)
+    }}
+  />
   <div class="actions">
     <button
       class="btn-reveal btn-primary"
@@ -40,9 +52,7 @@
     >
       Reveal answer
     </button>
-    <button class="btn-skip" onclick={() => reveal(null)}>
-      I don't know
-    </button>
+    <button class="btn-skip" onclick={() => reveal(null)}> I don't know </button>
   </div>
 </div>
 

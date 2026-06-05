@@ -23,7 +23,9 @@ describe('DashboardStats', () => {
   })
 
   it('shows "Now" with accent class when cards are due', () => {
-    render(DashboardStats, { props: { audioDue: 2, imageDue: 1, nextDueAt: '2099-01-01T00:00:00Z' } })
+    render(DashboardStats, {
+      props: { audioDue: 2, imageDue: 1, nextDueAt: '2099-01-01T00:00:00Z' },
+    })
     const el = screen.getByText('Now')
     expect(el).toBeInTheDocument()
     expect(el).toHaveClass('now')

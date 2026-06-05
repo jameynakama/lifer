@@ -20,7 +20,11 @@
     }
     const result: (number | '...')[] = [1]
     if (currentPage > 3) result.push('...')
-    for (let p = Math.max(2, currentPage - 1); p <= Math.min(totalPages - 1, currentPage + 1); p++) {
+    for (
+      let p = Math.max(2, currentPage - 1);
+      p <= Math.min(totalPages - 1, currentPage + 1);
+      p++
+    ) {
       result.push(p)
     }
     if (currentPage < totalPages - 2) result.push('...')
@@ -44,7 +48,7 @@
       &lt;
     </button>
 
-    {#each pages() as p}
+    {#each pages() as p, i (i)}
       {#if p === '...'}
         <span class="ellipsis">…</span>
       {:else}

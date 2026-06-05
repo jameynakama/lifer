@@ -5,13 +5,13 @@
     decks,
     onPractice,
   }: {
-    decks: Deck[];
-    onPractice: (deck: Deck, lane: 'audio' | 'image') => void;
+    decks: Deck[]
+    onPractice: (deck: Deck, lane: 'audio' | 'image') => void
   } = $props()
 </script>
 
 <div class="deck-list">
-  {#each decks as deck}
+  {#each decks as deck (deck.id)}
     <div class="deck-card card">
       <a href="/decks/{deck.id}" class="deck-name">{deck.name}</a>
       <div class="deck-actions">

@@ -15,10 +15,13 @@ const decks = [
 
 describe('DeckPickerPopover', () => {
   it('shows a list of user decks', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ decks, next_due_at: null }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ decks, next_due_at: null }),
+      }),
+    )
     renderWithClient(DeckPickerPopover, { onPick: vi.fn(), onClose: vi.fn() })
     await vi.waitFor(() => {
       expect(screen.getByText(/my warblers/i)).toBeInTheDocument()
@@ -28,10 +31,13 @@ describe('DeckPickerPopover', () => {
 
   it('calls onPick with deck id when a deck is selected', async () => {
     const onPick = vi.fn()
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ decks, next_due_at: null }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ decks, next_due_at: null }),
+      }),
+    )
     renderWithClient(DeckPickerPopover, { onPick, onClose: vi.fn() })
     await vi.waitFor(() => screen.getByText(/my warblers/i))
     await fireEvent.click(screen.getByText(/my warblers/i))
@@ -40,15 +46,26 @@ describe('DeckPickerPopover', () => {
 
   it('creates a new deck and calls onPick with the new deck id', async () => {
     const onPick = vi.fn()
-    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-      if (opts?.method === 'POST') {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 99, name: 'Sparrows' }) })
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks: [], next_due_at: null }) })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+        if (opts?.method === 'POST') {
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ id: 99, name: 'Sparrows' }),
+          })
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ decks: [], next_due_at: null }),
+        })
+      }),
+    )
     renderWithClient(DeckPickerPopover, { onPick, onClose: vi.fn() })
     await vi.waitFor(() => screen.getByPlaceholderText(/new deck name/i))
-    await fireEvent.input(screen.getByPlaceholderText(/new deck name/i), { target: { value: 'Sparrows' } })
+    await fireEvent.input(screen.getByPlaceholderText(/new deck name/i), {
+      target: { value: 'Sparrows' },
+    })
     await fireEvent.click(screen.getByRole('button', { name: /create/i }))
     await vi.waitFor(() => {
       expect(onPick).toHaveBeenCalledWith(99)
@@ -57,10 +74,13 @@ describe('DeckPickerPopover', () => {
 
   it('calls onClose when backdrop clicked', async () => {
     const onClose = vi.fn()
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ decks: [], next_due_at: null }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ decks: [], next_due_at: null }),
+      }),
+    )
     renderWithClient(DeckPickerPopover, { onPick: vi.fn(), onClose })
     await vi.waitFor(() => screen.getByRole('dialog'))
     await fireEvent.click(screen.getByTestId('backdrop'))

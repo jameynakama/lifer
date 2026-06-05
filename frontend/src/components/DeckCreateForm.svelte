@@ -1,5 +1,9 @@
 <script lang="ts">
-  let { label, onCreate, onEscape }: {
+  let {
+    label,
+    onCreate,
+    onEscape,
+  }: {
     /** Create-button label, e.g. "+ Create deck". */
     label: string
     /** Creates the deck. The input clears on success and stays on failure for retry. */
@@ -38,11 +42,7 @@
     bind:value={name}
     onkeydown={handleKeydown}
   />
-  <button
-    class="create-btn btn-primary"
-    onclick={create}
-    disabled={!name.trim() || creating}
-  >
+  <button class="create-btn btn-primary" onclick={create} disabled={!name.trim() || creating}>
     {creating ? 'Creating…' : label}
   </button>
 </div>

@@ -7,7 +7,7 @@
 
   let deckId = $derived(page.params.id)
   let lane: 'audio' | 'image' = $derived(
-    page.url.searchParams.get('lane') === 'image' ? 'image' : 'audio'
+    page.url.searchParams.get('lane') === 'image' ? 'image' : 'audio',
   )
 
   let cards: BirdCard[] = $state([])
@@ -23,7 +23,7 @@
       ebird_code: c.ebird_code,
       common_name: c.common_name,
       scientific_name: c.scientific_name,
-    }))
+    })),
   )
 
   function shuffle(arr: BirdCard[]): BirdCard[] {
@@ -105,7 +105,9 @@
           <p class="done-title">All done!</p>
           <p class="done-sub">{cards.length} species practiced.</p>
           <button class="btn-primary" onclick={practiceAgain}>Practice Again</button>
-          <button class="btn-secondary" onclick={() => goto(`/decks/${deckId}`)}>Back to Deck</button>
+          <button class="btn-secondary" onclick={() => goto(`/decks/${deckId}`)}
+            >Back to Deck</button
+          >
         </div>
       {/if}
     {/snippet}

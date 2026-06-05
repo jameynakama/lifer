@@ -7,7 +7,15 @@ const presets = [
 ]
 
 const userDecks = [
-  { id: 10, name: 'My Warblers', description: '', owner_id: 1, owner_name: 'Alice', owner_email: 'alice@example.com', species_count: 12 },
+  {
+    id: 10,
+    name: 'My Warblers',
+    description: '',
+    owner_id: 1,
+    owner_name: 'Alice',
+    owner_email: 'alice@example.com',
+    species_count: 12,
+  },
 ]
 
 function makeFetchWithUserDecks() {
@@ -17,7 +25,10 @@ function makeFetchWithUserDecks() {
     }
     if (opts?.method === 'DELETE') return Promise.resolve({ ok: true, status: 204 })
     if (opts?.method === 'POST') {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 99, name: 'New Preset', description: '' }) })
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ id: 99, name: 'New Preset', description: '' }),
+      })
     }
     return Promise.resolve({ ok: true, json: () => Promise.resolve(presets) })
   })
@@ -27,10 +38,16 @@ function makeFetch(overrides: Record<string, unknown> = {}) {
   return vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
     if (opts?.method === 'DELETE') return Promise.resolve({ ok: true, status: 204 })
     if (opts?.method === 'POST') {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 99, name: 'New Preset', description: '' }) })
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ id: 99, name: 'New Preset', description: '' }),
+      })
     }
     if (opts?.method === 'PATCH') {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 1, name: 'Updated', description: '' }) })
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ id: 1, name: 'Updated', description: '' }),
+      })
     }
     // user decks endpoint -- return empty list so it doesn't collide with preset data
     if (url === '/api/v1/admin/decks') {
@@ -60,18 +77,28 @@ describe('Admin decks page', () => {
 
   it('creates a preset deck when form submitted', async () => {
     let postBody: Record<string, unknown> | null = null
-    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-      if (opts?.method === 'POST') {
-        postBody = JSON.parse(opts.body as string)
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 99, name: 'New Preset', description: '' }) })
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(presets) })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+        if (opts?.method === 'POST') {
+          postBody = JSON.parse(opts.body as string)
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ id: 99, name: 'New Preset', description: '' }),
+          })
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(presets) })
+      }),
+    )
     render(AdminDecksPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/deck name/i))
-    await fireEvent.input(screen.getByPlaceholderText(/deck name/i), { target: { value: 'New Preset' } })
+    await fireEvent.input(screen.getByPlaceholderText(/deck name/i), {
+      target: { value: 'New Preset' },
+    })
     await fireEvent.click(screen.getByRole('button', { name: /create/i }))
-    await vi.waitFor(() => { expect(postBody?.name).toBe('New Preset') })
+    await vi.waitFor(() => {
+      expect(postBody?.name).toBe('New Preset')
+    })
   })
 
   it('shows a link to manage species on each preset deck', async () => {
@@ -103,16 +130,21 @@ describe('Admin decks page', () => {
   it('deletes a preset deck on confirm', async () => {
     let deleteCalled = false
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(true))
-    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-      if (opts?.method === 'DELETE') {
-        deleteCalled = true
-        return Promise.resolve({ ok: true })
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve(presets) })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+        if (opts?.method === 'DELETE') {
+          deleteCalled = true
+          return Promise.resolve({ ok: true })
+        }
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(presets) })
+      }),
+    )
     render(AdminDecksPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /delete/i }))
     await fireEvent.click(screen.getByRole('button', { name: /delete/i }))
-    await vi.waitFor(() => { expect(deleteCalled).toBe(true) })
+    await vi.waitFor(() => {
+      expect(deleteCalled).toBe(true)
+    })
   })
 })

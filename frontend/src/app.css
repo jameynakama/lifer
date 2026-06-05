@@ -1,4 +1,6 @@
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -25,15 +27,12 @@
   --radius-lg: 12px;
   --on-accent: #fff;
   --shadow-stacked:
-    -1px 2px 0 0 var(--surface),
-    -1px 2px 0 1px var(--border),
-    -3px 5px 0 0 var(--surface),
-    -3px 5px 0 1px var(--border),
-    var(--shadow);
+    -1px 2px 0 0 var(--surface), -1px 2px 0 1px var(--border), -3px 5px 0 0 var(--surface),
+    -3px 5px 0 1px var(--border), var(--shadow);
 }
 
 /* Light theme tokens (explicit override) */
-:root[data-theme="light"] {
+:root[data-theme='light'] {
   --bg: #f1f5f1;
   --surface: #f8fbf8;
   --border: #cddacd;
@@ -50,7 +49,7 @@
 
 /* Respect OS light preference unless user has overridden to dark */
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) {
+  :root:not([data-theme='dark']) {
     --bg: #f1f5f1;
     --surface: #f8fbf8;
     --border: #cddacd;
@@ -176,5 +175,7 @@ body {
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }

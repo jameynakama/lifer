@@ -29,7 +29,11 @@
   }
 </script>
 
-<svelte:window onclick={() => { dropdownOpen = false }} />
+<svelte:window
+  onclick={() => {
+    dropdownOpen = false
+  }}
+/>
 
 <div class="detail">
   {#if detailQuery.isPending}
@@ -45,11 +49,14 @@
         <p class="scientific-name">{sp.scientific_name}</p>
       </div>
       <div class="deck-btn-wrapper">
-        <button class="deck-btn" onclick={toggleDropdown} aria-label="Add to deck">
-          + Deck
-        </button>
+        <button class="deck-btn" onclick={toggleDropdown} aria-label="Add to deck"> + Deck </button>
         {#if dropdownOpen}
-          <DeckDropdown ebird_code={sp.ebird_code} onClose={() => { dropdownOpen = false }} />
+          <DeckDropdown
+            ebird_code={sp.ebird_code}
+            onClose={() => {
+              dropdownOpen = false
+            }}
+          />
         {/if}
       </div>
     </div>
@@ -129,5 +136,4 @@
     color: var(--text-secondary);
     margin-bottom: 0.5rem;
   }
-
 </style>

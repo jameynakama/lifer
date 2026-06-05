@@ -1,7 +1,11 @@
 <script lang="ts">
   import type { Species } from '../types'
 
-  let { species, onSelect, onSubmit }: {
+  let {
+    species,
+    onSelect,
+    onSubmit,
+  }: {
     species: Species[]
     onSelect: (s: Species | null) => void
     onSubmit?: () => void
@@ -18,11 +22,10 @@
           .filter((s) => {
             const q = query.toLowerCase()
             return (
-              s.common_name.toLowerCase().includes(q) ||
-              s.scientific_name.toLowerCase().includes(q)
+              s.common_name.toLowerCase().includes(q) || s.scientific_name.toLowerCase().includes(q)
             )
           })
-          .slice(0, 10)
+          .slice(0, 10),
   )
 
   function handleInput() {
@@ -73,7 +76,9 @@
     aria-expanded={open}
     aria-controls="typeahead-dropdown"
     aria-autocomplete="list"
-    aria-activedescendant={open && filtered.length > 0 ? 'typeahead-option-' + highlighted : undefined}
+    aria-activedescendant={open && filtered.length > 0
+      ? 'typeahead-option-' + highlighted
+      : undefined}
   />
   {#if open && filtered.length > 0}
     <ul class="dropdown" role="listbox" id="typeahead-dropdown">

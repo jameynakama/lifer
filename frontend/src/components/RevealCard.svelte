@@ -2,7 +2,12 @@
   import type { BirdCard, Species } from '../types'
   import WavePlayer from './WavePlayer.svelte'
 
-  let { card, correct, guessed, onNext }: {
+  let {
+    card,
+    correct,
+    guessed,
+    onNext,
+  }: {
     card: BirdCard
     correct: boolean
     guessed: Species | null
@@ -77,12 +82,12 @@
     color: #7f1d1d;
     border: 1px solid rgba(127, 29, 29, 0.3);
   }
-  :global([data-theme="dark"]) .result-banner.correct {
+  :global([data-theme='dark']) .result-banner.correct {
     background: rgba(20, 83, 45, 0.25);
     color: var(--success);
     border-color: rgba(20, 83, 45, 0.6);
   }
-  :global([data-theme="dark"]) .result-banner.incorrect {
+  :global([data-theme='dark']) .result-banner.incorrect {
     background: rgba(127, 29, 29, 0.25);
     color: var(--error);
     border-color: rgba(127, 29, 29, 0.6);

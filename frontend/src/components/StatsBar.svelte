@@ -12,7 +12,7 @@
 </script>
 
 <div class="stats-bar {variant}">
-  {#each stats as stat}
+  {#each stats as stat (stat.label)}
     <div class="stat" class:card={variant === 'grid'}>
       <span class="value" class:now={stat.highlight ?? false}>{stat.value}</span>
       <span class="label">{stat.label}</span>

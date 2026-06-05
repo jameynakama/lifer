@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/svelte'
 import ExplorePage from './+page.svelte'
+import { queryResult } from '../../test-utils'
 
 vi.mock('@tanstack/svelte-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/svelte-query')>()
@@ -11,17 +12,29 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
 })
 
 const mockSpecies = [
-  { ebird_code: 'amro', common_name: 'American Robin', scientific_name: 'Turdus migratorius', image_url: null },
-  { ebird_code: 'bcch', common_name: 'Black-capped Chickadee', scientific_name: 'Poecile atricapillus', image_url: null },
+  {
+    ebird_code: 'amro',
+    common_name: 'American Robin',
+    scientific_name: 'Turdus migratorius',
+    image_url: null,
+  },
+  {
+    ebird_code: 'bcch',
+    common_name: 'Black-capped Chickadee',
+    scientific_name: 'Poecile atricapillus',
+    image_url: null,
+  },
 ]
 
 beforeEach(async () => {
   const { createQuery } = await import('@tanstack/svelte-query')
-  vi.mocked(createQuery).mockReturnValue({
-    data: mockSpecies,
-    isPending: false,
-    isError: false,
-  } as any)
+  vi.mocked(createQuery).mockReturnValue(
+    queryResult({
+      data: mockSpecies,
+      isPending: false,
+      isError: false,
+    }),
+  )
 })
 
 afterEach(() => {
@@ -45,11 +58,13 @@ describe('Explore page', () => {
       scientific_name: `Genus species${i}`,
       image_url: null,
     }))
-    vi.mocked(createQuery).mockReturnValue({
-      data: manySpecies,
-      isPending: false,
-      isError: false,
-    } as any)
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: manySpecies,
+        isPending: false,
+        isError: false,
+      }),
+    )
     render(ExplorePage)
     await vi.waitFor(() => {
       expect(screen.getByRole('navigation', { name: /pagination/i })).toBeTruthy()
@@ -94,11 +109,13 @@ describe('Explore page', () => {
       scientific_name: `Genus species${i}`,
       image_url: null,
     }))
-    vi.mocked(createQuery).mockReturnValue({
-      data: manySpecies,
-      isPending: false,
-      isError: false,
-    } as any)
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: manySpecies,
+        isPending: false,
+        isError: false,
+      }),
+    )
     render(ExplorePage)
 
     // Navigate to page 2
@@ -118,22 +135,26 @@ describe('Explore page', () => {
 
   it('shows loading state', async () => {
     const { createQuery } = await import('@tanstack/svelte-query')
-    vi.mocked(createQuery).mockReturnValue({
-      data: undefined,
-      isPending: true,
-      isError: false,
-    } as any)
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: undefined,
+        isPending: true,
+        isError: false,
+      }),
+    )
     render(ExplorePage)
     expect(screen.getByText(/loading/i)).toBeTruthy()
   })
 
   it('shows error state', async () => {
     const { createQuery } = await import('@tanstack/svelte-query')
-    vi.mocked(createQuery).mockReturnValue({
-      data: undefined,
-      isPending: false,
-      isError: true,
-    } as any)
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: undefined,
+        isPending: false,
+        isError: true,
+      }),
+    )
     render(ExplorePage)
     expect(screen.getByText(/couldn't load species/i)).toBeTruthy()
   })

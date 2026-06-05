@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
   import { page } from '$app/state'
+  import { SvelteSet } from 'svelte/reactivity'
   import { createQuery, useQueryClient } from '@tanstack/svelte-query'
   import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '$lib/api'
   import { queryKeys } from '$lib/queries'
@@ -23,7 +24,7 @@
 
   let addedCodes = $derived(new Set(deckSpecies.map((s) => s.ebird_code)))
   let togglingCodes: Set<string> = $state(new Set())
-  let selectedSearchCodes: Set<string> = $state(new Set())
+  const selectedSearchCodes = new SvelteSet<string>()
 
   const allSpeciesQuery = createQuery(() => ({
     queryKey: queryKeys.speciesAll,
@@ -40,18 +41,17 @@
       : (allSpeciesQuery.data ?? []).filter((s) => {
           const lq = searchQuery.toLowerCase()
           return (
-            s.common_name.toLowerCase().includes(lq) ||
-            s.scientific_name.toLowerCase().includes(lq)
+            s.common_name.toLowerCase().includes(lq) || s.scientific_name.toLowerCase().includes(lq)
           )
-        })
+        }),
   )
 
   const pinnedSearchSpecies = $derived(
-    (allSpeciesQuery.data ?? []).filter((s) => selectedSearchCodes.has(s.ebird_code))
+    (allSpeciesQuery.data ?? []).filter((s) => selectedSearchCodes.has(s.ebird_code)),
   )
 
   const unpinnedSearchResults = $derived(
-    searchResults.filter((s) => !selectedSearchCodes.has(s.ebird_code))
+    searchResults.filter((s) => !selectedSearchCodes.has(s.ebird_code)),
   )
 
   async function loadDeck() {
@@ -79,7 +79,10 @@
 
   async function saveName() {
     const trimmed = nameInput.trim()
-    if (!trimmed || trimmed === deckName) { editingName = false; return }
+    if (!trimmed || trimmed === deckName) {
+      editingName = false
+      return
+    }
     try {
       await apiPatch(`/api/v1/decks/${deckId}`, { name: trimmed, description: deckDescription })
       deckName = trimmed
@@ -102,7 +105,10 @@
 
   async function saveDescription() {
     const trimmed = descriptionInput.trim()
-    if (trimmed === deckDescription) { editingDescription = false; return }
+    if (trimmed === deckDescription) {
+      editingDescription = false
+      return
+    }
     try {
       await apiPatch(`/api/v1/decks/${deckId}`, { name: deckName, description: trimmed })
       deckDescription = trimmed
@@ -118,10 +124,8 @@
   }
 
   function toggleSearchSelected(code: string) {
-    const next = new Set(selectedSearchCodes)
-    if (next.has(code)) next.delete(code)
-    else next.add(code)
-    selectedSearchCodes = next
+    if (selectedSearchCodes.has(code)) selectedSearchCodes.delete(code)
+    else selectedSearchCodes.add(code)
   }
 
   async function bulkAddToThisDeck() {
@@ -136,12 +140,18 @@
       .map((c) => {
         const s = (allSpeciesQuery.data ?? []).find((sp) => sp.ebird_code === c)
         return s
-          ? { ebird_code: s.ebird_code, common_name: s.common_name, scientific_name: s.scientific_name, audio_enabled: true, image_enabled: true }
+          ? {
+              ebird_code: s.ebird_code,
+              common_name: s.common_name,
+              scientific_name: s.scientific_name,
+              audio_enabled: true,
+              image_enabled: true,
+            }
           : null
       })
       .filter((s): s is DeckSpecies => s !== null)
     deckSpecies = [...deckSpecies, ...newSpecies]
-    selectedSearchCodes = new Set()
+    selectedSearchCodes.clear()
     invalidateDecks()
   }
 
@@ -153,13 +163,17 @@
     }
     {
       const added = searchResults.find((s) => s.ebird_code === ebirdCode)
-      if (added) deckSpecies = [...deckSpecies, {
-        ebird_code: added.ebird_code,
-        common_name: added.common_name,
-        scientific_name: added.scientific_name,
-        audio_enabled: true,
-        image_enabled: true,
-      }]
+      if (added)
+        deckSpecies = [
+          ...deckSpecies,
+          {
+            ebird_code: added.ebird_code,
+            common_name: added.common_name,
+            scientific_name: added.scientific_name,
+            audio_enabled: true,
+            image_enabled: true,
+          },
+        ]
     }
   }
 
@@ -195,22 +209,22 @@
         : { ...prev, image_enabled: !prev.image_enabled }
 
     deckSpecies = deckSpecies.map((s) =>
-      s.ebird_code === species.ebird_code ? { ...s, ...next } : s
+      s.ebird_code === species.ebird_code ? { ...s, ...next } : s,
     )
 
     try {
       const updated = await apiPut<{ audio_enabled: boolean; image_enabled: boolean }>(
         `/api/v1/species/${species.ebird_code}/preferences`,
-        next
+        next,
       )
       deckSpecies = deckSpecies.map((s) =>
         s.ebird_code === species.ebird_code
           ? { ...s, audio_enabled: updated.audio_enabled, image_enabled: updated.image_enabled }
-          : s
+          : s,
       )
     } catch {
       deckSpecies = deckSpecies.map((s) =>
-        s.ebird_code === species.ebird_code ? { ...s, ...prev } : s
+        s.ebird_code === species.ebird_code ? { ...s, ...prev } : s,
       )
     } finally {
       togglingCodes = new Set([...togglingCodes].filter((c) => c !== species.ebird_code))
@@ -251,8 +265,12 @@
         autofocus
       />
     {:else}
-      <span class="deck-description" class:placeholder={!deckDescription}>{deckDescription || 'Add a description...'}</span>
-      <button class="btn-rename" onclick={startEditingDescription} aria-label="Edit description">✎</button>
+      <span class="deck-description" class:placeholder={!deckDescription}
+        >{deckDescription || 'Add a description...'}</span
+      >
+      <button class="btn-rename" onclick={startEditingDescription} aria-label="Edit description"
+        >✎</button
+      >
     {/if}
   </div>
 
@@ -273,10 +291,16 @@
     </button>
   </div>
   <div class="actions">
-    <button class="btn-practice-outline" onclick={() => goto(`/decks/${deckId}/practice?lane=audio`)}>
+    <button
+      class="btn-practice-outline"
+      onclick={() => goto(`/decks/${deckId}/practice?lane=audio`)}
+    >
       Practice Audio
     </button>
-    <button class="btn-practice-outline" onclick={() => goto(`/decks/${deckId}/practice?lane=image`)}>
+    <button
+      class="btn-practice-outline"
+      onclick={() => goto(`/decks/${deckId}/practice?lane=image`)}
+    >
       Practice Image
     </button>
     <button class="btn-delete-deck btn-danger-ghost" onclick={deleteDeck}>Delete deck</button>
@@ -287,7 +311,9 @@
   {:else if deckSpecies.length === 0}
     <p class="status">No species yet. Search below to add some.</p>
   {:else}
-    <p class="lane-legend">♪ audio &nbsp; ◉ image -- click to include or exclude that media type from your study queue</p>
+    <p class="lane-legend">
+      ♪ audio &nbsp; ◉ image -- click to include or exclude that media type from your study queue
+    </p>
     <ul class="species-list list-reset">
       {#each deckSpecies as s (s.ebird_code)}
         <li class="species-row card">
@@ -302,17 +328,19 @@
                 class:active={s.audio_enabled}
                 aria-label="Toggle audio"
                 disabled={togglingCodes.has(s.ebird_code)}
-                onclick={() => toggleLane(s, 'audio')}
-              >♪</button>
+                onclick={() => toggleLane(s, 'audio')}>♪</button
+              >
               <button
                 class="lane-toggle"
                 class:active={s.image_enabled}
                 aria-label="Toggle image"
                 disabled={togglingCodes.has(s.ebird_code)}
-                onclick={() => toggleLane(s, 'image')}
-              >◉</button>
+                onclick={() => toggleLane(s, 'image')}>◉</button
+              >
             </div>
-            <button class="btn-remove btn-danger-ghost" onclick={() => removeSpecies(s.ebird_code)}>Remove</button>
+            <button class="btn-remove btn-danger-ghost" onclick={() => removeSpecies(s.ebird_code)}
+              >Remove</button
+            >
           </div>
         </li>
       {/each}
@@ -320,11 +348,7 @@
   {/if}
 
   <div class="search-section">
-    <input
-      type="text"
-      placeholder="Search species to add..."
-      bind:value={searchQuery}
-    />
+    <input type="text" placeholder="Search species to add..." bind:value={searchQuery} />
     <SpeciesSearchList
       results={unpinnedSearchResults}
       pinned={pinnedSearchSpecies}
@@ -332,14 +356,18 @@
       selectedCodes={selectedSearchCodes}
       onAdd={addSpecies}
       onToggle={toggleSearchSelected}
-      onSelectAll={(codes) => { selectedSearchCodes = new Set([...selectedSearchCodes, ...codes]) }}
+      onSelectAll={(codes) => {
+        for (const c of codes) selectedSearchCodes.add(c)
+      }}
     />
   </div>
 
   <BulkAddBar
     selectedCount={selectedSearchCodes.size}
     onAdd={bulkAddToThisDeck}
-    onClear={() => { selectedSearchCodes = new Set() }}
+    onClear={() => {
+      selectedSearchCodes.clear()
+    }}
   />
 </div>
 
@@ -525,7 +553,7 @@
     box-sizing: border-box;
   }
   .lane-legend {
-    font-size: .9rem;
+    font-size: 0.9rem;
     color: var(--text-muted);
     margin: 0;
   }

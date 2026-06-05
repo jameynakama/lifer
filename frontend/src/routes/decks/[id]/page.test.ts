@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/svelte'
 import { goto } from '$app/navigation'
 import { page } from '$app/state'
 import DeckDetailPage from './+page.svelte'
+import { queryResult } from '../../../test-utils'
 
 vi.mock('@tanstack/svelte-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/svelte-query')>()
@@ -31,14 +32,20 @@ function makeFetch(overrides: Record<string, unknown> = {}) {
     if (opts?.method === 'POST') {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
     }
-    if (opts?.method === 'PUT' && (overrides.putHandler as (url: string, opts: RequestInit) => unknown)) {
+    if (
+      opts?.method === 'PUT' &&
+      (overrides.putHandler as (url: string, opts: RequestInit) => unknown)
+    ) {
       return (overrides.putHandler as (url: string, opts: RequestInit) => unknown)(url, opts!)
     }
     if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
     }
     // deck detail (audio_due / image_due)
-    return Promise.resolve({ ok: true, json: () => Promise.resolve({ audio_due: 0, image_due: 0 }) })
+    return Promise.resolve({
+      ok: true,
+      json: () => Promise.resolve({ audio_due: 0, image_due: 0 }),
+    })
   })
 }
 
@@ -46,11 +53,13 @@ beforeEach(async () => {
   page.params = { id: '42' }
   vi.mocked(goto).mockClear()
   const { createQuery } = await import('@tanstack/svelte-query')
-  vi.mocked(createQuery).mockReturnValue({
-    data: [],
-    isPending: false,
-    isError: false,
-  } as any)
+  vi.mocked(createQuery).mockReturnValue(
+    queryResult({
+      data: [],
+      isPending: false,
+      isError: false,
+    }),
+  )
 })
 
 afterEach(() => {
@@ -107,11 +116,13 @@ describe('Deck detail page', () => {
       image_url: null,
     }
     const { createQuery } = await import('@tanstack/svelte-query')
-    vi.mocked(createQuery).mockReturnValue({
-      data: [foxSparrow],
-      isPending: false,
-      isError: false,
-    } as any)
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: [foxSparrow],
+        isPending: false,
+        isError: false,
+      }),
+    )
     vi.stubGlobal('fetch', makeFetch())
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
@@ -125,20 +136,28 @@ describe('Deck detail page', () => {
 
   it('removes species from deck on Remove click', async () => {
     let deleteCalled = false
-    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-      if (opts?.method === 'DELETE') {
-        deleteCalled = true
-        return Promise.resolve({ ok: true, status: 204 })
-      }
-      if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ audio_due: 0, image_due: 0 }) })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+        if (opts?.method === 'DELETE') {
+          deleteCalled = true
+          return Promise.resolve({ ok: true, status: 204 })
+        }
+        if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ audio_due: 0, image_due: 0 }),
+        })
+      }),
+    )
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /remove/i }))
     await fireEvent.click(screen.getByRole('button', { name: /remove/i }))
-    await vi.waitFor(() => { expect(deleteCalled).toBe(true) })
+    await vi.waitFor(() => {
+      expect(deleteCalled).toBe(true)
+    })
     await vi.waitFor(() => {
       expect(screen.queryByText(/song sparrow/i)).toBeNull()
     })
@@ -152,11 +171,13 @@ describe('Deck detail page', () => {
       image_url: null,
     }
     const { createQuery } = await import('@tanstack/svelte-query')
-    vi.mocked(createQuery).mockReturnValue({
-      data: [foxSparrow],
-      isPending: false,
-      isError: false,
-    } as any)
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: [foxSparrow],
+        isPending: false,
+        isError: false,
+      }),
+    )
     vi.stubGlobal('fetch', makeFetch())
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
@@ -173,11 +194,13 @@ describe('Deck detail page', () => {
 
   it('shows Added indicator for species already in the deck', async () => {
     const { createQuery } = await import('@tanstack/svelte-query')
-    vi.mocked(createQuery).mockReturnValue({
-      data: speciesWithPrefs.map((s) => ({ ...s, image_url: null })),
-      isPending: false,
-      isError: false,
-    } as any)
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: speciesWithPrefs.map((s) => ({ ...s, image_url: null })),
+        isPending: false,
+        isError: false,
+      }),
+    )
     vi.stubGlobal('fetch', makeFetch())
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
@@ -192,16 +215,19 @@ describe('Deck detail page', () => {
     let putUrl = ''
     let putBody: Record<string, boolean> | null = null
 
-    vi.stubGlobal('fetch', makeFetch({
-      putHandler: (url: string, opts: RequestInit) => {
-        putUrl = url
-        putBody = JSON.parse(opts.body as string)
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ audio_enabled: false, image_enabled: true }),
-        })
-      },
-    }))
+    vi.stubGlobal(
+      'fetch',
+      makeFetch({
+        putHandler: (url: string, opts: RequestInit) => {
+          putUrl = url
+          putBody = JSON.parse(opts.body as string)
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ audio_enabled: false, image_enabled: true }),
+          })
+        },
+      }),
+    )
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /toggle audio/i }))
     await fireEvent.click(screen.getByRole('button', { name: /toggle audio/i }))
@@ -214,15 +240,18 @@ describe('Deck detail page', () => {
   it('clicking Image toggle fires PUT /preferences with image_enabled flipped', async () => {
     let putBody: Record<string, boolean> | null = null
 
-    vi.stubGlobal('fetch', makeFetch({
-      putHandler: (_url: string, opts: RequestInit) => {
-        putBody = JSON.parse(opts.body as string)
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve({ audio_enabled: true, image_enabled: false }),
-        })
-      },
-    }))
+    vi.stubGlobal(
+      'fetch',
+      makeFetch({
+        putHandler: (_url: string, opts: RequestInit) => {
+          putBody = JSON.parse(opts.body as string)
+          return Promise.resolve({
+            ok: true,
+            json: () => Promise.resolve({ audio_enabled: true, image_enabled: false }),
+          })
+        },
+      }),
+    )
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /toggle image/i }))
     await fireEvent.click(screen.getByRole('button', { name: /toggle image/i }))
@@ -232,9 +261,12 @@ describe('Deck detail page', () => {
   })
 
   it('reverts toggle state on PUT failure', async () => {
-    vi.stubGlobal('fetch', makeFetch({
-      putHandler: () => Promise.resolve({ ok: false, json: () => Promise.resolve({}) }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      makeFetch({
+        putHandler: () => Promise.resolve({ ok: false, json: () => Promise.resolve({}) }),
+      }),
+    )
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /toggle audio/i }))
 
@@ -244,17 +276,27 @@ describe('Deck detail page', () => {
     await fireEvent.click(toggleBtn)
     await vi.waitFor(() => {
       // reverted: still active
-      expect(screen.getByRole('button', { name: /toggle audio/i }).classList.contains('active')).toBe(true)
+      expect(
+        screen.getByRole('button', { name: /toggle audio/i }).classList.contains('active'),
+      ).toBe(true)
     })
   })
 
   it('disables toggle buttons while PUT is in flight', async () => {
     let resolvePut!: () => void
-    vi.stubGlobal('fetch', makeFetch({
-      putHandler: () => new Promise<{ ok: boolean; json: () => Promise<unknown> }>((resolve) => {
-        resolvePut = () => resolve({ ok: true, json: () => Promise.resolve({ audio_enabled: false, image_enabled: true }) })
+    vi.stubGlobal(
+      'fetch',
+      makeFetch({
+        putHandler: () =>
+          new Promise<{ ok: boolean; json: () => Promise<unknown> }>((resolve) => {
+            resolvePut = () =>
+              resolve({
+                ok: true,
+                json: () => Promise.resolve({ audio_enabled: false, image_enabled: true }),
+              })
+          }),
       }),
-    }))
+    )
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /toggle audio/i }))
 
@@ -273,13 +315,25 @@ describe('Deck detail page', () => {
   })
 
   it('shows description returned from API', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-      if (opts?.method === 'DELETE') return Promise.resolve({ ok: true, status: 204 })
-      if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: 'My Deck', description: 'Birds that look alike', audio_due: 0, image_due: 0 }) })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+        if (opts?.method === 'DELETE') return Promise.resolve({ ok: true, status: 204 })
+        if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              name: 'My Deck',
+              description: 'Birds that look alike',
+              audio_due: 0,
+              image_due: 0,
+            }),
+        })
+      }),
+    )
     render(DeckDetailPage)
     await vi.waitFor(() => {
       expect(screen.getByText(/birds that look alike/i)).toBeInTheDocument()
@@ -287,26 +341,52 @@ describe('Deck detail page', () => {
   })
 
   it('shows checkboxes in search results', async () => {
-    const foxSparrow = { ebird_code: 'foxspa', common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', image_url: null }
+    const foxSparrow = {
+      ebird_code: 'foxspa',
+      common_name: 'Fox Sparrow',
+      scientific_name: 'Passerella iliaca',
+      image_url: null,
+    }
     const { createQuery } = await import('@tanstack/svelte-query')
-    vi.mocked(createQuery).mockReturnValue({ data: [foxSparrow], isPending: false, isError: false } as any)
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: [foxSparrow],
+        isPending: false,
+        isError: false,
+      }),
+    )
     vi.stubGlobal('fetch', makeFetch())
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
-    await fireEvent.input(screen.getByPlaceholderText(/search species/i), { target: { value: 'fox' } })
+    await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
+      target: { value: 'fox' },
+    })
     await vi.waitFor(() => {
       expect(screen.getAllByRole('checkbox').length).toBeGreaterThan(0)
     })
   })
 
   it('shows bulk add bar when search results are checked', async () => {
-    const foxSparrow = { ebird_code: 'foxspa', common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', image_url: null }
+    const foxSparrow = {
+      ebird_code: 'foxspa',
+      common_name: 'Fox Sparrow',
+      scientific_name: 'Passerella iliaca',
+      image_url: null,
+    }
     const { createQuery } = await import('@tanstack/svelte-query')
-    vi.mocked(createQuery).mockReturnValue({ data: [foxSparrow], isPending: false, isError: false } as any)
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: [foxSparrow],
+        isPending: false,
+        isError: false,
+      }),
+    )
     vi.stubGlobal('fetch', makeFetch())
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
-    await fireEvent.input(screen.getByPlaceholderText(/search species/i), { target: { value: 'fox' } })
+    await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
+      target: { value: 'fox' },
+    })
     await vi.waitFor(() => screen.getByRole('checkbox', { name: /fox sparrow/i }))
     await fireEvent.click(screen.getByRole('checkbox', { name: /fox sparrow/i }))
     await vi.waitFor(() => {
@@ -316,10 +396,26 @@ describe('Deck detail page', () => {
   })
 
   it('checked species stay visible when search query changes', async () => {
-    const foxSparrow = { ebird_code: 'foxspa', common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', image_url: null }
-    const junco = { ebird_code: 'daejun', common_name: 'Dark-eyed Junco', scientific_name: 'Junco hyemalis', image_url: null }
+    const foxSparrow = {
+      ebird_code: 'foxspa',
+      common_name: 'Fox Sparrow',
+      scientific_name: 'Passerella iliaca',
+      image_url: null,
+    }
+    const junco = {
+      ebird_code: 'daejun',
+      common_name: 'Dark-eyed Junco',
+      scientific_name: 'Junco hyemalis',
+      image_url: null,
+    }
     const { createQuery } = await import('@tanstack/svelte-query')
-    vi.mocked(createQuery).mockReturnValue({ data: [foxSparrow, junco], isPending: false, isError: false } as any)
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: [foxSparrow, junco],
+        isPending: false,
+        isError: false,
+      }),
+    )
     vi.stubGlobal('fetch', makeFetch())
     render(DeckDetailPage)
     const input = screen.getByPlaceholderText(/search species/i)
@@ -335,25 +431,44 @@ describe('Deck detail page', () => {
   })
 
   it('bulk add posts species_codes to bulk endpoint and clears selection', async () => {
-    const foxSparrow = { ebird_code: 'foxspa', common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', image_url: null }
+    const foxSparrow = {
+      ebird_code: 'foxspa',
+      common_name: 'Fox Sparrow',
+      scientific_name: 'Passerella iliaca',
+      image_url: null,
+    }
     const { createQuery } = await import('@tanstack/svelte-query')
-    vi.mocked(createQuery).mockReturnValue({ data: [foxSparrow], isPending: false, isError: false } as any)
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: [foxSparrow],
+        isPending: false,
+        isError: false,
+      }),
+    )
     let bulkCalled = false
     let bulkBody: unknown = null
-    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-      if (opts?.method === 'POST' && url.includes('/bulk')) {
-        bulkCalled = true
-        bulkBody = JSON.parse(opts.body as string)
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ added: 1 }) })
-      }
-      if (url.match(/\/api\/v1\/decks\/\d+\/species$/)) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ audio_due: 0, image_due: 0 }) })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+        if (opts?.method === 'POST' && url.includes('/bulk')) {
+          bulkCalled = true
+          bulkBody = JSON.parse(opts.body as string)
+          return Promise.resolve({ ok: true, json: () => Promise.resolve({ added: 1 }) })
+        }
+        if (url.match(/\/api\/v1\/decks\/\d+\/species$/)) {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ audio_due: 0, image_due: 0 }),
+        })
+      }),
+    )
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
-    await fireEvent.input(screen.getByPlaceholderText(/search species/i), { target: { value: 'fox' } })
+    await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
+      target: { value: 'fox' },
+    })
     await vi.waitFor(() => screen.getByRole('checkbox', { name: /fox sparrow/i }))
     await fireEvent.click(screen.getByRole('checkbox', { name: /fox sparrow/i }))
     await vi.waitFor(() => screen.getByRole('button', { name: /add 1 species/i }))
@@ -369,23 +484,37 @@ describe('Deck detail page', () => {
 
   it('sends updated description in PATCH when description edited', async () => {
     let patchBody: Record<string, unknown> | null = null
-    vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-      if (opts?.method === 'PATCH') {
-        patchBody = JSON.parse(opts.body as string)
-        return Promise.resolve({ ok: true, status: 204 })
-      }
-      if (opts?.method === 'DELETE') return Promise.resolve({ ok: true, status: 204 })
-      if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
-        return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
-      }
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({ name: 'My Deck', description: 'Old desc', audio_due: 0, image_due: 0 }) })
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+        if (opts?.method === 'PATCH') {
+          patchBody = JSON.parse(opts.body as string)
+          return Promise.resolve({ ok: true, status: 204 })
+        }
+        if (opts?.method === 'DELETE') return Promise.resolve({ ok: true, status: 204 })
+        if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
+          return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              name: 'My Deck',
+              description: 'Old desc',
+              audio_due: 0,
+              image_due: 0,
+            }),
+        })
+      }),
+    )
     render(DeckDetailPage)
     await vi.waitFor(() => screen.getByText(/old desc/i))
     await fireEvent.click(screen.getByRole('button', { name: /edit description/i }))
     const input = screen.getByDisplayValue('Old desc')
     await fireEvent.input(input, { target: { value: 'New desc' } })
     await fireEvent.blur(input)
-    await vi.waitFor(() => { expect(patchBody?.description).toBe('New desc') })
+    await vi.waitFor(() => {
+      expect(patchBody?.description).toBe('New desc')
+    })
   })
 })

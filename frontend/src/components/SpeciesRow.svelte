@@ -41,9 +41,7 @@
     </div>
   </a>
   <div class="deck-btn-wrapper">
-    <button class="deck-btn" onclick={toggleDropdown} aria-label="Add to deck">
-      + Deck
-    </button>
+    <button class="deck-btn" onclick={toggleDropdown} aria-label="Add to deck"> + Deck </button>
     {#if dropdownOpen}
       <DeckDropdown {ebird_code} onClose={closeDropdown} />
     {/if}

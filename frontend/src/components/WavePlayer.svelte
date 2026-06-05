@@ -16,11 +16,13 @@
   // browser without CORS restrictions) and supply pre-generated peaks so it
   // never needs to XHR-fetch anything.
   function generatePeaks(count: number): number[][] {
-    return [Array.from({ length: count }, (_, i) => {
-      const x = i / count
-      const envelope = Math.pow(Math.sin(x * Math.PI), 0.4) * 0.85
-      return Math.random() * envelope + 0.05
-    })]
+    return [
+      Array.from({ length: count }, (_, i) => {
+        const x = i / count
+        const envelope = Math.pow(Math.sin(x * Math.PI), 0.4) * 0.85
+        return Math.random() * envelope + 0.05
+      }),
+    ]
   }
 
   onMount(() => {
@@ -45,10 +47,18 @@
       barRadius: 2,
     })
 
-    ws.on('ready', () => { ready = true })
-    ws.on('play', () => { playing = true })
-    ws.on('pause', () => { playing = false })
-    ws.on('finish', () => { playing = false })
+    ws.on('ready', () => {
+      ready = true
+    })
+    ws.on('play', () => {
+      playing = true
+    })
+    ws.on('pause', () => {
+      playing = false
+    })
+    ws.on('finish', () => {
+      playing = false
+    })
 
     return () => {
       audio?.pause()

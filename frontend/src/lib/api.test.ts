@@ -44,7 +44,7 @@ describe('apiGet', () => {
   it('should use the {error} field when the server returns a JSON error body', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse({ error: 'name is required' }, 400))
+      vi.fn().mockResolvedValue(jsonResponse({ error: 'name is required' }, 400)),
     )
 
     const err = await captureError(apiGet('/api/v1/decks'))

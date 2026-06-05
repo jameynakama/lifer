@@ -5,12 +5,15 @@ import { auth } from '$stores/auth'
 import Layout from './+layout.svelte'
 
 const mockMatchMedia = (prefersDark = true) => {
-  vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
-    matches: query === '(prefers-color-scheme: dark)' ? prefersDark : !prefersDark,
-    media: query,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  })))
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-color-scheme: dark)' ? prefersDark : !prefersDark,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  )
 }
 
 beforeEach(() => {
@@ -35,7 +38,10 @@ describe('Layout', () => {
 
   it('shows app shell and sets auth when /api/v1/me returns 200', async () => {
     const user = { id: 1, email: 'test@example.com', name: 'Test User' }
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }),
+    )
     render(Layout)
     await vi.waitFor(() => {
       expect(screen.getByText(/FlockDeck/)).toBeInTheDocument()
@@ -45,7 +51,10 @@ describe('Layout', () => {
 
   it('shows theme toggle when authenticated', async () => {
     const user = { id: 1, email: 'test@example.com', name: 'Test User' }
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }),
+    )
     render(Layout)
     await vi.waitFor(() => {
       expect(screen.getByRole('button', { name: /switch to .* mode/i })).toBeInTheDocument()
@@ -54,7 +63,10 @@ describe('Layout', () => {
 
   it('shows Admin link when user is admin', async () => {
     const user = { id: 1, email: 'test@example.com', name: 'Test User', is_admin: true }
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }),
+    )
     render(Layout)
     await vi.waitFor(() => {
       expect(screen.getByRole('link', { name: /admin/i })).toBeInTheDocument()
@@ -63,7 +75,10 @@ describe('Layout', () => {
 
   it('hides Admin link for non-admin users', async () => {
     const user = { id: 1, email: 'test@example.com', name: 'Test User', is_admin: false }
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }),
+    )
     render(Layout)
     await vi.waitFor(() => {
       expect(screen.getByText(/FlockDeck/)).toBeInTheDocument()

@@ -8,15 +8,25 @@ alias tfe := test-fe
 # Run all tests and checks (backend + frontend)
 test args='':
     cd backend && go vet ./... && gotestsum ./... -- {{ args }}
-    cd frontend && npx svelte-check --tsconfig tsconfig.json && npm test
+    cd frontend && npm run check && npm test
 
 # Run backend tests and checks
 test-be args='':
     cd backend && go vet ./... && gotestsum ./... -- {{ args }}
 
-# Run frontend tests and checks
+# Run frontend tests and checks (npm run check syncs svelte-kit first)
 test-fe:
-    cd frontend && npx svelte-check --tsconfig tsconfig.json && npm test
+    cd frontend && npm run check && npm test
+
+# Lint backend (golangci-lint) and frontend (eslint + prettier --check)
+lint:
+    cd backend && golangci-lint run
+    cd frontend && npm run lint
+
+# Auto-fix lint findings and formatting
+lint-fix:
+    cd backend && golangci-lint run --fix
+    cd frontend && npm run lint:fix && npm run format
 
 # Run regular tests with certain args that gotestsum seems to ignore
 gotest args='':
@@ -25,6 +35,10 @@ gotest args='':
 # Run tests with coverage report
 cover:
     cd backend && gotestsum -- -coverprofile=coverage.out ./... && go tool cover -func=coverage.out
+
+# Run frontend tests with coverage report
+cover-fe:
+    cd frontend && npm run test:coverage
 
 # Build the backend binary
 build:
@@ -67,7 +81,7 @@ run:
 
 # Install all the required tools
 install-tools:
-    brew install sqlc
+    brew install sqlc golangci-lint
     go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
     go install github.com/air-verse/air@latest
     go install gotest.tools/gotestsum@latest

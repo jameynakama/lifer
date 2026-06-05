@@ -14,33 +14,39 @@ afterEach(() => {
 
 describe('Admin species page', () => {
   it('renders a search form', () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({ results: [], count: 0, next: null, previous: null }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ results: [], count: 0, next: null, previous: null }),
+      }),
+    )
     render(Page)
     expect(screen.getByRole('textbox')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /search/i })).toBeInTheDocument()
   })
 
   it('renders species results as links', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          results: [
-            {
-              ebird_code: 'sonspa',
-              common_name: 'Song Sparrow',
-              scientific_name: 'Melospiza melodia',
-              image_url: null,
-            },
-          ],
-          count: 1,
-          next: null,
-          previous: null,
-        }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            results: [
+              {
+                ebird_code: 'sonspa',
+                common_name: 'Song Sparrow',
+                scientific_name: 'Melospiza melodia',
+                image_url: null,
+              },
+            ],
+            count: 1,
+            next: null,
+            previous: null,
+          }),
+      }),
+    )
     render(Page)
     await vi.waitFor(() => {
       expect(screen.getByRole('link', { name: /song sparrow/i })).toBeInTheDocument()
@@ -48,23 +54,26 @@ describe('Admin species page', () => {
   })
 
   it('shows Next link when next is not null', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          results: [
-            {
-              ebird_code: 'sonspa',
-              common_name: 'Song Sparrow',
-              scientific_name: 'Melospiza melodia',
-              image_url: null,
-            },
-          ],
-          count: 50,
-          next: 'http://localhost/?offset=25',
-          previous: null,
-        }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            results: [
+              {
+                ebird_code: 'sonspa',
+                common_name: 'Song Sparrow',
+                scientific_name: 'Melospiza melodia',
+                image_url: null,
+              },
+            ],
+            count: 50,
+            next: 'http://localhost/?offset=25',
+            previous: null,
+          }),
+      }),
+    )
     render(Page)
     await vi.waitFor(() => {
       expect(screen.getByRole('link', { name: /next/i })).toBeInTheDocument()
@@ -72,23 +81,26 @@ describe('Admin species page', () => {
   })
 
   it('does not show Previous link when previous is null', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: () =>
-        Promise.resolve({
-          results: [
-            {
-              ebird_code: 'sonspa',
-              common_name: 'Song Sparrow',
-              scientific_name: 'Melospiza melodia',
-              image_url: null,
-            },
-          ],
-          count: 50,
-          next: 'http://localhost/?offset=25',
-          previous: null,
-        }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            results: [
+              {
+                ebird_code: 'sonspa',
+                common_name: 'Song Sparrow',
+                scientific_name: 'Melospiza melodia',
+                image_url: null,
+              },
+            ],
+            count: 50,
+            next: 'http://localhost/?offset=25',
+            previous: null,
+          }),
+      }),
+    )
     render(Page)
     await vi.waitFor(() => {
       expect(screen.queryByRole('link', { name: /previous/i })).not.toBeInTheDocument()
@@ -98,9 +110,11 @@ describe('Admin species page', () => {
   it('handles fetch errors and displays error message', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 })
-      )
+      vi
+        .fn()
+        .mockResolvedValue(
+          new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 }),
+        ),
     )
     render(Page)
     await vi.waitFor(() => {

@@ -22,7 +22,7 @@
     queryKey: queryKeys.speciesDecks(ebird_code),
     queryFn: () =>
       apiGet<{ deck_ids: number[] | null }>(`/api/v1/species/${ebird_code}/decks`).then(
-        (d) => d.deck_ids ?? []
+        (d) => d.deck_ids ?? [],
       ),
   }))
 
@@ -44,11 +44,15 @@
     mutationError = ''
     if (currentlyIn) {
       removeMutation.mutate(deckId, {
-        onError: () => { mutationError = 'Failed. Try again.' },
+        onError: () => {
+          mutationError = 'Failed. Try again.'
+        },
       })
     } else {
       addMutation.mutate(deckId, {
-        onError: () => { mutationError = 'Failed. Try again.' },
+        onError: () => {
+          mutationError = 'Failed. Try again.'
+        },
       })
     }
   }
@@ -86,11 +90,7 @@
       {#each decks as deck (deck.id)}
         {@const isMember = (membershipQuery.data ?? []).includes(deck.id)}
         <label class="deck-item">
-          <input
-            type="checkbox"
-            checked={isMember}
-            onchange={() => toggle(deck.id, isMember)}
-          />
+          <input type="checkbox" checked={isMember} onchange={() => toggle(deck.id, isMember)} />
           {deck.name}
         </label>
       {/each}

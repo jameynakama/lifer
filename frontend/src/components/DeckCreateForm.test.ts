@@ -42,7 +42,11 @@ describe('DeckCreateForm', () => {
 
   it('shows Creating… and disables while onCreate is pending', async () => {
     let resolve!: () => void
-    const onCreate = vi.fn().mockReturnValue(new Promise<void>((r) => { resolve = r }))
+    const onCreate = vi.fn().mockReturnValue(
+      new Promise<void>((r) => {
+        resolve = r
+      }),
+    )
     render(DeckCreateForm, { label: '+ Create deck', onCreate })
     await fireEvent.input(screen.getByPlaceholderText(/new deck name/i), {
       target: { value: 'Warblers' },

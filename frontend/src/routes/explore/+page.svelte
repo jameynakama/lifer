@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SvelteSet } from 'svelte/reactivity'
   import { createQuery } from '@tanstack/svelte-query'
   import { apiGet, apiPost } from '$lib/api'
   import { queryKeys } from '$lib/queries'
@@ -12,7 +13,7 @@
 
   let q = $state('')
   let offset = $state(0)
-  let selectedCodes: Set<string> = $state(new Set())
+  const selectedCodes = new SvelteSet<string>()
   let showDeckPicker = $state(false)
 
   const allSpeciesQuery = createQuery(() => ({
@@ -23,9 +24,7 @@
 
   const allSpecies = $derived(allSpeciesQuery.data ?? [])
 
-  const pinnedSpecies = $derived(
-    allSpecies.filter((s) => selectedCodes.has(s.ebird_code))
-  )
+  const pinnedSpecies = $derived(allSpecies.filter((s) => selectedCodes.has(s.ebird_code)))
 
   const filtered = $derived(
     q.length < 2
@@ -33,15 +32,12 @@
       : allSpecies.filter((s) => {
           const lq = q.toLowerCase()
           return (
-            s.common_name.toLowerCase().includes(lq) ||
-            s.scientific_name.toLowerCase().includes(lq)
+            s.common_name.toLowerCase().includes(lq) || s.scientific_name.toLowerCase().includes(lq)
           )
-        })
+        }),
   )
 
-  const filteredNonPinned = $derived(
-    filtered.filter((s) => !selectedCodes.has(s.ebird_code))
-  )
+  const filteredNonPinned = $derived(filtered.filter((s) => !selectedCodes.has(s.ebird_code)))
 
   const displayed = $derived(filteredNonPinned.slice(offset, offset + defaultLimit))
 
@@ -50,14 +46,12 @@
   }
 
   function toggleSelected(code: string) {
-    const next = new Set(selectedCodes)
-    if (next.has(code)) next.delete(code)
-    else next.add(code)
-    selectedCodes = next
+    if (selectedCodes.has(code)) selectedCodes.delete(code)
+    else selectedCodes.add(code)
   }
 
   function clearSelection() {
-    selectedCodes = new Set()
+    selectedCodes.clear()
   }
 
   async function bulkAddToDeck(deckId: number) {
@@ -73,7 +67,9 @@
     type="text"
     placeholder="Search species…"
     bind:value={q}
-    oninput={() => { offset = 0 }}
+    oninput={() => {
+      offset = 0
+    }}
   />
 
   {#if allSpeciesQuery.isPending}
@@ -86,9 +82,9 @@
         <button
           class="btn-select-all"
           onclick={() => {
-            selectedCodes = new Set([...selectedCodes, ...filteredNonPinned.map((s) => s.ebird_code)])
-          }}
-        >Select all ({filteredNonPinned.length})</button>
+            for (const sp of filteredNonPinned) selectedCodes.add(sp.ebird_code)
+          }}>Select all ({filteredNonPinned.length})</button
+        >
       </div>
     {/if}
     <ul class="species-list">
@@ -126,24 +122,23 @@
       {/each}
     </ul>
 
-    <PaginationBar
-      total={filteredNonPinned.length}
-      {offset}
-      limit={defaultLimit}
-      {onPageChange}
-    />
+    <PaginationBar total={filteredNonPinned.length} {offset} limit={defaultLimit} {onPageChange} />
   {/if}
 
   <BulkAddBar
     selectedCount={selectedCodes.size}
-    onAdd={() => { showDeckPicker = true }}
+    onAdd={() => {
+      showDeckPicker = true
+    }}
     onClear={clearSelection}
   />
 
   {#if showDeckPicker}
     <DeckPickerPopover
       onPick={bulkAddToDeck}
-      onClose={() => { showDeckPicker = false }}
+      onClose={() => {
+        showDeckPicker = false
+      }}
     />
   {/if}
 </div>

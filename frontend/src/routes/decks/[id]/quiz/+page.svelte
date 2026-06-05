@@ -7,7 +7,7 @@
 
   let deckId = $derived(page.params.id)
   let lane: 'audio' | 'image' = $derived(
-    page.url.searchParams.get('lane') === 'image' ? 'image' : 'audio'
+    page.url.searchParams.get('lane') === 'image' ? 'image' : 'audio',
   )
 
   let card = $state<BirdCard | null>(null)
@@ -33,7 +33,7 @@
     error = ''
     try {
       const next = await apiGet<BirdCard | undefined>(
-        `/api/v1/decks/${deckId}/next?lane=${lane}&due_before=${encodeURIComponent(sessionStart)}`
+        `/api/v1/decks/${deckId}/next?lane=${lane}&due_before=${encodeURIComponent(sessionStart)}`,
       )
       if (!next) {
         done = true
@@ -84,13 +84,25 @@
 </script>
 
 {#key deckId}
-  <QuizSession {card} species={deckSpecies} {stats} {loading} {error} {done} {onAdvance} onRetry={fetchNext}>
+  <QuizSession
+    {card}
+    species={deckSpecies}
+    {stats}
+    {loading}
+    {error}
+    {done}
+    {onAdvance}
+    onRetry={fetchNext}
+  >
     {#snippet doneScreen()}
       <div class="done">
         <p class="done-icon">🎉</p>
         <p class="done-title">All caught up!</p>
         {#if reviewed > 0}
-          <p class="done-sub">{reviewed} {reviewed === 1 ? 'card' : 'cards'} reviewed this session.</p>
+          <p class="done-sub">
+            {reviewed}
+            {reviewed === 1 ? 'card' : 'cards'} reviewed this session.
+          </p>
         {/if}
         <p class="done-sub">Come back later when more cards are due.</p>
         <button class="btn-primary" onclick={() => goto(`/decks/${deckId}`)}>Back to deck</button>

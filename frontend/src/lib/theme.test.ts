@@ -2,12 +2,15 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { getCurrentTheme, initTheme, toggleTheme } from './theme'
 
 const mockMatchMedia = (prefersDark: boolean) => {
-  vi.stubGlobal('matchMedia', vi.fn().mockImplementation((query: string) => ({
-    matches: query === '(prefers-color-scheme: dark)' ? prefersDark : !prefersDark,
-    media: query,
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-  })))
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn().mockImplementation((query: string) => ({
+      matches: query === '(prefers-color-scheme: dark)' ? prefersDark : !prefersDark,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
+  )
 }
 
 beforeEach(() => {

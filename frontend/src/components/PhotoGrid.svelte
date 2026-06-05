@@ -7,12 +7,13 @@
 {#if images.length > 0}
   <div class="photo-grid">
     {#each images as img (img.macaulay_id)}
-      <a href={img.file_path} target="_blank" rel="noopener noreferrer" aria-label="View full resolution photo{img.credit ? ` by ${img.credit}` : ''}">
-        <img
-          src={img.file_path}
-          alt={img.credit || 'Species photo'}
-          loading="lazy"
-        />
+      <a
+        href={img.file_path}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="View full resolution photo{img.credit ? ` by ${img.credit}` : ''}"
+      >
+        <img src={img.file_path} alt={img.credit || 'Species photo'} loading="lazy" />
         {#if img.credit}
           <span class="credit">{img.credit}</span>
         {/if}

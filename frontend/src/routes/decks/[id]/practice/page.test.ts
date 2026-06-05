@@ -7,7 +7,9 @@ import PracticePage from './+page.svelte'
 vi.mock('wavesurfer.js', () => ({
   default: {
     create: vi.fn(() => ({
-      on: vi.fn((event: string, cb: () => void) => { if (event === 'ready') cb() }),
+      on: vi.fn((event: string, cb: () => void) => {
+        if (event === 'ready') cb()
+      }),
       playPause: vi.fn(),
       pause: vi.fn(),
       destroy: vi.fn(),
@@ -106,7 +108,7 @@ describe('Practice page', () => {
     await fireEvent.click(screen.getByRole('button', { name: /next/i }))
     await vi.waitFor(() => {
       const posts = fetchMock.mock.calls.filter(
-        (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === 'POST'
+        (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === 'POST',
       )
       expect(posts.length).toBe(0)
     })

@@ -27,7 +27,9 @@ describe('decksQueryOptions', () => {
   it('should fetch the user deck list under the shared key', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse({ decks: [{ id: 1, name: 'Yard' }], next_due_at: null }))
+      vi
+        .fn()
+        .mockResolvedValue(jsonResponse({ decks: [{ id: 1, name: 'Yard' }], next_due_at: null })),
     )
 
     const opts = decksQueryOptions()
@@ -44,7 +46,7 @@ describe('presetsQueryOptions', () => {
   it('should fetch preset decks under the shared key', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse([{ id: 2, name: 'Oregon', species_count: 120 }]))
+      vi.fn().mockResolvedValue(jsonResponse([{ id: 2, name: 'Oregon', species_count: 120 }])),
     )
 
     const opts = presetsQueryOptions()

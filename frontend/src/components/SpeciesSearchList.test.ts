@@ -6,9 +6,24 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-const sparrow = { ebird_code: 'sonspa', common_name: 'Song Sparrow', scientific_name: 'Melospiza melodia', image_url: null }
-const robin = { ebird_code: 'amro', common_name: 'American Robin', scientific_name: 'Turdus migratorius', image_url: null }
-const crow = { ebird_code: 'amcro', common_name: 'American Crow', scientific_name: 'Corvus brachyrhynchos', image_url: null }
+const sparrow = {
+  ebird_code: 'sonspa',
+  common_name: 'Song Sparrow',
+  scientific_name: 'Melospiza melodia',
+  image_url: null,
+}
+const robin = {
+  ebird_code: 'amro',
+  common_name: 'American Robin',
+  scientific_name: 'Turdus migratorius',
+  image_url: null,
+}
+const crow = {
+  ebird_code: 'amcro',
+  common_name: 'American Crow',
+  scientific_name: 'Corvus brachyrhynchos',
+  image_url: null,
+}
 
 function make(overrides = {}) {
   return {

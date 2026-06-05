@@ -36,7 +36,7 @@
     if (!confirm(`Delete image ${macaulayID}?`)) return
     try {
       await apiDelete(`/api/v1/admin/species/${ebirdCode}/images/${macaulayID}`)
-      images = images.filter(i => i.macaulay_id !== macaulayID)
+      images = images.filter((i) => i.macaulay_id !== macaulayID)
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         alert('This image is locked and cannot be deleted.')
@@ -49,7 +49,7 @@
   async function toggleImageLocked(macaulayID: string, locked: boolean) {
     try {
       await apiPatch(`/api/v1/admin/species/${ebirdCode}/images/${macaulayID}/locked`, { locked })
-      images = images.map(i => i.macaulay_id === macaulayID ? { ...i, locked } : i)
+      images = images.map((i) => (i.macaulay_id === macaulayID ? { ...i, locked } : i))
     } catch {
       // leave toggle unchanged
     }
@@ -59,7 +59,7 @@
     if (!confirm(`Delete recording ${xenoCantoID}?`)) return
     try {
       await apiDelete(`/api/v1/admin/species/${ebirdCode}/recordings/${xenoCantoID}`)
-      recordings = recordings.filter(r => r.xeno_canto_id !== xenoCantoID)
+      recordings = recordings.filter((r) => r.xeno_canto_id !== xenoCantoID)
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         alert('This recording is locked and cannot be deleted.')
@@ -71,8 +71,10 @@
 
   async function toggleRecordingLocked(xenoCantoID: string, locked: boolean) {
     try {
-      await apiPatch(`/api/v1/admin/species/${ebirdCode}/recordings/${xenoCantoID}/locked`, { locked })
-      recordings = recordings.map(r => r.xeno_canto_id === xenoCantoID ? { ...r, locked } : r)
+      await apiPatch(`/api/v1/admin/species/${ebirdCode}/recordings/${xenoCantoID}/locked`, {
+        locked,
+      })
+      recordings = recordings.map((r) => (r.xeno_canto_id === xenoCantoID ? { ...r, locked } : r))
     } catch {
       // leave toggle unchanged
     }
@@ -123,7 +125,7 @@
   <section>
     <h3>Images ({images.length})</h3>
     <div class="image-grid">
-      {#each images as img}
+      {#each images as img (img.macaulay_id)}
         <div class="image-card" class:locked={img.locked}>
           <img src={img.file_path} alt={img.credit} />
           <p class="credit">{img.credit}</p>
@@ -133,12 +135,13 @@
               class="btn-lock"
               class:active={img.locked}
               onclick={() => toggleImageLocked(img.macaulay_id, !img.locked)}
-            >{img.locked ? '🔒 Locked' : '🔓 Lock'}</button>
+              >{img.locked ? '🔒 Locked' : '🔓 Lock'}</button
+            >
             <button
               class="btn-delete btn-danger-ghost"
               disabled={img.locked}
-              onclick={() => deleteImage(img.macaulay_id)}
-            >Delete</button>
+              onclick={() => deleteImage(img.macaulay_id)}>Delete</button
+            >
           </div>
         </div>
       {/each}
@@ -161,7 +164,7 @@
         <tr><th>ID</th><th>Quality</th><th>Type</th><th>Credit</th><th>Actions</th></tr>
       </thead>
       <tbody>
-        {#each recordings as rec}
+        {#each recordings as rec (rec.xeno_canto_id)}
           <tr class:locked={rec.locked}>
             <td>{rec.xeno_canto_id}</td>
             <td>{rec.quality}</td>
@@ -173,12 +176,13 @@
                 class="btn-lock"
                 class:active={rec.locked}
                 onclick={() => toggleRecordingLocked(rec.xeno_canto_id, !rec.locked)}
-              >{rec.locked ? '🔒' : '🔓'}</button>
+                >{rec.locked ? '🔒' : '🔓'}</button
+              >
               <button
                 class="btn-delete btn-danger-ghost"
                 disabled={rec.locked}
-                onclick={() => deleteRecording(rec.xeno_canto_id)}
-              >Delete</button>
+                onclick={() => deleteRecording(rec.xeno_canto_id)}>Delete</button
+              >
             </td>
           </tr>
         {/each}
@@ -192,7 +196,9 @@
         <label>
           Quality:
           <select name="quality">
-            <option>A</option><option>B</option><option>C</option><option>D</option><option>E</option>
+            <option>A</option><option>B</option><option>C</option><option>D</option><option
+              >E</option
+            >
           </select>
         </label>
         <label>
@@ -202,7 +208,7 @@
           </select>
         </label>
         <label>
-            Credit: <input type="text" name="credit" placeholder="Recorder name" />
+          Credit: <input type="text" name="credit" placeholder="Recorder name" />
         </label>
         <button type="submit">Upload</button>
       </form>
@@ -211,18 +217,64 @@
 {/if}
 
 <style>
-  section { margin-top: 2rem; }
-  .image-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1rem; margin: 1rem 0; }
-  .image-card { border: 1px solid var(--border); border-radius: 6px; padding: 0.5rem; }
-  .image-card img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 4px; }
-  .image-card.locked { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
-  .credit, .id { font-size: 0.75rem; color: var(--text-muted); margin: 0.25rem 0; }
-  .card-actions { display: flex; gap: 0.25rem; margin-top: 0.25rem; }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
-  tr.locked td { background: color-mix(in srgb, var(--accent) 5%, transparent); }
-  .actions-cell { display: flex; align-items: center; gap: 0.375rem; flex-wrap: wrap; }
-  audio { height: 28px; vertical-align: middle; }
+  section {
+    margin-top: 2rem;
+  }
+  .image-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+  }
+  .image-card {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.5rem;
+  }
+  .image-card img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 4px;
+  }
+  .image-card.locked {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  }
+  .credit,
+  .id {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin: 0.25rem 0;
+  }
+  .card-actions {
+    display: flex;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th,
+  td {
+    text-align: left;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.875rem;
+  }
+  tr.locked td {
+    background: color-mix(in srgb, var(--accent) 5%, transparent);
+  }
+  .actions-cell {
+    display: flex;
+    align-items: center;
+    gap: 0.375rem;
+    flex-wrap: wrap;
+  }
+  audio {
+    height: 28px;
+    vertical-align: middle;
+  }
   .btn-lock {
     background: transparent;
     border: 1px solid var(--border);
@@ -241,10 +293,31 @@
     padding: 0.2rem 0.4rem;
     font-size: 0.75rem;
   }
-  .btn-delete:disabled { opacity: 0.4; cursor: not-allowed; }
-  details { margin-top: 1rem; }
-  summary { cursor: pointer; color: var(--text-secondary); }
-  form { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; max-width: 400px; }
-  label { display: flex; flex-direction: column; gap: 0.25rem; font-size: 0.875rem; }
-  .error { color: var(--danger); }
+  .btn-delete:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+  details {
+    margin-top: 1rem;
+  }
+  summary {
+    cursor: pointer;
+    color: var(--text-secondary);
+  }
+  form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    max-width: 400px;
+  }
+  label {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    font-size: 0.875rem;
+  }
+  .error {
+    color: var(--danger);
+  }
 </style>

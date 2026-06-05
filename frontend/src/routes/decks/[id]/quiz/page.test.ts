@@ -8,7 +8,9 @@ import QuizPage from './+page.svelte'
 vi.mock('wavesurfer.js', () => ({
   default: {
     create: vi.fn(() => ({
-      on: vi.fn((event: string, cb: () => void) => { if (event === 'ready') cb() }),
+      on: vi.fn((event: string, cb: () => void) => {
+        if (event === 'ready') cb()
+      }),
       playPause: vi.fn(),
       pause: vi.fn(),
       destroy: vi.fn(),
@@ -183,7 +185,7 @@ describe('Quiz page', () => {
     await fireEvent.click(screen.getByRole('button', { name: /next/i }))
     await vi.waitFor(() => {
       const posts = fetchMock.mock.calls.filter(
-        (c: unknown[]) => (c[1] as RequestInit)?.method === 'POST'
+        (c: unknown[]) => (c[1] as RequestInit)?.method === 'POST',
       )
       expect(posts.length).toBe(1)
     })

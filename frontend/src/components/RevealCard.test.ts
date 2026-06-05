@@ -6,7 +6,9 @@ import type { BirdCard, Species } from '../types'
 vi.mock('wavesurfer.js', () => ({
   default: {
     create: vi.fn(() => ({
-      on: vi.fn((event: string, cb: () => void) => { if (event === 'ready') cb() }),
+      on: vi.fn((event: string, cb: () => void) => {
+        if (event === 'ready') cb()
+      }),
       pause: vi.fn(),
       destroy: vi.fn(),
     })),
@@ -27,10 +29,14 @@ const card: BirdCard = {
 }
 
 const songSparrow: Species = {
-  common_name: 'Song Sparrow', scientific_name: 'Melospiza melodia', ebird_code: 'sonspa',
+  common_name: 'Song Sparrow',
+  scientific_name: 'Melospiza melodia',
+  ebird_code: 'sonspa',
 }
 const foxSparrow: Species = {
-  common_name: 'Fox Sparrow', scientific_name: 'Passerella iliaca', ebird_code: 'foxspa',
+  common_name: 'Fox Sparrow',
+  scientific_name: 'Passerella iliaca',
+  ebird_code: 'foxspa',
 }
 
 describe('RevealCard', () => {

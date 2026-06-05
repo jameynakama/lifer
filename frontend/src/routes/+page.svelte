@@ -47,7 +47,9 @@
   {#if loading}
     <p class="status">Loading...</p>
   {:else if decks.length === 0}
-    <p class="status">No decks yet. <a href="/decks">Create one</a> or clone a Starter Deck below to get started.</p>
+    <p class="status">
+      No decks yet. <a href="/decks">Create one</a> or clone a Starter Deck below to get started.
+    </p>
     {#if !presetsLoading && presetDecks.length > 0}
       <h2 class="section-heading">Starter Decks</h2>
       <p class="section-subheading">Clone one and start practicing right away</p>

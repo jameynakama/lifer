@@ -5,7 +5,12 @@ import StatsBar from './StatsBar.svelte'
 describe('StatsBar', () => {
   it('renders each stat value and label', () => {
     render(StatsBar, {
-      props: { stats: [{ label: 'Due today', value: 11 }, { label: 'Streak', value: 5 }] },
+      props: {
+        stats: [
+          { label: 'Due today', value: 11 },
+          { label: 'Streak', value: 5 },
+        ],
+      },
     })
     expect(screen.getByText('11')).toBeInTheDocument()
     expect(screen.getByText('Due today')).toBeInTheDocument()

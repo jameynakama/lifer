@@ -65,7 +65,7 @@
     try {
       await apiDelete(`/api/v1/decks/${id}`)
       queryClient.setQueryData(queryKeys.decks, (prev: { decks: Deck[] } | undefined) =>
-        prev ? { ...prev, decks: prev.decks.filter((d) => d.id !== id) } : prev
+        prev ? { ...prev, decks: prev.decks.filter((d) => d.id !== id) } : prev,
       )
     } catch {
       // network error, leave state unchanged
@@ -91,14 +91,15 @@
     </p>
   {/if}
 
-  <form class="create-form" onsubmit={(e) => { e.preventDefault(); createDeck() }}>
+  <form
+    class="create-form"
+    onsubmit={(e) => {
+      e.preventDefault()
+      createDeck()
+    }}
+  >
     <div class="create-fields">
-      <input
-        type="text"
-        bind:value={newName}
-        placeholder="Deck name"
-        disabled={creating}
-      />
+      <input type="text" bind:value={newName} placeholder="Deck name" disabled={creating} />
       <input
         type="text"
         bind:value={newDescription}
@@ -127,30 +128,30 @@
             {#if practiceMode}
               <button
                 class="btn-action"
-                onclick={() => goto(`/decks/${deck.id}/practice?lane=audio`)}
-              >▶ Audio</button>
+                onclick={() => goto(`/decks/${deck.id}/practice?lane=audio`)}>▶ Audio</button
+              >
               <button
                 class="btn-action"
-                onclick={() => goto(`/decks/${deck.id}/practice?lane=image`)}
-              >◉ Image</button>
+                onclick={() => goto(`/decks/${deck.id}/practice?lane=image`)}>◉ Image</button
+              >
             {:else}
               {#if deck.audio_due > 0}
-                <button
-                  class="btn-action"
-                  onclick={() => goto(`/decks/${deck.id}/quiz?lane=audio`)}
-                >🔊 Audio · {deck.audio_due}</button>
+                <button class="btn-action" onclick={() => goto(`/decks/${deck.id}/quiz?lane=audio`)}
+                  >🔊 Audio · {deck.audio_due}</button
+                >
               {/if}
               {#if deck.image_due > 0}
-                <button
-                  class="btn-action"
-                  onclick={() => goto(`/decks/${deck.id}/quiz?lane=image`)}
-                >👁 Image · {deck.image_due}</button>
+                <button class="btn-action" onclick={() => goto(`/decks/${deck.id}/quiz?lane=image`)}
+                  >👁 Image · {deck.image_due}</button
+                >
               {/if}
               {#if deck.audio_due === 0 && deck.image_due === 0}
                 <span class="all-done">All done</span>
               {/if}
             {/if}
-            <button class="btn-danger-ghost btn-delete" onclick={() => deleteDeck(deck.id)}>Delete</button>
+            <button class="btn-danger-ghost btn-delete" onclick={() => deleteDeck(deck.id)}
+              >Delete</button
+            >
           </div>
         </li>
       {/each}
