@@ -61,6 +61,7 @@ type metadataStore interface {
 // the DB (no media work). Returns the refreshed count and any codes absent
 // from the eBird taxonomy (reported, never deleted). Fails fast on the first
 // DB error -- a row-level failure here means DB trouble, not data trouble.
+// Partial counts are returned alongside the error for diagnostic logging.
 func refreshMetadata(ctx context.Context, q metadataStore, taxMap map[string]ebird.TaxonomyEntry) (int, []string, error) {
 	codes, err := q.ListSpeciesCodes(ctx)
 	if err != nil {

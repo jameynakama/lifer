@@ -34,19 +34,29 @@ func main() {
 	xcOverrideFlag := flag.String("xc-override", "", "comma-separated xeno-canto taxonomy overrides, e.g. \"comrav=Corvus:corax\"")
 	noR2 := flag.Bool("no-r2", false, "skip R2 uploads; store placeholder:// URLs in DB (local dev/testing only -- never use in prod)")
 	noCleanup := flag.Bool("no-cleanup", false, "skip post-run cleanup of incomplete species from R2 and DB (safe for local dev)")
+	refreshMeta := flag.Bool("refresh-metadata", false, "re-upsert species metadata (names, family) from the eBird taxonomy for every species already in the DB; no regions, no media work")
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "Usage: ingest [flags] <region-code> [region-code...]\n\n")
 		fmt.Fprintf(os.Stderr, "Examples:\n")
 		fmt.Fprintf(os.Stderr, "  ingest US-OR\n")
-		fmt.Fprintf(os.Stderr, "  ingest US-OR US-WA US-ID\n\n")
+		fmt.Fprintf(os.Stderr, "  ingest US-OR US-WA US-ID\n")
+		fmt.Fprintf(os.Stderr, "  ingest --refresh-metadata\n\n")
 		fmt.Fprintf(os.Stderr, "Flags:\n")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
 
 	regions := flag.Args()
-	if len(regions) == 0 {
+	if *refreshMeta && len(regions) > 0 {
+		fmt.Fprintln(os.Stderr, "--refresh-metadata cannot be combined with region codes")
+		os.Exit(1)
+	}
+	if !*refreshMeta && len(regions) == 0 {
 		fmt.Fprintln(os.Stderr, "usage: ingest [flags] <region-code> [region-code...]")
+		os.Exit(1)
+	}
+	if *dryRun && *refreshMeta {
+		fmt.Fprintln(os.Stderr, "--dry-run has no effect with --refresh-metadata")
 		os.Exit(1)
 	}
 
@@ -71,7 +81,6 @@ func main() {
 	}
 
 	ebirdKey := mustEnv("EBIRD_API_KEY")
-	xcKey := mustEnv("XENO_CANTO_API_KEY")
 	dbURL := mustEnv("DATABASE_URL")
 
 	// Cancellation has two triggers: signals outside the TUI (SIGTERM, or
@@ -89,6 +98,37 @@ func main() {
 	}
 	defer pool.Close()
 
+	q := store.New(pool)
+	ebirdClient := ebird.New(ebirdKey)
+
+	fmt.Fprintln(os.Stderr, "fetching eBird taxonomy...")
+	taxonomy, err := ebirdClient.Taxonomy(ctx)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "fetch taxonomy: %v\n", err)
+		os.Exit(1)
+	}
+	taxMap := make(map[string]ebird.TaxonomyEntry, len(taxonomy))
+	for _, t := range taxonomy {
+		taxMap[t.SpeciesCode] = t
+	}
+	fmt.Fprintf(os.Stderr, "taxonomy loaded: %d entries\n", len(taxMap))
+
+	if *refreshMeta {
+		n, missing, err := refreshMetadata(ctx, q, taxMap)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "refresh metadata (refreshed %d before failure): %v\n", n, err)
+			os.Exit(1)
+		}
+		fmt.Fprintf(os.Stderr, "refreshed %d species\n", n)
+		if len(missing) > 0 {
+			fmt.Fprintf(os.Stderr, "%d codes not in eBird taxonomy (left untouched): %s\n",
+				len(missing), strings.Join(missing, ", "))
+		}
+		return
+	}
+
+	xcKey := mustEnv("XENO_CANTO_API_KEY")
+
 	var r2c *r2.Client
 	if !*noR2 {
 		r2AccountID := mustEnv("R2_ACCOUNT_ID")
@@ -105,22 +145,8 @@ func main() {
 		fmt.Fprintln(os.Stderr, "--no-r2: skipping R2 uploads, placeholder URLs will be stored in DB")
 	}
 
-	q := store.New(pool)
-	ebirdClient := ebird.New(ebirdKey)
 	xcClient := xenocanto.New(xcKey)
 	macaulayClient := macaulay.New(ebirdKey)
-
-	fmt.Fprintln(os.Stderr, "fetching eBird taxonomy...")
-	taxonomy, err := ebirdClient.Taxonomy(ctx)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "fetch taxonomy: %v\n", err)
-		os.Exit(1)
-	}
-	taxMap := make(map[string]ebird.TaxonomyEntry, len(taxonomy))
-	for _, t := range taxonomy {
-		taxMap[t.SpeciesCode] = t
-	}
-	fmt.Fprintf(os.Stderr, "taxonomy loaded: %d entries\n", len(taxMap))
 
 	seen := make(map[string]struct{})
 	var codes []string
