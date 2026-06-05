@@ -3,6 +3,8 @@ export interface Stat {
   value: string | number
   /** Render the value in the accent color (e.g. "due now"). */
   highlight?: boolean
+  /** Optional InfoTip explainer rendered next to the label. */
+  tip?: string
 }
 
 export interface BirdCard {

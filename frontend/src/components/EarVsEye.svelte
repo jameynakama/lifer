@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { StatsLanes } from '../types'
+  import InfoTip from './InfoTip.svelte'
 
   let { lanes }: { lanes: StatsLanes } = $props()
 
@@ -9,7 +10,11 @@
 </script>
 
 <section class="card panel">
-  <h3 class="panel-title">Ear vs Eye</h3>
+  <h3 class="panel-title">
+    Ear vs Eye<InfoTip
+      text="Every bird is two separate memories: its sound and its look. Each bar shows how much of that lane has graduated to known. In the gaps list, ✓ means that lane's card has graduated and ✗ means it hasn't yet (it may just be new). Graduation is sticky — a ✓ only reverses when you miss that card again."
+    />
+  </h3>
   <div class="vs">
     <div class="side">
       <span class="lane-label">🔊 Audio</span>

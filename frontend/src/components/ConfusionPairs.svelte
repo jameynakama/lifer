@@ -1,11 +1,16 @@
 <script lang="ts">
   import type { StatsConfusion } from '../types'
+  import InfoTip from './InfoTip.svelte'
 
   let { confusions }: { confusions: StatsConfusion[] } = $props()
 </script>
 
 <section class="card panel">
-  <h3 class="panel-title">Confusion pairs</h3>
+  <h3 class="panel-title">
+    Confusion pairs<InfoTip
+      text="Specific wrong answers, counted: the bird shown vs the bird you named. Your personal lookalikes and soundalikes."
+    />
+  </h3>
   {#if confusions.length === 0}
     <p class="muted">No confusions yet — flawless, or just getting started.</p>
   {:else}

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Stat } from '../types'
+  import InfoTip from './InfoTip.svelte'
 
   let {
     stats = [],
@@ -15,7 +16,9 @@
   {#each stats as stat (stat.label)}
     <div class="stat" class:card={variant === 'grid'}>
       <span class="value" class:now={stat.highlight ?? false}>{stat.value}</span>
-      <span class="label">{stat.label}</span>
+      <span class="label">
+        {stat.label}{#if stat.tip}<InfoTip text={stat.tip} />{/if}
+      </span>
     </div>
   {/each}
 </div>

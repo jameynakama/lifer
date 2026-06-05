@@ -1,11 +1,16 @@
 <script lang="ts">
   import type { StatsHardMedia } from '../types'
+  import InfoTip from './InfoTip.svelte'
 
   let { media }: { media: StatsHardMedia[] } = $props()
 </script>
 
 <section class="card panel">
-  <h3 class="panel-title">Hard media (≥3 looks)</h3>
+  <h3 class="panel-title">
+    Hard media (≥3 looks)<InfoTip
+      text="The exact recordings or photos you keep missing (at least three looks each). Sometimes it's not the bird — it's that one recording."
+    />
+  </h3>
   {#if media.length === 0}
     <p class="muted">No repeat offenders yet — needs three looks at the same recording or photo.</p>
   {:else}

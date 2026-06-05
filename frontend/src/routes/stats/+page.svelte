@@ -31,10 +31,27 @@
   const totalsRow: Stat[] = $derived(
     stats
       ? [
-          { label: 'Birds', value: stats.totals.species },
-          { label: 'Known', value: `${stats.totals.known}/${stats.totals.cards}`, highlight: true },
-          { label: 'Accuracy', value: accuracy === null ? '—' : `${accuracy}%` },
-          { label: 'This week', value: stats.totals.reviews_last_7d },
+          {
+            label: 'Birds',
+            value: stats.totals.species,
+            tip: 'Distinct species with at least one card.',
+          },
+          {
+            label: 'Known',
+            value: `${stats.totals.known}/${stats.totals.cards}`,
+            highlight: true,
+            tip: 'Cards graduated to long-term review, out of all your cards. A scheduler state, not a score.',
+          },
+          {
+            label: 'Accuracy',
+            value: accuracy === null ? '—' : `${accuracy}%`,
+            tip: 'Correct answers across your whole logged review history.',
+          },
+          {
+            label: 'This week',
+            value: stats.totals.reviews_last_7d,
+            tip: 'Reviews answered in the last 7 days.',
+          },
         ]
       : [],
   )

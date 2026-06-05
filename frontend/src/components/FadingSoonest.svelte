@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { StatsFading } from '../types'
+  import InfoTip from './InfoTip.svelte'
 
   let {
     fading,
@@ -11,7 +12,11 @@
 </script>
 
 <section class="card panel">
-  <h3 class="panel-title">Fading soonest</h3>
+  <h3 class="panel-title">
+    Fading soonest<InfoTip
+      text="Known birds whose memory the model predicts is decaying fastest. The next ones you'd likely miss without a refresher."
+    />
+  </h3>
   <p class="remember muted">
     You'd remember ~{remember.now} now · ~{remember.in_a_week} in a week · ~{remember.in_a_month} in a
     month

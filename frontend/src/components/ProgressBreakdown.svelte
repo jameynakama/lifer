@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { StatsProgress } from '../types'
+  import InfoTip from './InfoTip.svelte'
 
   let { progress }: { progress: StatsProgress } = $props()
 
@@ -22,7 +23,11 @@
 </script>
 
 <section class="card panel">
-  <h3 class="panel-title">Progress</h3>
+  <h3 class="panel-title">
+    Progress<InfoTip
+      text="Where each card sits in the scheduler right now: not seen, learning (short steps), known (graduated to long intervals), or relearning (lapsed and being repaired). A snapshot of state — not your accuracy."
+    />
+  </h3>
   {#if total === 0}
     <p class="muted">No cards yet — add a deck to get started.</p>
   {:else}

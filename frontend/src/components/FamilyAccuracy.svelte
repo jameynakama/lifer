@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { StatsFamily } from '../types'
+  import InfoTip from './InfoTip.svelte'
 
   let { families }: { families: StatsFamily[] } = $props()
 
@@ -7,7 +8,11 @@
 </script>
 
 <section class="card panel">
-  <h3 class="panel-title">By family</h3>
+  <h3 class="panel-title">
+    By family<InfoTip
+      text="Answer accuracy from your whole review history, grouped by family, worst first. Small attempt counts swing wildly — 100% on three tries is luck, not mastery."
+    />
+  </h3>
   {#if families.length === 0}
     <p class="muted">No family stats yet — they build as you review.</p>
   {:else}
