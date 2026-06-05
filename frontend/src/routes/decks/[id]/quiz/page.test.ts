@@ -99,6 +99,27 @@ describe('Quiz page', () => {
     expect(new Set(nextCalls.map((u) => u.split('due_before=')[1])).size).toBe(1)
   })
 
+  it('fetches /next exactly once per mount, even when the clock ticks', async () => {
+    // Strictly-increasing timestamps: if the mount $effect re-runs (the old
+    // sessionStart self-dependency bug), every re-run mints a distinct
+    // due_before and fires a duplicate fetch -- this test fails loudly
+    // instead of only when CI straddles a millisecond boundary.
+    let tick = 0
+    vi.spyOn(Date.prototype, 'toISOString').mockImplementation(
+      () => `2026-01-01T00:00:00.${String(tick++).padStart(3, '0')}Z`,
+    )
+    const fetchMock = makeFetch()
+    vi.stubGlobal('fetch', fetchMock)
+    render(QuizPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /i don't know/i }))
+    // settle any trailing effect re-runs before counting
+    await new Promise((r) => setTimeout(r, 25))
+    const nextCalls = fetchMock.mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .filter((url) => url.includes('/next'))
+    expect(nextCalls).toHaveLength(1)
+  })
+
   it('shows QuizCard with play button when a card is returned', async () => {
     vi.stubGlobal('fetch', makeFetch())
     render(QuizPage)

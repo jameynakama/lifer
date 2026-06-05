@@ -17,8 +17,11 @@
   let loading = $state(true)
   let error = $state('')
   // Pins the session: cards FSRS re-dues mid-session (short learning steps)
-  // must not repeat within the same quiz run.
-  let sessionStart = $state(new Date().toISOString())
+  // must not repeat within the same quiz run. Deliberately NOT $state -- it
+  // only feeds /next URLs, and as reactive state the mount $effect (which
+  // writes it, then reads it via fetchNext) becomes self-dependent and
+  // re-runs, duplicating fetches until the clock repeats a millisecond.
+  let sessionStart = new Date().toISOString()
 
   async function loadDeckSpecies() {
     try {
