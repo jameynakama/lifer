@@ -17,12 +17,14 @@
       <div class="deck-actions">
         {#if deck.audio_due > 0}
           <button class="btn-lane" onclick={() => onPractice(deck, 'audio')}>
-            🔊 Audio · {deck.audio_due}
+            🔊 <span class="btn-word">Audio ·</span>
+            {deck.audio_due}
           </button>
         {/if}
         {#if deck.image_due > 0}
           <button class="btn-lane" onclick={() => onPractice(deck, 'image')}>
-            👁 Image · {deck.image_due}
+            👁 <span class="btn-word">Image ·</span>
+            {deck.image_due}
           </button>
         {/if}
         {#if deck.audio_due === 0 && deck.image_due === 0}
@@ -54,14 +56,26 @@
   }
   .deck-name {
     flex: 1;
+    min-width: 0;
     font-size: 0.9375rem;
     font-weight: 600;
     color: var(--text);
     text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .deck-actions {
     display: flex;
     gap: 0.5rem;
+    flex-shrink: 0;
+  }
+  /* Compact buttons on narrow screens: words give way to icons so the deck
+     name keeps its room. */
+  @media (max-width: 639px) {
+    .btn-word {
+      display: none;
+    }
   }
   .btn-lane {
     background: var(--surface);

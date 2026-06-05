@@ -128,29 +128,34 @@
             {#if practiceMode}
               <button
                 class="btn-action"
-                onclick={() => goto(`/decks/${deck.id}/practice?lane=audio`)}>▶ Audio</button
+                onclick={() => goto(`/decks/${deck.id}/practice?lane=audio`)}
+                >▶ <span class="btn-word">Audio</span><span class="btn-icon">🔊</span></button
               >
               <button
                 class="btn-action"
-                onclick={() => goto(`/decks/${deck.id}/practice?lane=image`)}>◉ Image</button
+                onclick={() => goto(`/decks/${deck.id}/practice?lane=image`)}
+                >◉ <span class="btn-word">Image</span><span class="btn-icon">👁</span></button
               >
             {:else}
               {#if deck.audio_due > 0}
                 <button class="btn-action" onclick={() => goto(`/decks/${deck.id}/quiz?lane=audio`)}
-                  >🔊 Audio · {deck.audio_due}</button
+                  >🔊 <span class="btn-word">Audio ·</span> {deck.audio_due}</button
                 >
               {/if}
               {#if deck.image_due > 0}
                 <button class="btn-action" onclick={() => goto(`/decks/${deck.id}/quiz?lane=image`)}
-                  >👁 Image · {deck.image_due}</button
+                  >👁 <span class="btn-word">Image ·</span> {deck.image_due}</button
                 >
               {/if}
               {#if deck.audio_due === 0 && deck.image_due === 0}
                 <span class="all-done">All done</span>
               {/if}
             {/if}
-            <button class="btn-danger-ghost btn-delete" onclick={() => deleteDeck(deck.id)}
-              >Delete</button
+            <button
+              class="btn-danger-ghost btn-delete"
+              aria-label="Delete deck"
+              onclick={() => deleteDeck(deck.id)}
+              ><span class="btn-word">Delete</span><span class="btn-icon">✕</span></button
             >
           </div>
         </li>
@@ -257,6 +262,22 @@
     font-weight: 600;
     text-decoration: none;
     font-size: 0.9375rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* Compact buttons on narrow screens: words give way to icons so the deck
+     name keeps its room (the buttons were crushing it to a sliver). */
+  .btn-icon {
+    display: none;
+  }
+  @media (max-width: 639px) {
+    .btn-word {
+      display: none;
+    }
+    .btn-icon {
+      display: inline;
+    }
   }
   .deck-description {
     font-size: 0.8125rem;
