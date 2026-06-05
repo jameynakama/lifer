@@ -434,6 +434,53 @@ func TestDeleteRecordingsBySpeciesCode_LockedRow_Survives(t *testing.T) {
 	assert.Equal(t, 1, n, "locked recording must survive delete-by-species")
 }
 
+// CreateReviewLog
+
+func TestCreateReviewLog_RoundTrip(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+
+	row, err := q.CreateReviewLog(context.Background(), store.CreateReviewLogParams{
+		UserID:             f.userID,
+		SpeciesCode:        "_tst1",
+		Lane:               "audio",
+		Rating:             3,
+		GuessedSpeciesCode: pgtype.Text{String: "_tst1", Valid: true},
+		MediaID:            pgtype.Text{String: "_xc_tst1", Valid: true},
+	})
+	require.NoError(t, err, "Should insert review_log row without error")
+	assert.Equal(t, f.userID, row.UserID, "Should round-trip user_id")
+	assert.Equal(t, "_tst1", row.SpeciesCode, "Should round-trip species_code")
+	assert.Equal(t, "audio", row.Lane, "Should round-trip lane")
+	assert.Equal(t, int16(3), row.Rating, "Should round-trip rating")
+	assert.Equal(t, "_tst1", row.GuessedSpeciesCode.String, "Should round-trip guessed_species_code")
+	assert.True(t, row.GuessedSpeciesCode.Valid, "Should round-trip guessed_species_code validity")
+	assert.Equal(t, "_xc_tst1", row.MediaID.String, "Should round-trip media_id")
+	assert.True(t, row.MediaID.Valid, "Should round-trip media_id validity")
+	assert.Greater(t, row.ID, int64(0), "Should assign a positive id")
+	assert.True(t, row.ReviewedAt.Valid, "Should set reviewed_at")
+}
+
+func TestCreateReviewLog_NullGuessIsSkip(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+
+	row, err := q.CreateReviewLog(context.Background(), store.CreateReviewLogParams{
+		UserID:      f.userID,
+		SpeciesCode: "_tst1",
+		Lane:        "image",
+		Rating:      1,
+		// GuessedSpeciesCode and MediaID left as zero-values (not valid)
+	})
+	require.NoError(t, err, "Should insert skip row without error")
+	assert.False(t, row.GuessedSpeciesCode.Valid, "Should store NULL when no guess provided")
+	assert.False(t, row.MediaID.Valid, "Should store NULL when no media_id provided")
+}
+
 func TestListSpeciesCodesWithLockedMedia_ReturnsCodesFromBothTables(t *testing.T) {
 	pool := connectTestDB(t)
 	tx := withTx(t, pool)

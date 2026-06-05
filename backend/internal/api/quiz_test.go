@@ -26,6 +26,7 @@ type stubQuerier struct {
 	getRandomMedia        func(ctx context.Context, speciesCode string) (store.GetRandomMediaForSpeciesRow, error)
 	getCard               func(ctx context.Context, arg store.GetCardParams) (store.Card, error)
 	updateCardSchedule    func(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error)
+	createReviewLog       func(ctx context.Context, arg store.CreateReviewLogParams) (store.ReviewLog, error)
 	getDeckPracticeCards func(ctx context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error)
 	getDeck              func(ctx context.Context, id int64) (store.Deck, error)
 	getUsers             func(ctx context.Context) ([]store.GetUsersRow, error)
@@ -43,6 +44,9 @@ func (s *stubQuerier) GetCard(ctx context.Context, arg store.GetCardParams) (sto
 }
 func (s *stubQuerier) UpdateCardSchedule(ctx context.Context, arg store.UpdateCardScheduleParams) (store.Card, error) {
 	return s.updateCardSchedule(ctx, arg)
+}
+func (s *stubQuerier) CreateReviewLog(ctx context.Context, arg store.CreateReviewLogParams) (store.ReviewLog, error) {
+	return s.createReviewLog(ctx, arg)
 }
 func (s *stubQuerier) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]store.GetDeckPracticeCardsRow, error) {
 	return s.getDeckPracticeCards(ctx, deckID)
@@ -273,6 +277,9 @@ func TestRateCard_UpdatesSchedule(t *testing.T) {
 			assert.Equal(t, "audio", arg.Lane)
 			assert.Greater(t, arg.Stability, 0.0)
 			return updatedCard, nil
+		},
+		createReviewLog: func(_ context.Context, _ store.CreateReviewLogParams) (store.ReviewLog, error) {
+			return store.ReviewLog{}, nil
 		},
 	}
 
@@ -674,4 +681,64 @@ func TestRateCard_ForeignDeck_Returns403(t *testing.T) {
 	h.rateCard(w, r)
 
 	assert.Equal(t, http.StatusForbidden, w.Code)
+}
+
+func TestRateCard_WritesReviewLog(t *testing.T) {
+	var logged store.CreateReviewLogParams
+	q := &stubQuerier{
+		getDeck: deckOwnedBy(1),
+		getCard: func(_ context.Context, arg store.GetCardParams) (store.Card, error) {
+			return store.Card{UserID: 1, SpeciesCode: arg.SpeciesCode, Lane: arg.Lane}, nil
+		},
+		updateCardSchedule: func(_ context.Context, arg store.UpdateCardScheduleParams) (store.Card, error) {
+			return store.Card{}, nil
+		},
+		createReviewLog: func(_ context.Context, arg store.CreateReviewLogParams) (store.ReviewLog, error) {
+			logged = arg
+			return store.ReviewLog{}, nil
+		},
+	}
+	h := makeHandler(q)
+	body := `{"ebird_code":"sonspa","lane":"audio","rating":1,"guessed_species_code":"foxspa","media_id":"XC1"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/decks/42/rate", strings.NewReader(body))
+	req = injectUserID(req, 1)
+	req = withChiParam(req, "id", "42")
+	rec := httptest.NewRecorder()
+	h.rateCard(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, "Should return 200 OK")
+	assert.Equal(t, "foxspa", logged.GuessedSpeciesCode.String, "Should log guessed_species_code")
+	assert.True(t, logged.GuessedSpeciesCode.Valid, "Should mark guessed_species_code as valid")
+	assert.Equal(t, "XC1", logged.MediaID.String, "Should log media_id")
+	assert.True(t, logged.MediaID.Valid, "Should mark media_id as valid")
+	assert.Equal(t, int16(1), logged.Rating, "Should log rating")
+}
+
+func TestRateCard_OmittedGuessAndMedia_LogsNulls(t *testing.T) {
+	var logged store.CreateReviewLogParams
+	q := &stubQuerier{
+		getDeck: deckOwnedBy(1),
+		getCard: func(_ context.Context, arg store.GetCardParams) (store.Card, error) {
+			return store.Card{UserID: 1, SpeciesCode: arg.SpeciesCode, Lane: arg.Lane}, nil
+		},
+		updateCardSchedule: func(_ context.Context, arg store.UpdateCardScheduleParams) (store.Card, error) {
+			return store.Card{}, nil
+		},
+		createReviewLog: func(_ context.Context, arg store.CreateReviewLogParams) (store.ReviewLog, error) {
+			logged = arg
+			return store.ReviewLog{}, nil
+		},
+	}
+	h := makeHandler(q)
+	// Old-client body without the new fields -- back-compat must work.
+	body := `{"ebird_code":"sonspa","lane":"audio","rating":3}`
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/decks/42/rate", strings.NewReader(body))
+	req = injectUserID(req, 1)
+	req = withChiParam(req, "id", "42")
+	rec := httptest.NewRecorder()
+	h.rateCard(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code, "Should return 200 OK for old-client body")
+	assert.False(t, logged.GuessedSpeciesCode.Valid, "Should log NULL when no guess provided")
+	assert.False(t, logged.MediaID.Valid, "Should log NULL when no media_id provided")
 }

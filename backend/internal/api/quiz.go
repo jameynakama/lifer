@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	fsrs "github.com/open-spaced-repetition/go-fsrs/v3"
 
@@ -175,9 +176,11 @@ func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
 }
 
 type rateCardRequest struct {
-	EbirdCode string `json:"ebird_code"`
-	Lane      string `json:"lane"`
-	Rating    int    `json:"rating"`
+	EbirdCode          string  `json:"ebird_code"`
+	Lane               string  `json:"lane"`
+	Rating             int     `json:"rating"`
+	GuessedSpeciesCode *string `json:"guessed_species_code"` // nil = "I don't know"
+	MediaID            *string `json:"media_id"`
 }
 
 func (h *Handler) rateCard(w http.ResponseWriter, r *http.Request) {
@@ -243,18 +246,50 @@ func (h *Handler) rateCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	updated, err := h.queries.UpdateCardSchedule(r.Context(), store.UpdateCardScheduleParams{
-		UserID:      userID,
-		SpeciesCode: req.EbirdCode,
-		Lane:        req.Lane,
-		Stability:   result.Stability,
-		Difficulty:  result.Difficulty,
-		Due:         due,
-		Lapses:      int32(result.Lapses),
-		State:       int16(result.State),
+	var guessed, mediaID pgtype.Text
+	if req.GuessedSpeciesCode != nil && *req.GuessedSpeciesCode != "" {
+		guessed = pgtype.Text{String: *req.GuessedSpeciesCode, Valid: true}
+	}
+	if req.MediaID != nil && *req.MediaID != "" {
+		mediaID = pgtype.Text{String: *req.MediaID, Valid: true}
+	}
+
+	var updated store.Card
+	err = h.inTx(r.Context(), func(q store.Querier) error {
+		var err error
+		updated, err = q.UpdateCardSchedule(r.Context(), store.UpdateCardScheduleParams{
+			UserID:      userID,
+			SpeciesCode: req.EbirdCode,
+			Lane:        req.Lane,
+			Stability:   result.Stability,
+			Difficulty:  result.Difficulty,
+			Due:         due,
+			Lapses:      int32(result.Lapses),
+			State:       int16(result.State),
+		})
+		if err != nil {
+			return err
+		}
+		_, err = q.CreateReviewLog(r.Context(), store.CreateReviewLogParams{
+			UserID:             userID,
+			SpeciesCode:        req.EbirdCode,
+			Lane:               req.Lane,
+			Rating:             int16(req.Rating),
+			GuessedSpeciesCode: guessed,
+			MediaID:            mediaID,
+		})
+		return err
 	})
 	if err != nil {
-		log.Printf("UpdateCardSchedule error: %v", err)
+		var pgErr *pgconn.PgError
+		// Only the guess is client-controlled; any other FK violation here is a
+		// server-side race (e.g. concurrent species delete) and stays a 500.
+		if errors.As(err, &pgErr) && pgErr.Code == "23503" &&
+			pgErr.ConstraintName == "review_log_guessed_species_code_fkey" {
+			writeError(w, http.StatusBadRequest, "unknown guessed_species_code")
+			return
+		}
+		log.Printf("rate tx error: %v", err)
 		writeError(w, http.StatusInternalServerError, "server error")
 		return
 	}
