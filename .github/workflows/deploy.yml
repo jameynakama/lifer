@@ -55,7 +55,8 @@ jobs:
           chmod 600 /tmp/deploy_key
           ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} '
             cd /app/flockdeck &&
-            git pull origin main &&
+            git fetch origin main &&
+            git reset --hard FETCH_HEAD &&
             cd frontend && npm ci && npm run build && cd .. &&
             cd backend && /usr/local/go/bin/go build -o bin/flockdeck ./cmd/server && cd .. &&
             set -a && source .env && set +a &&
