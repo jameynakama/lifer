@@ -3,9 +3,7 @@
   import { page } from '$app/state'
   import { apiGet } from '$lib/api'
   import type { BirdCard, Species, Stat } from '../../../../types'
-  import QuizCard from '$components/QuizCard.svelte'
-  import RevealCard from '$components/RevealCard.svelte'
-  import StatsBar from '$components/StatsBar.svelte'
+  import QuizSession from '$components/QuizSession.svelte'
 
   let deckId = $derived(page.params.id)
   let lane: 'audio' | 'image' = $derived(
@@ -14,13 +12,10 @@
 
   let cards: BirdCard[] = $state([])
   let index = $state(0)
-  let revealed = $state(false)
   let done = $state(false)
   let noMedia = $state(false)
   let loading = $state(true)
   let error = $state('')
-  let guessed: Species | null = $state(null)
-  let correct = $state(false)
 
   let card: BirdCard | null = $derived(cards[index] ?? null)
   let species: Species[] = $derived(
@@ -62,29 +57,17 @@
     }
   }
 
-  function onReveal(selected: Species | null) {
-    guessed = selected
-    correct = selected !== null && card !== null && selected.ebird_code === card.ebird_code
-    revealed = true
-  }
-
-  function onNext() {
+  function onAdvance() {
     if (index >= cards.length - 1) {
       done = true
       return
     }
     index += 1
-    revealed = false
-    guessed = null
-    correct = false
   }
 
   function practiceAgain() {
     cards = shuffle(cards)
     index = 0
-    revealed = false
-    guessed = null
-    correct = false
     done = false
   }
 
@@ -98,71 +81,38 @@
   })
 </script>
 
-<div class="quiz">
-  {#if !done && !noMedia && !error && cards.length > 0}
-    <StatsBar {stats} />
-  {/if}
-
-  {#if loading}
-    <p class="status">Loading...</p>
-  {:else if error}
-    <p class="status error">{error} <button onclick={loadCards}>Retry</button></p>
-  {:else if noMedia}
-    <div class="done">
-      <p class="done-title">No species with media in this deck.</p>
-      <button onclick={() => goto(`/decks/${deckId}`)}>Back to Deck</button>
-    </div>
-  {:else if done}
-    <div class="done">
-      <p class="done-icon">🎉</p>
-      <p class="done-title">All done!</p>
-      <p class="done-sub">{cards.length} species practiced.</p>
-      <button class="btn-primary" onclick={practiceAgain}>Practice Again</button>
-      <button class="btn-secondary" onclick={() => goto(`/decks/${deckId}`)}>Back to Deck</button>
-    </div>
-  {:else if card}
-    {#if revealed}
-      <RevealCard {card} {correct} {guessed} {onNext} />
-    {:else}
-      {#key card.ebird_code}
-        <QuizCard {card} {species} {onReveal} />
-      {/key}
-    {/if}
-  {:else}
-    <p class="status error">Something went wrong. <button onclick={loadCards}>Retry</button></p>
-  {/if}
-</div>
+{#key deckId}
+  <QuizSession
+    {card}
+    {species}
+    {stats}
+    showStats={!done && !noMedia && !error && cards.length > 0}
+    {loading}
+    {error}
+    done={done || noMedia}
+    {onAdvance}
+    onRetry={loadCards}
+  >
+    {#snippet doneScreen()}
+      {#if noMedia}
+        <div class="done">
+          <p class="done-title">No species with media in this deck.</p>
+          <button onclick={() => goto(`/decks/${deckId}`)}>Back to Deck</button>
+        </div>
+      {:else}
+        <div class="done">
+          <p class="done-icon">🎉</p>
+          <p class="done-title">All done!</p>
+          <p class="done-sub">{cards.length} species practiced.</p>
+          <button class="btn-primary" onclick={practiceAgain}>Practice Again</button>
+          <button class="btn-secondary" onclick={() => goto(`/decks/${deckId}`)}>Back to Deck</button>
+        </div>
+      {/if}
+    {/snippet}
+  </QuizSession>
+{/key}
 
 <style>
-  .quiz {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-  .error {
-    color: var(--error);
-  }
-  .done {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1rem;
-    padding: 2rem 0;
-  }
-  .done-icon {
-    font-size: 2.5rem;
-    line-height: 1;
-  }
-  .done-title {
-    color: var(--text);
-    font-size: 1.125rem;
-    font-weight: 700;
-  }
-  .done-sub {
-    color: var(--text-muted);
-    font-size: 0.875rem;
-    text-align: center;
-  }
   .btn-primary {
     padding: 0.75rem 1.5rem;
     font-size: 0.9375rem;

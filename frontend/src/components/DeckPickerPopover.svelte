@@ -3,6 +3,7 @@
   import { apiPost } from '$lib/api'
   import { createDecksQuery, queryKeys } from '$lib/queries'
   import type { Deck } from '../types'
+  import DeckCreateForm from './DeckCreateForm.svelte'
 
   interface Props {
     onPick: (deckId: number) => void
@@ -16,22 +17,10 @@
   const decks = $derived(decksQuery.data?.decks ?? [])
   const loading = $derived(decksQuery.isPending)
 
-  let newDeckName = $state('')
-  let creating = $state(false)
-
-  async function createAndPick() {
-    const name = newDeckName.trim()
-    if (!name) return
-    creating = true
-    try {
-      const deck = await apiPost<Deck>('/api/v1/decks', { name })
-      queryClient.invalidateQueries({ queryKey: queryKeys.decks })
-      onPick(deck.id)
-    } catch {
-      // creation failed; input stays for retry
-    } finally {
-      creating = false
-    }
+  async function createAndPick(name: string) {
+    const deck = await apiPost<Deck>('/api/v1/decks', { name })
+    queryClient.invalidateQueries({ queryKey: queryKeys.decks })
+    onPick(deck.id)
   }
 </script>
 
@@ -44,20 +33,7 @@
 ></div>
 <div class="popover" role="dialog" aria-label="Pick a deck">
   <p class="popover-title">Add to deck</p>
-  <div class="create-section">
-    <input
-      class="create-input"
-      type="text"
-      placeholder="New deck name…"
-      bind:value={newDeckName}
-      onkeydown={(e) => e.key === 'Enter' && createAndPick()}
-    />
-    <button
-      class="create-btn btn-primary"
-      onclick={createAndPick}
-      disabled={!newDeckName.trim() || creating}
-    >{creating ? 'Creating…' : '+ Create & add'}</button>
-  </div>
+  <DeckCreateForm label="+ Create & add" onCreate={createAndPick} onEscape={onClose} />
   {#if loading}
     <p class="status">Loading...</p>
   {:else if decks.length === 0}
@@ -95,32 +71,6 @@
     padding: 0.75rem 0;
     max-height: 60vh;
     overflow-y: auto;
-  }
-  .create-section {
-    padding: 0.625rem 0.75rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-  }
-  .create-input {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 0.375rem 0.5rem;
-    font-size: 0.8125rem;
-    font-family: inherit;
-    width: 100%;
-    box-sizing: border-box;
-  }
-  .create-btn {
-    padding: 0.3125rem 0.625rem;
-    font-size: 0.75rem;
-    width: 100%;
-  }
-  .create-btn:disabled {
-    opacity: 0.6;
   }
   .popover-title {
     font-size: 0.8125rem;

@@ -3,6 +3,7 @@
   import { apiDelete, apiGet, apiPost } from '$lib/api'
   import { createDecksQuery, queryKeys } from '$lib/queries'
   import type { Deck } from '../types'
+  import DeckCreateForm from './DeckCreateForm.svelte'
 
   let {
     ebird_code,
@@ -37,20 +38,6 @@
       queryClient.invalidateQueries({ queryKey: queryKeys.speciesDecks(ebird_code) }),
   }))
 
-  const createDeckMutation = createMutation(() => ({
-    mutationFn: async (name: string) => {
-      const deck = await apiPost<Deck>('/api/v1/decks', { name })
-      await apiPost(`/api/v1/decks/${deck.id}/species`, { ebird_code })
-      return deck
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.decks })
-      queryClient.invalidateQueries({ queryKey: queryKeys.speciesDecks(ebird_code) })
-      newDeckName = ''
-    },
-  }))
-
-  let newDeckName = $state('')
   let mutationError = $state('')
 
   function toggle(deckId: number, currentlyIn: boolean) {
@@ -66,17 +53,17 @@
     }
   }
 
-  function createDeck() {
-    if (!newDeckName.trim()) return
+  async function createDeck(name: string) {
     mutationError = ''
-    createDeckMutation.mutate(newDeckName.trim(), {
-      onError: () => { mutationError = 'Failed. Try again.' },
-    })
-  }
-
-  function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter') createDeck()
-    if (e.key === 'Escape') onClose()
+    try {
+      const deck = await apiPost<Deck>('/api/v1/decks', { name })
+      await apiPost(`/api/v1/decks/${deck.id}/species`, { ebird_code })
+      queryClient.invalidateQueries({ queryKey: queryKeys.decks })
+      queryClient.invalidateQueries({ queryKey: queryKeys.speciesDecks(ebird_code) })
+    } catch (e) {
+      mutationError = 'Failed. Try again.'
+      throw e // form keeps the input for retry
+    }
   }
 </script>
 
@@ -88,22 +75,7 @@
   onclick={(e) => e.stopPropagation()}
   onkeydown={(e) => e.stopPropagation()}
 >
-  <div class="create-section">
-    <input
-      class="create-input"
-      type="text"
-      placeholder="New deck name…"
-      bind:value={newDeckName}
-      onkeydown={handleKeydown}
-    />
-    <button
-      class="create-btn btn-primary"
-      onclick={createDeck}
-      disabled={!newDeckName.trim() || createDeckMutation.isPending}
-    >
-      {createDeckMutation.isPending ? 'Creating…' : '+ Create deck'}
-    </button>
-  </div>
+  <DeckCreateForm label="+ Create deck" onCreate={createDeck} onEscape={onClose} />
 
   <div class="decks-list">
     {#if decksQuery.isPending || membershipQuery.isPending}
@@ -142,36 +114,6 @@
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     z-index: 100;
     overflow: hidden;
-  }
-
-  .create-section {
-    padding: 0.625rem 0.75rem;
-    border-bottom: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    gap: 0.375rem;
-  }
-
-  .create-input {
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    border-radius: 6px;
-    padding: 0.375rem 0.5rem;
-    font-size: 0.8125rem;
-    font-family: inherit;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .create-btn {
-    padding: 0.3125rem 0.625rem;
-    font-size: 0.75rem;
-    width: 100%;
-  }
-
-  .create-btn:disabled {
-    opacity: 0.6;
   }
 
   .decks-list {

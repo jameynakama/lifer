@@ -146,6 +146,25 @@ describe('Quiz page', () => {
     })
   })
 
+  it('shows Retry on load failure and refetches when clicked', async () => {
+    let fail = true
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes('/species')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(species) })
+      }
+      if (fail) return Promise.reject(new Error('Network error'))
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(card) })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(QuizPage)
+    await vi.waitFor(() => screen.getByText(/failed to load/i))
+    fail = false
+    await fireEvent.click(screen.getByRole('button', { name: /retry/i }))
+    await vi.waitFor(() => {
+      expect(screen.getByRole('button', { name: /play/i })).toBeInTheDocument()
+    })
+  })
+
   it('clicking Next POSTs rating and advances to next card', async () => {
     const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       if (url.includes('/species')) {

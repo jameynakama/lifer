@@ -142,6 +142,29 @@ body {
   color: var(--text-muted);
 }
 
+/* End-of-session screen (quiz "all caught up", practice "all done"). */
+.done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 0;
+}
+.done-icon {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+.done-title {
+  color: var(--text);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+.done-sub {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
 .spinner {
   display: inline-block;
   width: 32px;
