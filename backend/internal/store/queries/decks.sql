@@ -107,3 +107,12 @@ FROM species s
 JOIN deck_species ds ON ds.species_code = s.ebird_code
 WHERE ds.deck_id = $1
 ORDER BY s.common_name;
+
+-- Seeder: distinct species (with family) across the user's decks, for
+-- picking plausible confusable wrong answers.
+-- name: GetUserDeckSpecies :many
+SELECT DISTINCT s.ebird_code, s.family
+FROM species s
+JOIN deck_species ds ON ds.species_code = s.ebird_code
+JOIN decks d ON d.id = ds.deck_id
+WHERE d.owner_id = sqlc.arg(user_id)::bigint;

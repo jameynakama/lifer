@@ -25,3 +25,8 @@ ON CONFLICT (google_id) DO UPDATE
         name    = EXCLUDED.name,
         picture = EXCLUDED.picture
 RETURNING id, google_id, email, name, picture, is_admin, created_at;
+
+-- name: GetUserByEmail :one
+SELECT id, google_id, email, name, picture, is_admin, created_at
+FROM users
+WHERE email = $1;

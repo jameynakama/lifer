@@ -239,6 +239,54 @@ func (q *Queries) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]Get
 	return items, nil
 }
 
+const getDueCardsForUser = `-- name: GetDueCardsForUser :many
+SELECT id, user_id, species_code, lane, stability, difficulty, due,
+       last_review, reps, lapses, state, created_at
+FROM cards
+WHERE user_id = $1 AND due <= $2
+ORDER BY due, id
+`
+
+type GetDueCardsForUserParams struct {
+	UserID int64              `db:"user_id" json:"user_id"`
+	AsOf   pgtype.Timestamptz `db:"as_of" json:"as_of"`
+}
+
+// Seeder: every card of the user's due at the given instant, all decks,
+// both lanes (the quiz path's GetNextDueCard is deck- and lane-scoped).
+func (q *Queries) GetDueCardsForUser(ctx context.Context, arg GetDueCardsForUserParams) ([]Card, error) {
+	rows, err := q.db.Query(ctx, getDueCardsForUser, arg.UserID, arg.AsOf)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Card
+	for rows.Next() {
+		var i Card
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.SpeciesCode,
+			&i.Lane,
+			&i.Stability,
+			&i.Difficulty,
+			&i.Due,
+			&i.LastReview,
+			&i.Reps,
+			&i.Lapses,
+			&i.State,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getKnownCards = `-- name: GetKnownCards :many
 SELECT c.species_code, s.common_name, s.scientific_name, c.lane,
        c.stability, c.due, c.last_review

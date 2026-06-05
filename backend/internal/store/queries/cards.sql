@@ -205,3 +205,12 @@ WHERE d.owner_id = sqlc.arg(user_id)::bigint
   AND ((l.lane = 'audio' AND COALESCE(p.audio_enabled, TRUE))
     OR (l.lane = 'image' AND COALESCE(p.image_enabled, TRUE)))
 ON CONFLICT (user_id, species_code, lane) DO NOTHING;
+
+-- Seeder: every card of the user's due at the given instant, all decks,
+-- both lanes (the quiz path's GetNextDueCard is deck- and lane-scoped).
+-- name: GetDueCardsForUser :many
+SELECT id, user_id, species_code, lane, stability, difficulty, due,
+       last_review, reps, lapses, state, created_at
+FROM cards
+WHERE user_id = $1 AND due <= sqlc.arg(as_of)
+ORDER BY due, id;

@@ -40,6 +40,9 @@ type Querier interface {
 	GetDeckWithDue(ctx context.Context, arg GetDeckWithDueParams) (GetDeckWithDueRow, error)
 	GetDeckWithOwner(ctx context.Context, id int64) (GetDeckWithOwnerRow, error)
 	GetDecksForSpecies(ctx context.Context, arg GetDecksForSpeciesParams) ([]int64, error)
+	// Seeder: every card of the user's due at the given instant, all decks,
+	// both lanes (the quiz path's GetNextDueCard is deck- and lane-scoped).
+	GetDueCardsForUser(ctx context.Context, arg GetDueCardsForUserParams) ([]Card, error)
 	// Stats: accuracy by eBird family; species without a backfilled family are omitted.
 	GetFamilyAccuracy(ctx context.Context, arg GetFamilyAccuracyParams) ([]GetFamilyAccuracyRow, error)
 	// Stats: specific media the user keeps missing (>=3 looks). media_url resolves
@@ -65,10 +68,14 @@ type Querier interface {
 	GetSpeciesByCode(ctx context.Context, ebirdCode string) (GetSpeciesByCodeRow, error)
 	GetSpeciesImages(ctx context.Context, speciesCode string) ([]GetSpeciesImagesRow, error)
 	GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]GetSpeciesRecordingsRow, error)
+	GetUserByEmail(ctx context.Context, email string) (User, error)
 	// Columns are enumerated (no SELECT */RETURNING *) so that adding a column to
 	// users is an explicit decision per query, not a silent change to API output.
 	GetUserByGoogleID(ctx context.Context, googleID string) (User, error)
 	GetUserByID(ctx context.Context, id int64) (User, error)
+	// Seeder: distinct species (with family) across the user's decks, for
+	// picking plausible confusable wrong answers.
+	GetUserDeckSpecies(ctx context.Context, userID int64) ([]GetUserDeckSpeciesRow, error)
 	// GetUsers feeds the admin users API: google_id is deliberately excluded so
 	// third-party identifiers never reach the client.
 	GetUsers(ctx context.Context) ([]GetUsersRow, error)

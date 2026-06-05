@@ -213,6 +213,41 @@ func (q *Queries) GetDeckWithOwner(ctx context.Context, id int64) (GetDeckWithOw
 	return i, err
 }
 
+const getUserDeckSpecies = `-- name: GetUserDeckSpecies :many
+SELECT DISTINCT s.ebird_code, s.family
+FROM species s
+JOIN deck_species ds ON ds.species_code = s.ebird_code
+JOIN decks d ON d.id = ds.deck_id
+WHERE d.owner_id = $1::bigint
+`
+
+type GetUserDeckSpeciesRow struct {
+	EbirdCode string      `db:"ebird_code" json:"ebird_code"`
+	Family    pgtype.Text `db:"family" json:"family"`
+}
+
+// Seeder: distinct species (with family) across the user's decks, for
+// picking plausible confusable wrong answers.
+func (q *Queries) GetUserDeckSpecies(ctx context.Context, userID int64) ([]GetUserDeckSpeciesRow, error) {
+	rows, err := q.db.Query(ctx, getUserDeckSpecies, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetUserDeckSpeciesRow
+	for rows.Next() {
+		var i GetUserDeckSpeciesRow
+		if err := rows.Scan(&i.EbirdCode, &i.Family); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAllUserDecks = `-- name: ListAllUserDecks :many
 SELECT d.id, d.name, d.description, d.created_at,
     u.id AS owner_id, u.name AS owner_name, u.email AS owner_email,
