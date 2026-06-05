@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/svelte'
+import { screen, fireEvent } from '@testing-library/svelte'
+import { renderWithClient } from '../../../../test-utils'
 import { goto } from '$app/navigation'
 import { page } from '$app/state'
 import QuizPage from './+page.svelte'
@@ -65,14 +66,14 @@ afterEach(() => {
 describe('Quiz page', () => {
   it('shows loading initially', () => {
     vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})))
-    render(QuizPage)
+    renderWithClient(QuizPage)
     expect(screen.getByText(/loading/i)).toBeInTheDocument()
   })
 
   it('fetches deck species on mount', async () => {
     const fetchMock = makeFetch()
     vi.stubGlobal('fetch', fetchMock)
-    render(QuizPage)
+    renderWithClient(QuizPage)
     await vi.waitFor(() => {
       const calls = fetchMock.mock.calls.map((c: unknown[]) => c[0] as string)
       expect(calls.some((url) => url.includes('/species'))).toBe(true)
@@ -82,7 +83,7 @@ describe('Quiz page', () => {
   it('pins the session with a stable due_before on every /next call', async () => {
     const fetchMock = makeFetch()
     vi.stubGlobal('fetch', fetchMock)
-    render(QuizPage)
+    renderWithClient(QuizPage)
     await vi.waitFor(() => {
       const calls = fetchMock.mock.calls.map((c: unknown[]) => c[0] as string)
       expect(calls.some((url) => url.includes('/next'))).toBe(true)
@@ -110,7 +111,7 @@ describe('Quiz page', () => {
     )
     const fetchMock = makeFetch()
     vi.stubGlobal('fetch', fetchMock)
-    render(QuizPage)
+    renderWithClient(QuizPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /i don't know/i }))
     // settle any trailing effect re-runs before counting
     await new Promise((r) => setTimeout(r, 25))
@@ -122,7 +123,7 @@ describe('Quiz page', () => {
 
   it('shows QuizCard with play button when a card is returned', async () => {
     vi.stubGlobal('fetch', makeFetch())
-    render(QuizPage)
+    renderWithClient(QuizPage)
     await vi.waitFor(() => {
       expect(screen.getByRole('button', { name: /play/i })).toBeInTheDocument()
     })
@@ -130,7 +131,7 @@ describe('Quiz page', () => {
 
   it('shows all caught up when 204 is returned for next card', async () => {
     vi.stubGlobal('fetch', makeFetch({ status: 204 }))
-    render(QuizPage)
+    renderWithClient(QuizPage)
     await vi.waitFor(() => {
       expect(screen.getByText(/all caught up/i)).toBeInTheDocument()
     })
@@ -138,7 +139,7 @@ describe('Quiz page', () => {
 
   it('navigates to deck detail when Back to deck is clicked', async () => {
     vi.stubGlobal('fetch', makeFetch({ status: 204 }))
-    render(QuizPage)
+    renderWithClient(QuizPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /back to deck/i }))
     await fireEvent.click(screen.getByRole('button', { name: /back to deck/i }))
     expect(goto).toHaveBeenCalledWith('/decks/42')
@@ -146,7 +147,7 @@ describe('Quiz page', () => {
 
   it('passes correct=true to RevealCard when selected species matches card', async () => {
     vi.stubGlobal('fetch', makeFetch())
-    render(QuizPage)
+    renderWithClient(QuizPage)
     // Wait for quiz card to load
     await vi.waitFor(() => screen.getByRole('combobox'))
     // Type and select the correct species (id=99 = Song Sparrow = card.species_id)
@@ -162,7 +163,7 @@ describe('Quiz page', () => {
 
   it("passes correct=false to RevealCard when I don't know is clicked", async () => {
     vi.stubGlobal('fetch', makeFetch())
-    render(QuizPage)
+    renderWithClient(QuizPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /i don't know/i }))
     await fireEvent.click(screen.getByRole('button', { name: /i don't know/i }))
     await vi.waitFor(() => {
@@ -180,7 +181,7 @@ describe('Quiz page', () => {
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(card) })
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(QuizPage)
+    renderWithClient(QuizPage)
     await vi.waitFor(() => screen.getByText(/failed to load/i))
     fail = false
     await fireEvent.click(screen.getByRole('button', { name: /retry/i }))
@@ -200,7 +201,7 @@ describe('Quiz page', () => {
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(card) })
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(QuizPage)
+    renderWithClient(QuizPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /i don't know/i }))
     await fireEvent.click(screen.getByRole('button', { name: /i don't know/i }))
     await vi.waitFor(() => screen.getByRole('button', { name: /next/i }))
@@ -224,7 +225,7 @@ describe('Quiz page', () => {
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(card) })
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(QuizPage)
+    renderWithClient(QuizPage)
     await vi.waitFor(() => screen.getByRole('combobox'))
     await fireEvent.input(screen.getByRole('combobox'), { target: { value: 'fox' } })
     await vi.waitFor(() => screen.getByRole('option', { name: /fox sparrow/i }))
@@ -243,6 +244,32 @@ describe('Quiz page', () => {
     })
   })
 
+  it('invalidates deck and stats queries after rating', async () => {
+    // Due counts and review stats change server-side on every /rate; the
+    // cached ['decks'] and ['stats', *] queries must be marked stale or
+    // home//decks//stats show pre-quiz numbers until staleTime expires.
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/species')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(species) })
+      }
+      if (opts?.method === 'POST') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(card) })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const { client } = renderWithClient(QuizPage)
+    const invalidate = vi.spyOn(client, 'invalidateQueries')
+    await vi.waitFor(() => screen.getByRole('button', { name: /i don't know/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /i don't know/i }))
+    await vi.waitFor(() => screen.getByRole('button', { name: /next/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    await vi.waitFor(() => {
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['decks'] })
+      expect(invalidate).toHaveBeenCalledWith({ queryKey: ['stats'] })
+    })
+  })
+
   it("POSTs a null guess for I don't know", async () => {
     const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       if (url.includes('/species')) {
@@ -254,7 +281,7 @@ describe('Quiz page', () => {
       return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(card) })
     })
     vi.stubGlobal('fetch', fetchMock)
-    render(QuizPage)
+    renderWithClient(QuizPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /i don't know/i }))
     await fireEvent.click(screen.getByRole('button', { name: /i don't know/i }))
     await vi.waitFor(() => screen.getByRole('button', { name: /next/i }))

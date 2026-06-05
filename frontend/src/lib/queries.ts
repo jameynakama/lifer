@@ -13,6 +13,8 @@ export const queryKeys = {
   species: (code: string) => ['species', code] as const,
   speciesDecks: (code: string) => ['species', code, 'decks'] as const,
   stats: (lane: string) => ['stats', lane] as const,
+  /** Prefix of every stats(lane) key -- invalidates all lane tabs at once. */
+  statsAll: ['stats'] as const,
 }
 
 export const decksQueryOptions = () => ({

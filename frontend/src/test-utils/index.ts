@@ -19,12 +19,15 @@ export function queryResult<T>(r: {
 /**
  * Render a component inside a fresh QueryClientProvider. Required for any
  * component using createQuery/createMutation (e.g. the $lib/queries factories).
+ * Returns the render result plus the `client`, so tests can spy on cache
+ * operations like invalidateQueries.
  */
 export function renderWithClient(component: Component<never>, props: Record<string, unknown> = {}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
-  return render(TestWrapper, {
+  const result = render(TestWrapper, {
     props: { component: component as Component<Record<string, unknown>>, props, client },
   })
+  return { ...result, client }
 }

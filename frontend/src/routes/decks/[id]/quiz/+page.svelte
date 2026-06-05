@@ -1,7 +1,9 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
   import { page } from '$app/state'
+  import { useQueryClient } from '@tanstack/svelte-query'
   import { apiGet, apiPost } from '$lib/api'
+  import { queryKeys } from '$lib/queries'
   import type { BirdCard, Species } from '../../../../types'
   import QuizSession from '$components/QuizSession.svelte'
 
@@ -22,6 +24,8 @@
   // writes it, then reads it via fetchNext) becomes self-dependent and
   // re-runs, duplicating fetches until the clock repeats a millisecond.
   let sessionStart = new Date().toISOString()
+
+  const queryClient = useQueryClient()
 
   async function loadDeckSpecies() {
     try {
@@ -62,6 +66,11 @@
         guessed_species_code: guessed?.ebird_code ?? null,
         media_id: card.media_id,
       })
+      // Due counts and review stats changed server-side; mark the cached
+      // queries stale so home//decks//stats refetch on next visit. No
+      // observers are mounted here, so this costs no network until then.
+      queryClient.invalidateQueries({ queryKey: queryKeys.decks })
+      queryClient.invalidateQueries({ queryKey: queryKeys.statsAll })
     } catch {
       // non-fatal
     }
