@@ -81,3 +81,24 @@ describe('QuizCard', () => {
     expect(onReveal).toHaveBeenCalledWith(null)
   })
 })
+
+describe('QuizCard (image lane)', () => {
+  const imageCard: BirdCard = { ...card, lane: 'image', media_url: '/photos/song-sparrow.jpg' }
+
+  it('renders the photo instead of an audio player', () => {
+    render(QuizCard, { card: imageCard, species, onReveal: vi.fn() })
+    const img = document.querySelector('img.quiz-photo') as HTMLImageElement
+    expect(img).toBeInTheDocument()
+    expect(img.src).toContain('/photos/song-sparrow.jpg')
+    expect(screen.getByText(/what bird is this/i)).toBeInTheDocument()
+  })
+
+  it('calls onReveal with the selected species', async () => {
+    const onReveal = vi.fn()
+    render(QuizCard, { card: imageCard, species, onReveal })
+    await fireEvent.input(screen.getByRole('combobox'), { target: { value: 'fox' } })
+    await fireEvent.mouseDown(screen.getByRole('option', { name: /fox sparrow/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /reveal answer/i }))
+    expect(onReveal).toHaveBeenCalledWith(expect.objectContaining({ ebird_code: 'foxspa' }))
+  })
+})

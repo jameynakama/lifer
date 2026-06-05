@@ -18,3 +18,15 @@ describe('StatsBar', () => {
     expect(container.querySelector('.stat')).toBeNull()
   })
 })
+
+describe('StatsBar grid variant', () => {
+  it('applies the grid variant class and card chrome', () => {
+    render(StatsBar, {
+      stats: [{ label: 'DUE TODAY', value: 3, highlight: true }],
+      variant: 'grid',
+    })
+    expect(document.querySelector('.stats-bar.grid')).toBeInTheDocument()
+    expect(document.querySelector('.stat.card')).toBeInTheDocument()
+    expect(document.querySelector('.value.now')).toBeInTheDocument()
+  })
+})

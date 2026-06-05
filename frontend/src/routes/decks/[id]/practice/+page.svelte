@@ -4,7 +4,6 @@
   import { apiGet } from '$lib/api'
   import type { BirdCard, Species, Stat } from '../../../../types'
   import QuizCard from '$components/QuizCard.svelte'
-  import ImageQuizCard from '$components/ImageQuizCard.svelte'
   import RevealCard from '$components/RevealCard.svelte'
   import StatsBar from '$components/StatsBar.svelte'
 
@@ -124,13 +123,9 @@
   {:else if card}
     {#if revealed}
       <RevealCard {card} {correct} {guessed} {onNext} />
-    {:else if lane === 'audio'}
-      {#key card.ebird_code}
-        <QuizCard {card} {species} {onReveal} />
-      {/key}
     {:else}
       {#key card.ebird_code}
-        <ImageQuizCard {card} {species} {onReveal} />
+        <QuizCard {card} {species} {onReveal} />
       {/key}
     {/if}
   {:else}

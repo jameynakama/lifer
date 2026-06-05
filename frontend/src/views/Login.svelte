@@ -1,9 +1,18 @@
+<script lang="ts">
+  // Set by the OAuth callback when the state check fails (e.g. expired or
+  // cross-profile cookie); the user just needs to try again.
+  const authError = new URLSearchParams(location.search).get('error') === 'auth_state'
+</script>
+
 <div class="login">
   <div class="bird" aria-hidden="true">🐦‍🔥</div>
   <div class="content">
     <h1>FlockDeck</h1>
     <p class="tagline">Learn bird songs by ear</p>
     <p class="detail">Bird song identification practice</p>
+    {#if authError}
+      <p class="auth-error">Sign-in didn't complete -- please try again.</p>
+    {/if}
     <a href="/api/v1/auth/google" class="google-btn">
       <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24">
         <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -17,6 +26,11 @@
 </div>
 
 <style>
+  .auth-error {
+    color: var(--error);
+    font-size: 0.875rem;
+    margin: 0.5rem 0 0;
+  }
   .login {
     position: fixed;
     inset: 0;

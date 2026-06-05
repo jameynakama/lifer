@@ -1,6 +1,8 @@
 export interface Stat {
     label: string;
     value: string | number;
+    /** Render the value in the accent color (e.g. "due now"). */
+    highlight?: boolean;
 }
 
 export interface BirdCard {

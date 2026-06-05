@@ -10,7 +10,7 @@
   } = $props()
 
   let selected: Species | null = $state(null)
-  let player: WavePlayer
+  let player: WavePlayer | undefined = $state()
 
   function reveal(s: Species | null) {
     player?.stop()
@@ -19,9 +19,18 @@
 </script>
 
 <div class="quiz-card">
-  <div class="audio-card card">
-    <WavePlayer url={card.media_url} bind:this={player} />
-  </div>
+  {#if card.lane === 'audio'}
+    <div class="audio-card card">
+      <WavePlayer url={card.media_url} bind:this={player} />
+    </div>
+  {:else}
+    <div class="photo-card card">
+      <div class="photo-wrapper">
+        <img src={card.media_url} alt="Identify this bird" class="quiz-photo" />
+      </div>
+      <p class="prompt">What bird is this?</p>
+    </div>
+  {/if}
   <SpeciesTypeahead {species} onSelect={(s) => { selected = s }} onSubmit={() => { if (selected) reveal(selected) }} />
   <div class="actions">
     <button
@@ -46,6 +55,28 @@
   .audio-card {
     border-radius: var(--radius-lg);
     padding: 1rem;
+  }
+  .photo-card {
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .photo-wrapper {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+  }
+  .quiz-photo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
+    display: block;
+  }
+  .prompt {
+    padding: 0.625rem 1rem;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+    font-style: italic;
   }
   .actions {
     display: grid;
