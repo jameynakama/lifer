@@ -16,6 +16,7 @@ export interface BirdCard {
   recording_credit: string
   photo_credit: string
   due_remaining: number
+  media_id: string
 }
 
 export interface Deck {

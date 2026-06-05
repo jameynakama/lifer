@@ -27,6 +27,7 @@ const card = {
   lane: 'audio',
   recording_type: 'song',
   due_remaining: 5,
+  media_id: 'XC1',
 }
 
 const species = [
@@ -188,6 +189,61 @@ describe('Quiz page', () => {
         (c: unknown[]) => (c[1] as RequestInit)?.method === 'POST',
       )
       expect(posts.length).toBe(1)
+    })
+  })
+
+  it('POSTs the guessed species and media id with the rating', async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/species')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(species) })
+      }
+      if (opts?.method === 'POST') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(card) })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(QuizPage)
+    await vi.waitFor(() => screen.getByRole('combobox'))
+    await fireEvent.input(screen.getByRole('combobox'), { target: { value: 'fox' } })
+    await vi.waitFor(() => screen.getByRole('option', { name: /fox sparrow/i }))
+    await fireEvent.mouseDown(screen.getByRole('option', { name: /fox sparrow/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /reveal answer/i }))
+    await vi.waitFor(() => screen.getByRole('button', { name: /next/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    await vi.waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === 'POST',
+      )
+      const body = JSON.parse((post![1] as RequestInit).body as string)
+      expect(body.guessed_species_code).toBe('foxspa')
+      expect(body.media_id).toBe('XC1')
+      expect(body.rating).toBe(1)
+    })
+  })
+
+  it("POSTs a null guess for I don't know", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
+      if (url.includes('/species')) {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve(species) })
+      }
+      if (opts?.method === 'POST') {
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      }
+      return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(card) })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(QuizPage)
+    await vi.waitFor(() => screen.getByRole('button', { name: /i don't know/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /i don't know/i }))
+    await vi.waitFor(() => screen.getByRole('button', { name: /next/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /next/i }))
+    await vi.waitFor(() => {
+      const post = fetchMock.mock.calls.find(
+        (c: unknown[]) => (c[1] as RequestInit | undefined)?.method === 'POST',
+      )
+      const body = JSON.parse((post![1] as RequestInit).body as string)
+      expect(body.guessed_species_code).toBeNull()
     })
   })
 })

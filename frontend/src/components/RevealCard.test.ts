@@ -26,6 +26,7 @@ const card: BirdCard = {
   recording_credit: '',
   photo_credit: '',
   due_remaining: 5,
+  media_id: '',
 }
 
 const songSparrow: Species = {

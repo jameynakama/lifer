@@ -48,7 +48,7 @@
     }
   }
 
-  async function onAdvance(correct: boolean) {
+  async function onAdvance(correct: boolean, guessed: Species | null) {
     if (!card) return
     const rating = correct ? 3 : 1
     try {
@@ -56,6 +56,8 @@
         ebird_code: card.ebird_code,
         lane: card.lane,
         rating,
+        guessed_species_code: guessed?.ebird_code ?? null,
+        media_id: card.media_id,
       })
     } catch {
       // non-fatal

@@ -24,8 +24,8 @@
     loading: boolean
     error: string
     done: boolean
-    /** Called when the user advances past a reveal, with whether the guess was correct. */
-    onAdvance: (correct: boolean) => void | Promise<void>
+    /** Called when the user advances past a reveal, with whether the guess was correct, and what was guessed (null = I don't know). */
+    onAdvance: (correct: boolean, guessed: Species | null) => void | Promise<void>
     onRetry: () => void
     doneScreen: Snippet
   } = $props()
@@ -43,7 +43,7 @@
   async function onNext() {
     // Reset only after the advance completes so the reveal stays visible
     // while the next card (and any rating POST) is in flight.
-    await onAdvance(correct)
+    await onAdvance(correct, guessed)
     revealed = false
     guessed = null
     correct = false
