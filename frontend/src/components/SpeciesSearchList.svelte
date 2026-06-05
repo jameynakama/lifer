@@ -30,9 +30,9 @@
       </button>
     </div>
   {/if}
-  <ul class="search-list">
+  <ul class="search-list list-reset">
     {#each allRows as s (s.ebird_code)}
-      <li class="search-row" class:pinned={s.isPinned}>
+      <li class="search-row card" class:pinned={s.isPinned}>
         {#if !addedCodes.has(s.ebird_code)}
           <input
             type="checkbox"
@@ -71,23 +71,16 @@
     padding: 0.25rem 0;
   }
   .search-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
   }
 
   .search-row {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
     padding: 0.75rem 1rem;
     display: flex;
     align-items: center;
     gap: 0.625rem;
-    box-shadow: var(--shadow);
   }
 
   .search-row.pinned {

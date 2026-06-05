@@ -97,7 +97,7 @@
       onkeydown={handleKeydown}
     />
     <button
-      class="create-btn"
+      class="create-btn btn-primary"
       onclick={createDeck}
       disabled={!newDeckName.trim() || createDeckMutation.isPending}
     >
@@ -165,21 +165,13 @@
   }
 
   .create-btn {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 6px;
     padding: 0.3125rem 0.625rem;
     font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
     width: 100%;
   }
 
   .create-btn:disabled {
     opacity: 0.6;
-    cursor: not-allowed;
   }
 
   .decks-list {
@@ -217,7 +209,7 @@
   .error-msg {
     padding: 0.25rem 0.75rem 0.5rem;
     font-size: 0.75rem;
-    color: #ef4444;
+    color: var(--danger);
     margin: 0;
   }
 </style>

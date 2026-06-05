@@ -57,19 +57,19 @@
 </script>
 
 <div class="stats-bar">
-  <div class="stat">
+  <div class="stat card">
     <span class="value">{totalDue}</span>
     <span class="label">DUE TODAY</span>
   </div>
-  <div class="stat">
+  <div class="stat card">
     <span class="value">{audioDue}</span>
     <span class="label">AUDIO DUE</span>
   </div>
-  <div class="stat">
+  <div class="stat card">
     <span class="value">{imageDue}</span>
     <span class="label">IMAGE DUE</span>
   </div>
-  <div class="stat">
+  <div class="stat card">
     <span class="value" class:now={totalDue > 0}>{countdown}</span>
     <span class="label">NEXT DUE IN</span>
   </div>
@@ -82,13 +82,9 @@
     gap: 0.625rem;
   }
   .stat {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
     padding: 0.875rem 1rem;
     display: flex;
     flex-direction: column;
-    box-shadow: var(--shadow);
   }
   .value {
     color: var(--text);

@@ -54,12 +54,12 @@
       </div>
     </div>
 
-    <div class="section">
+    <div class="section card">
       <div class="section-label">Recordings</div>
       <RecordingsList recordings={sp.recordings} />
     </div>
 
-    <div class="section">
+    <div class="section card">
       <div class="section-label">Photos</div>
       <PhotoGrid images={sp.images} />
     </div>
@@ -119,11 +119,7 @@
   }
 
   .section {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
     padding: 0.75rem 1rem;
-    box-shadow: var(--shadow);
   }
 
   .section-label {
@@ -134,9 +130,4 @@
     margin-bottom: 0.5rem;
   }
 
-  .status {
-    text-align: center;
-    color: var(--text-muted);
-    padding: 2rem 0;
-  }
 </style>

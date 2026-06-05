@@ -218,12 +218,6 @@
     font-family: inherit;
     padding: 0.25rem 0;
   }
-  .status {
-    text-align: center;
-    color: var(--text-muted);
-    padding: 2rem 0;
-  }
-
   .status.error {
     color: var(--error);
   }

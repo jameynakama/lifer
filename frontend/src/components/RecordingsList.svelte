@@ -8,7 +8,7 @@
 {#if recordings.length > 0}
   <div class="recordings-list">
     {#each recordings as rec (rec.xeno_canto_id)}
-      <div class="recording-row">
+      <div class="recording-row card">
         <div class="recording-meta">{rec.type} · {rec.quality}{#if rec.credit} · {rec.credit}{/if}</div>
         <WavePlayer url={rec.file_path} />
       </div>
@@ -26,9 +26,6 @@
   }
 
   .recording-row {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 8px;
     padding: 0.5rem 0.75rem;
   }
 

@@ -19,13 +19,13 @@
 </script>
 
 <div class="quiz-card">
-  <div class="audio-card">
+  <div class="audio-card card">
     <WavePlayer url={card.media_url} bind:this={player} />
   </div>
   <SpeciesTypeahead {species} onSelect={(s) => { selected = s }} onSubmit={() => { if (selected) reveal(selected) }} />
   <div class="actions">
     <button
-      class="btn-reveal"
+      class="btn-reveal btn-primary"
       onclick={() => reveal(selected)}
       disabled={selected === null}
     >
@@ -44,11 +44,8 @@
     gap: 0.75rem;
   }
   .audio-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     padding: 1rem;
-    box-shadow: var(--shadow);
   }
   .actions {
     display: grid;
@@ -56,19 +53,11 @@
     gap: 0.5rem;
   }
   .btn-reveal {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
     padding: 0.8125rem;
     font-size: 0.9375rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
   }
   .btn-reveal:disabled {
     opacity: 0.35;
-    cursor: not-allowed;
   }
   .btn-skip {
     background: var(--surface);

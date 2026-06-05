@@ -110,7 +110,7 @@
         <p class="done-sub">{reviewed} {reviewed === 1 ? 'card' : 'cards'} reviewed this session.</p>
       {/if}
       <p class="done-sub">Come back later when more cards are due.</p>
-      <button onclick={() => goto(`/decks/${deckId}`)}>Back to deck</button>
+      <button class="btn-primary" onclick={() => goto(`/decks/${deckId}`)}>Back to deck</button>
     </div>
   {:else if card}
     {#if revealed}
@@ -135,13 +135,8 @@
     flex-direction: column;
     gap: 1rem;
   }
-  .status {
-    text-align: center;
-    color: var(--text-muted);
-    padding: 2rem 0;
-  }
   .error {
-    color: #b91c1c;
+    color: var(--error);
   }
   .done {
     display: flex;
@@ -165,14 +160,7 @@
     text-align: center;
   }
   .done button {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
     padding: 0.75rem 1.5rem;
     font-size: 0.9375rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
   }
 </style>

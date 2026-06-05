@@ -73,17 +73,6 @@
     align-items: center;
     min-height: 100vh;
   }
-  .spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid var(--text-muted);
-    border-top-color: var(--text-secondary);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin {
-    to { transform: rotate(360deg); }
-  }
   .app-container {
     max-width: 900px;
     margin: 0 auto;

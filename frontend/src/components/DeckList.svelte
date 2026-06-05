@@ -12,7 +12,7 @@
 
 <div class="deck-list">
   {#each decks as deck}
-    <div class="deck-card">
+    <div class="deck-card card">
       <a href="/decks/{deck.id}" class="deck-name">{deck.name}</a>
       <div class="deck-actions">
         {#if deck.audio_due > 0}
@@ -46,19 +46,11 @@
     }
   }
   .deck-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
     padding: 0.875rem 1rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow:
-      -1px 2px 0 0 var(--surface),
-      -1px 2px 0 1px var(--border),
-      -3px 5px 0 0 var(--surface),
-      -3px 5px 0 1px var(--border),
-      var(--shadow);
+    box-shadow: var(--shadow-stacked);
   }
   .deck-name {
     flex: 1;

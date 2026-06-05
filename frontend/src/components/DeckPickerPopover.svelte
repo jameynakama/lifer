@@ -53,7 +53,7 @@
       onkeydown={(e) => e.key === 'Enter' && createAndPick()}
     />
     <button
-      class="create-btn"
+      class="create-btn btn-primary"
       onclick={createAndPick}
       disabled={!newDeckName.trim() || creating}
     >{creating ? 'Creating…' : '+ Create & add'}</button>
@@ -63,7 +63,7 @@
   {:else if decks.length === 0}
     <p class="status">No decks yet. <a href="/decks">Create one first.</a></p>
   {:else}
-    <ul class="deck-list">
+    <ul class="deck-list list-reset">
       {#each decks as deck (deck.id)}
         <li>
           <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
@@ -115,20 +115,12 @@
     box-sizing: border-box;
   }
   .create-btn {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 6px;
     padding: 0.3125rem 0.625rem;
     font-size: 0.75rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
     width: 100%;
   }
   .create-btn:disabled {
     opacity: 0.6;
-    cursor: not-allowed;
   }
   .popover-title {
     font-size: 0.8125rem;
@@ -138,11 +130,6 @@
     margin: 0;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-  }
-  .deck-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
   }
   .deck-item {
     display: block;

@@ -12,7 +12,7 @@
     <span class="count">{selectedCount} selected</span>
     <div class="actions">
       <button class="btn-clear" onclick={onClear}>Clear</button>
-      <button class="btn-add" onclick={onAdd}>Add {selectedCount} species</button>
+      <button class="btn-add btn-primary" onclick={onAdd}>Add {selectedCount} species</button>
     </div>
   </div>
 {/if}
@@ -51,14 +51,7 @@
     font-family: inherit;
   }
   .btn-add {
-    background: var(--accent);
-    border: none;
-    color: #fff;
-    border-radius: 6px;
     padding: 0.375rem 0.875rem;
     font-size: 0.8125rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
   }
 </style>

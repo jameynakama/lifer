@@ -258,14 +258,14 @@
 
   <div class="actions">
     <button
-      class="btn-study"
+      class="btn-study btn-primary"
       onclick={() => goto(`/decks/${deckId}/quiz?lane=audio`)}
       disabled={audioDue === 0}
     >
       Study Audio{#if audioDue > 0}<span class="due-badge">{audioDue}</span>{/if}
     </button>
     <button
-      class="btn-study"
+      class="btn-study btn-primary"
       onclick={() => goto(`/decks/${deckId}/quiz?lane=image`)}
       disabled={imageDue === 0}
     >
@@ -279,18 +279,18 @@
     <button class="btn-practice-outline" onclick={() => goto(`/decks/${deckId}/practice?lane=image`)}>
       Practice Image
     </button>
-    <button class="btn-delete-deck" onclick={deleteDeck}>Delete deck</button>
+    <button class="btn-delete-deck btn-danger-ghost" onclick={deleteDeck}>Delete deck</button>
   </div>
 
   {#if loading}
     <p class="status">Loading...</p>
   {:else if deckSpecies.length === 0}
-    <p class="empty">No species yet. Search below to add some.</p>
+    <p class="status">No species yet. Search below to add some.</p>
   {:else}
     <p class="lane-legend">♪ audio &nbsp; ◉ image -- click to include or exclude that media type from your study queue</p>
-    <ul class="species-list">
+    <ul class="species-list list-reset">
       {#each deckSpecies as s (s.ebird_code)}
-        <li class="species-row">
+        <li class="species-row card">
           <a href="/explore/{s.ebird_code}" class="species-names">
             <strong>{s.common_name}</strong>
             <em>{s.scientific_name}</em>
@@ -312,7 +312,7 @@
                 onclick={() => toggleLane(s, 'image')}
               >◉</button>
             </div>
-            <button class="btn-remove" onclick={() => removeSpecies(s.ebird_code)}>Remove</button>
+            <button class="btn-remove btn-danger-ghost" onclick={() => removeSpecies(s.ebird_code)}>Remove</button>
           </div>
         </li>
       {/each}
@@ -412,22 +412,14 @@
     gap: 0.75rem;
   }
   .btn-study {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
     padding: 0.625rem 1.25rem;
     font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
     display: flex;
     align-items: center;
     gap: 0.5rem;
   }
   .btn-study:disabled {
     opacity: 0.4;
-    cursor: not-allowed;
   }
   .due-badge {
     background: rgba(255, 255, 255, 0.25);
@@ -449,38 +441,22 @@
     font-family: inherit;
   }
   .btn-delete-deck {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    border-radius: 10px;
+    border-radius: var(--radius-md);
     padding: 0.625rem 1.25rem;
     font-size: 0.875rem;
     font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
     margin-left: auto;
   }
-  .btn-delete-deck:hover {
-    border-color: #ef4444;
-    color: #ef4444;
-  }
   .species-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
   }
   .species-row {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
     padding: 0.75rem 1rem;
     display: flex;
     align-items: center;
     gap: 0.625rem;
-    box-shadow: var(--shadow);
   }
   .species-names {
     display: flex;
@@ -522,25 +498,15 @@
   .lane-toggle.active {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
   }
   .lane-toggle:disabled {
     opacity: 0.4;
     cursor: not-allowed;
   }
   .btn-remove {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    border-radius: 6px;
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .btn-remove:hover {
-    border-color: #ef4444;
-    color: #ef4444;
   }
   .search-section {
     display: flex;
@@ -562,10 +528,5 @@
     font-size: .9rem;
     color: var(--text-muted);
     margin: 0;
-  }
-  .status, .empty {
-    text-align: center;
-    color: var(--text-muted);
-    padding: 2rem 0;
   }
 </style>

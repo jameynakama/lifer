@@ -81,17 +81,17 @@
           disabled={creating}
         />
       </div>
-      <button type="submit" disabled={creating || !newName.trim()}>Create</button>
+      <button type="submit" class="btn-primary" disabled={creating || !newName.trim()}>Create</button>
     </form>
 
     {#if loading}
       <p class="status">Loading...</p>
     {:else if presets.length === 0}
-      <p class="empty">No preset decks yet.</p>
+      <p class="status">No preset decks yet.</p>
     {:else}
-      <ul class="preset-list">
+      <ul class="preset-list list-reset">
         {#each presets as preset (preset.id)}
-          <li class="preset-row">
+          <li class="preset-row card">
             <div class="preset-info">
               <a href="/admin/decks/{preset.id}" class="preset-name">{preset.name}</a>
               {#if preset.description}
@@ -101,7 +101,7 @@
             </div>
             <div class="preset-actions">
               <a href="/decks/{preset.id}" class="btn-manage">Manage Species</a>
-              <button class="btn-delete" onclick={() => deletePreset(preset.id)}>Delete</button>
+              <button class="btn-delete btn-danger-ghost" onclick={() => deletePreset(preset.id)}>Delete</button>
             </div>
           </li>
         {/each}
@@ -115,9 +115,9 @@
     {#if userDecksLoading}
       <p class="status">Loading...</p>
     {:else if userDecks.length === 0}
-      <p class="empty">No user decks yet.</p>
+      <p class="status">No user decks yet.</p>
     {:else}
-      <ul class="user-deck-list">
+      <ul class="user-deck-list list-reset">
         {#each userDecks as deck (deck.id)}
           <li>
             <div class="deck-main">
@@ -168,37 +168,19 @@
     box-sizing: border-box;
   }
   .create-form button {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .create-form button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
   .preset-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
     display: flex;
     flex-direction: column;
     gap: 0.75rem;
   }
   .preset-row {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
     padding: 0.875rem 1rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    box-shadow: var(--shadow);
   }
   .preset-info {
     display: flex;
@@ -243,19 +225,8 @@
     font-family: inherit;
   }
   .btn-delete {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    border-radius: 6px;
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .user-deck-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
   }
   .user-deck-list li {
     display: flex;
@@ -275,11 +246,6 @@
   }
   .user-deck-list a:hover { color: var(--accent); }
   .muted {
-    color: var(--text-muted);
     font-size: 0.8125rem;
-  }
-  .status, .empty {
-    color: var(--text-muted);
-    padding: 1rem 0;
   }
 </style>

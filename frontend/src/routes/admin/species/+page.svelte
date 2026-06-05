@@ -48,7 +48,7 @@
 {:else if error}
   <p class="error">{error}</p>
 {:else}
-  <ul>
+  <ul class="list-reset">
     {#each results as sp}
       <li>
         <a href="/admin/species/{sp.ebird_code}">
@@ -78,10 +78,6 @@
     flex: 1;
     padding: 0.4rem 0.6rem;
   }
-  ul {
-    list-style: none;
-    padding: 0;
-  }
   li {
     padding: 0.4rem 0;
     border-bottom: 1px solid var(--border);
@@ -94,7 +90,6 @@
     color: var(--text-secondary);
   }
   .muted {
-    color: var(--text-muted);
     font-size: 0.875rem;
   }
   .pagination {

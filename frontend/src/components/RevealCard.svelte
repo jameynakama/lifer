@@ -28,7 +28,7 @@
   </div>
 
   {#if card.lane === 'audio'}
-    <div class="audio-card">
+    <div class="audio-card card">
       {#if card.recording_type}
         <span class="recording-type">{card.recording_type}</span>
       {/if}
@@ -39,7 +39,7 @@
     </div>
   {/if}
 
-  <div class="photo-card">
+  <div class="photo-card card">
     <div class="photo-wrapper">
       <img src={card.photo_url} alt={card.common_name} class="photo" />
     </div>
@@ -52,7 +52,7 @@
     </div>
   </div>
 
-  <button class="btn-next" onclick={onNext}>Next</button>
+  <button class="btn-next btn-primary" onclick={onNext}>Next</button>
 </div>
 
 <style>
@@ -79,20 +79,17 @@
   }
   :global([data-theme="dark"]) .result-banner.correct {
     background: rgba(20, 83, 45, 0.25);
-    color: #4ade80;
+    color: var(--success);
     border-color: rgba(20, 83, 45, 0.6);
   }
   :global([data-theme="dark"]) .result-banner.incorrect {
     background: rgba(127, 29, 29, 0.25);
-    color: #f87171;
+    color: var(--error);
     border-color: rgba(127, 29, 29, 0.6);
   }
   .audio-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     padding: 1rem;
-    box-shadow: var(--shadow);
     position: relative;
   }
   .recording-type {
@@ -109,11 +106,8 @@
     margin-bottom: 0.5rem;
   }
   .photo-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: var(--shadow);
   }
   .photo-wrapper {
     width: 100%;
@@ -148,15 +142,8 @@
     margin-top: 0.375rem;
   }
   .btn-next {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
     padding: 0.8125rem;
     font-size: 0.9375rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
     width: 100%;
   }
   .btn-next:active {

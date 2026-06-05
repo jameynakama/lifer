@@ -106,17 +106,17 @@
         disabled={creating}
       />
     </div>
-    <button type="submit" disabled={creating || !newName.trim()}>Create</button>
+    <button type="submit" class="btn-primary" disabled={creating || !newName.trim()}>Create</button>
   </form>
 
   {#if loading}
     <p class="status">Loading...</p>
   {:else if decks.length === 0}
-    <p class="empty">No decks yet. Create one to get started, or clone a Starter Deck below.</p>
+    <p class="status">No decks yet. Create one to get started, or clone a Starter Deck below.</p>
   {:else}
-    <ul class="deck-list">
+    <ul class="deck-list list-reset">
       {#each decks as deck (deck.id)}
-        <li class="deck-row">
+        <li class="deck-row card">
           <div class="deck-info">
             <a href="/decks/{deck.id}" class="deck-name">{deck.name}</a>
             {#if deck.description}
@@ -150,7 +150,7 @@
                 <span class="all-done">All done</span>
               {/if}
             {/if}
-            <button class="btn-delete" onclick={() => deleteDeck(deck.id)}>Delete</button>
+            <button class="btn-danger-ghost btn-delete" onclick={() => deleteDeck(deck.id)}>Delete</button>
           </div>
         </li>
       {/each}
@@ -195,7 +195,7 @@
   .btn-toggle.active {
     background: var(--accent);
     border-color: var(--accent);
-    color: #fff;
+    color: var(--on-accent);
   }
   .practice-banner {
     background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -229,42 +229,20 @@
     box-sizing: border-box;
   }
   .create-form button {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
     padding: 0.5rem 1rem;
     font-size: 0.875rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .create-form button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
   }
   .deck-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
     display: flex;
     flex-direction: column;
     gap: 1rem;
   }
   .deck-row {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
     padding: 0.875rem 1rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    box-shadow:
-      -1px 2px 0 0 var(--surface),
-      -1px 2px 0 1px var(--border),
-      -3px 5px 0 0 var(--surface),
-      -3px 5px 0 1px var(--border),
-      var(--shadow);
+    box-shadow: var(--shadow-stacked);
   }
   .deck-info {
     display: flex;
@@ -309,23 +287,8 @@
     color: var(--text-muted);
   }
   .btn-delete {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    border-radius: 6px;
     padding: 0.25rem 0.5rem;
     font-size: 0.75rem;
-    cursor: pointer;
-    font-family: inherit;
-  }
-  .btn-delete:hover {
-    border-color: #ef4444;
-    color: #ef4444;
-  }
-  .status, .empty {
-    text-align: center;
-    color: var(--text-muted);
-    padding: 2rem 0;
   }
   .section-divider {
     border: none;

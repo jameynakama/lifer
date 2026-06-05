@@ -49,7 +49,7 @@
   {#if species.length === 0}
     <p class="empty">No species in this deck.</p>
   {:else}
-    <ul>
+    <ul class="list-reset">
       {#each species as sp (sp.ebird_code)}
         <li>
           <span class="name">{sp.common_name}</span>
@@ -98,11 +98,6 @@
     font-size: 0.875rem;
     margin: 0.25rem 0 0.75rem;
   }
-  ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-  }
   li {
     display: flex;
     align-items: baseline;
@@ -115,7 +110,6 @@
     font-size: 0.9375rem;
   }
   .muted {
-    color: var(--text-muted);
     font-size: 0.8125rem;
   }
   .empty {

@@ -135,7 +135,7 @@
               onclick={() => toggleImageLocked(img.macaulay_id, !img.locked)}
             >{img.locked ? '🔒 Locked' : '🔓 Lock'}</button>
             <button
-              class="btn-delete"
+              class="btn-delete btn-danger-ghost"
               disabled={img.locked}
               onclick={() => deleteImage(img.macaulay_id)}
             >Delete</button>
@@ -175,7 +175,7 @@
                 onclick={() => toggleRecordingLocked(rec.xeno_canto_id, !rec.locked)}
               >{rec.locked ? '🔒' : '🔓'}</button>
               <button
-                class="btn-delete"
+                class="btn-delete btn-danger-ghost"
                 disabled={rec.locked}
                 onclick={() => deleteRecording(rec.xeno_canto_id)}
               >Delete</button>
@@ -238,16 +238,9 @@
     color: var(--accent);
   }
   .btn-delete {
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 4px;
     padding: 0.2rem 0.4rem;
     font-size: 0.75rem;
-    cursor: pointer;
-    font-family: inherit;
-    color: var(--text-muted);
   }
-  .btn-delete:hover:not(:disabled) { border-color: #ef4444; color: #ef4444; }
   .btn-delete:disabled { opacity: 0.4; cursor: not-allowed; }
   details { margin-top: 1rem; }
   summary { cursor: pointer; color: var(--text-secondary); }

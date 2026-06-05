@@ -29,7 +29,7 @@
 <svelte:window onclick={closeDropdown} />
 
 <div class="species-row-wrapper">
-  <a href="/explore/{ebird_code}" class="species-row">
+  <a href="/explore/{ebird_code}" class="species-row card">
     {#if image_url}
       <img class="thumbnail" src={image_url} alt={common_name} loading="lazy" />
     {:else}
@@ -60,15 +60,12 @@
   .species-row {
     flex: 1;
     min-width: 0;
-    background: var(--surface);
-    border: 1px solid var(--border);
     border-right: none;
     border-radius: 10px 0 0 10px;
     padding: 0.625rem 1rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    box-shadow: var(--shadow);
     text-decoration: none;
   }
 

@@ -39,7 +39,7 @@
   {:else if users.length === 0}
     <p>No users.</p>
   {:else}
-    <ul>
+    <ul class="list-reset">
       {#each users as user (user.id)}
         <li>
           <div class="user-info">
@@ -60,10 +60,6 @@
 </div>
 
 <style>
-  ul {
-    list-style: none;
-    padding: 0;
-  }
   li {
     display: flex;
     align-items: center;
@@ -80,7 +76,6 @@
     font-weight: 500;
   }
   .muted {
-    color: var(--text-muted);
     font-size: 0.875rem;
   }
   .admin-toggle {
@@ -94,7 +89,7 @@
   }
   .admin-toggle.active {
     background: var(--accent, #2563eb);
-    color: #fff;
+    color: var(--on-accent);
     border-color: transparent;
   }
   .error {

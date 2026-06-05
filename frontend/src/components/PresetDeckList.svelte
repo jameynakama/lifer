@@ -9,9 +9,9 @@
   let { presetDecks, cloning, onClone }: Props = $props()
 </script>
 
-<ul class="preset-list">
+<ul class="preset-list list-reset">
   {#each presetDecks as preset (preset.id)}
-    <li class="preset-row">
+    <li class="preset-row card">
       <div class="preset-info">
         <span class="preset-name">{preset.name}</span>
         {#if preset.description}
@@ -30,27 +30,16 @@
 
 <style>
   .preset-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
     display: flex;
     flex-direction: column;
     gap: 1rem;
   }
   .preset-row {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
     padding: 0.875rem 1rem;
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    box-shadow:
-      -1px 2px 0 0 var(--surface),
-      -1px 2px 0 1px var(--border),
-      -3px 5px 0 0 var(--surface),
-      -3px 5px 0 1px var(--border),
-      var(--shadow);
+    box-shadow: var(--shadow-stacked);
   }
   .preset-info {
     display: flex;

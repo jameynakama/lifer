@@ -12,7 +12,7 @@
 </script>
 
 <div class="quiz-card">
-  <div class="photo-card">
+  <div class="photo-card card">
     <div class="photo-wrapper">
       <img src={card.media_url} alt="Identify this bird" class="quiz-photo" />
     </div>
@@ -21,7 +21,7 @@
   <SpeciesTypeahead {species} onSelect={(s) => { selected = s }} onSubmit={() => { if (selected) onReveal(selected) }} />
   <div class="actions">
     <button
-      class="btn-reveal"
+      class="btn-reveal btn-primary"
       onclick={() => onReveal(selected)}
       disabled={selected === null}
     >
@@ -40,11 +40,8 @@
     gap: 0.75rem;
   }
   .photo-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
-    box-shadow: var(--shadow);
   }
   .photo-wrapper {
     width: 100%;
@@ -70,19 +67,11 @@
     gap: 0.5rem;
   }
   .btn-reveal {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 10px;
     padding: 0.8125rem;
     font-size: 0.9375rem;
-    font-weight: 600;
-    cursor: pointer;
-    font-family: inherit;
   }
   .btn-reveal:disabled {
     opacity: 0.35;
-    cursor: not-allowed;
   }
   .btn-skip {
     background: var(--surface);

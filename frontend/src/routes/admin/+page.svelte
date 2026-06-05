@@ -1,9 +1,9 @@
 <div class="admin-home">
   <h1>Admin</h1>
-  <ul class="section-list">
-    <li><a href="/admin/species">Species</a></li>
-    <li><a href="/admin/decks">Decks</a></li>
-    <li><a href="/admin/users">Users</a></li>
+  <ul class="section-list list-reset">
+    <li class="card"><a href="/admin/species">Species</a></li>
+    <li class="card"><a href="/admin/decks">Decks</a></li>
+    <li class="card"><a href="/admin/users">Users</a></li>
   </ul>
 </div>
 
@@ -20,18 +20,9 @@
     margin: 0;
   }
   .section-list {
-    list-style: none;
-    padding: 0;
-    margin: 0;
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-  }
-  .section-list li {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    box-shadow: var(--shadow);
   }
   .section-list a {
     display: block;
