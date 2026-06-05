@@ -78,6 +78,7 @@ type Querier interface {
 	ListIncompleteSpecies(ctx context.Context) ([]string, error)
 	ListPresetDecks(ctx context.Context) ([]ListPresetDecksRow, error)
 	ListSpecies(ctx context.Context, arg ListSpeciesParams) ([]ListSpeciesRow, error)
+	ListSpeciesCodes(ctx context.Context) ([]string, error)
 	// Species with any locked media are protected from ingest cleanup: deleting
 	// the species row would cascade onto locked rows, so cleanup must skip them.
 	ListSpeciesCodesWithLockedMedia(ctx context.Context) ([]string, error)

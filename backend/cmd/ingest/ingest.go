@@ -35,6 +35,53 @@ type ingestStore interface {
 	UpsertSpecies(ctx context.Context, arg store.UpsertSpeciesParams) (store.Species, error)
 }
 
+// speciesUpsertParams maps an eBird taxonomy entry onto the species upsert,
+// including the family NULL-when-empty rule. Shared by ingestSpecies and
+// refreshMetadata so the two paths cannot drift.
+func speciesUpsertParams(entry ebird.TaxonomyEntry) store.UpsertSpeciesParams {
+	var family pgtype.Text
+	if entry.FamilyComName != "" {
+		family = pgtype.Text{String: entry.FamilyComName, Valid: true}
+	}
+	return store.UpsertSpeciesParams{
+		EbirdCode:      entry.SpeciesCode,
+		CommonName:     entry.CommonName,
+		ScientificName: entry.SciName,
+		Family:         family,
+	}
+}
+
+// metadataStore is the slice of store.Querier refreshMetadata needs.
+type metadataStore interface {
+	ListSpeciesCodes(ctx context.Context) ([]string, error)
+	UpsertSpecies(ctx context.Context, arg store.UpsertSpeciesParams) (store.Species, error)
+}
+
+// refreshMetadata re-upserts taxonomy metadata for every species already in
+// the DB (no media work). Returns the refreshed count and any codes absent
+// from the eBird taxonomy (reported, never deleted). Fails fast on the first
+// DB error -- a row-level failure here means DB trouble, not data trouble.
+func refreshMetadata(ctx context.Context, q metadataStore, taxMap map[string]ebird.TaxonomyEntry) (int, []string, error) {
+	codes, err := q.ListSpeciesCodes(ctx)
+	if err != nil {
+		return 0, nil, fmt.Errorf("list species: %w", err)
+	}
+	refreshed := 0
+	var missing []string
+	for _, code := range codes {
+		entry, ok := taxMap[code]
+		if !ok {
+			missing = append(missing, code)
+			continue
+		}
+		if _, err := q.UpsertSpecies(ctx, speciesUpsertParams(entry)); err != nil {
+			return refreshed, missing, fmt.Errorf("upsert %s: %w", code, err)
+		}
+		refreshed++
+	}
+	return refreshed, missing, nil
+}
+
 // ingestSpecies fetches and uploads media for one species.
 // xcOverrides maps ebird codes to [genus, species] pairs for xeno-canto taxonomy overrides.
 func ingestSpecies(
@@ -63,16 +110,7 @@ func ingestSpecies(
 
 	send(speciesStartedMsg{workerID: workerID, code: entry.SpeciesCode, name: entry.CommonName})
 
-	var family pgtype.Text
-	if entry.FamilyComName != "" {
-		family = pgtype.Text{String: entry.FamilyComName, Valid: true}
-	}
-	sp, err := q.UpsertSpecies(ctx, store.UpsertSpeciesParams{
-		EbirdCode:      entry.SpeciesCode,
-		CommonName:     entry.CommonName,
-		ScientificName: entry.SciName,
-		Family:         family,
-	})
+	sp, err := q.UpsertSpecies(ctx, speciesUpsertParams(entry))
 	if err != nil {
 		err = fmt.Errorf("upsert species: %w", err)
 		return

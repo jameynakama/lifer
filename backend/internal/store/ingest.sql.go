@@ -91,6 +91,30 @@ func (q *Queries) ListIncompleteSpecies(ctx context.Context) ([]string, error) {
 	return items, nil
 }
 
+const listSpeciesCodes = `-- name: ListSpeciesCodes :many
+SELECT ebird_code FROM species ORDER BY ebird_code
+`
+
+func (q *Queries) ListSpeciesCodes(ctx context.Context) ([]string, error) {
+	rows, err := q.db.Query(ctx, listSpeciesCodes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var ebird_code string
+		if err := rows.Scan(&ebird_code); err != nil {
+			return nil, err
+		}
+		items = append(items, ebird_code)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSpeciesCodesWithLockedMedia = `-- name: ListSpeciesCodesWithLockedMedia :many
 SELECT DISTINCT species_code FROM species_recordings WHERE locked
 UNION

@@ -508,6 +508,17 @@ func TestListSpeciesCodesWithLockedMedia_ReturnsCodesFromBothTables(t *testing.T
 	assert.NotContains(t, codes, "_tst2")
 }
 
+func TestListSpeciesCodes_ReturnsSeededSpecies(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	seedFixtures(t, tx)
+	q := store.New(tx)
+
+	codes, err := q.ListSpeciesCodes(context.Background())
+	require.NoError(t, err)
+	assert.Contains(t, codes, "_tst1")
+}
+
 // mustSchedule drives a card to a given FSRS state by calling UpdateCardSchedule.
 // stability is set to 10 (a reasonable "known" value); due is set one day ahead.
 func mustSchedule(t *testing.T, q *store.Queries, userID int64, speciesCode, lane string, state int16) {

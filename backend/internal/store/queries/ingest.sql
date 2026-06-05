@@ -54,3 +54,6 @@ DELETE FROM species WHERE ebird_code = $1;
 SELECT DISTINCT species_code FROM species_recordings WHERE locked
 UNION
 SELECT DISTINCT species_code FROM species_images WHERE locked;
+
+-- name: ListSpeciesCodes :many
+SELECT ebird_code FROM species ORDER BY ebird_code;

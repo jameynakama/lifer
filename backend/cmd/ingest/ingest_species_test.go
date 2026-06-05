@@ -189,3 +189,77 @@ func TestIngestSpecies_EmptyFamily_UpsertsNull(t *testing.T) {
 		t.Errorf("Should upsert NULL family when eBird has none, got %+v", got.Family)
 	}
 }
+
+func TestSpeciesUpsertParams(t *testing.T) {
+	got := speciesUpsertParams(testEntry)
+	if got.EbirdCode != "sonspa" || got.CommonName != "Song Sparrow" || got.ScientificName != "Melospiza melodia" {
+		t.Errorf("Should map identity fields, got %+v", got)
+	}
+	if !got.Family.Valid || got.Family.String != "New World Sparrows" {
+		t.Errorf("Should set family when present, got %+v", got.Family)
+	}
+
+	noFam := testEntry
+	noFam.FamilyComName = ""
+	if speciesUpsertParams(noFam).Family.Valid {
+		t.Error("Should leave family NULL when eBird has none")
+	}
+}
+
+func TestRefreshMetadata_RefreshesKnownAndReportsMissing(t *testing.T) {
+	var upserted []store.UpsertSpeciesParams
+	q := &stubUpserter{
+		t: t,
+		listSpeciesCodes: func(context.Context) ([]string, error) {
+			return []string{"sonspa", "ghost1"}, nil
+		},
+		upsertSpecies: func(arg store.UpsertSpeciesParams) (store.Species, error) {
+			upserted = append(upserted, arg)
+			return store.Species{EbirdCode: arg.EbirdCode}, nil
+		},
+	}
+	taxMap := map[string]ebird.TaxonomyEntry{"sonspa": testEntry}
+
+	n, missing, err := refreshMetadata(context.Background(), q, taxMap)
+	if err != nil {
+		t.Fatalf("Should refresh without error, got %v", err)
+	}
+	if n != 1 || len(upserted) != 1 || upserted[0].EbirdCode != "sonspa" {
+		t.Errorf("Should upsert exactly the taxonomy-known code, got n=%d %+v", n, upserted)
+	}
+	if !upserted[0].Family.Valid || upserted[0].Family.String != "New World Sparrows" {
+		t.Errorf("Should carry the family through, got %+v", upserted[0].Family)
+	}
+	if len(missing) != 1 || missing[0] != "ghost1" {
+		t.Errorf("Should report ghost1 as missing (never upserted), got %v", missing)
+	}
+}
+
+func TestRefreshMetadata_UpsertErrorFailsFast(t *testing.T) {
+	q := &stubUpserter{
+		t: t,
+		listSpeciesCodes: func(context.Context) ([]string, error) {
+			return []string{"sonspa"}, nil
+		},
+		upsertSpecies: func(store.UpsertSpeciesParams) (store.Species, error) {
+			return store.Species{}, fmt.Errorf("db down")
+		},
+	}
+	_, _, err := refreshMetadata(context.Background(), q, map[string]ebird.TaxonomyEntry{"sonspa": testEntry})
+	if err == nil || !strings.Contains(err.Error(), "sonspa") {
+		t.Errorf("Should fail fast naming the code, got %v", err)
+	}
+}
+
+func TestRefreshMetadata_ListErrorPropagates(t *testing.T) {
+	q := &stubUpserter{
+		t: t,
+		listSpeciesCodes: func(context.Context) ([]string, error) {
+			return nil, fmt.Errorf("boom")
+		},
+	}
+	_, _, err := refreshMetadata(context.Background(), q, nil)
+	if err == nil {
+		t.Error("Should propagate the list error")
+	}
+}
