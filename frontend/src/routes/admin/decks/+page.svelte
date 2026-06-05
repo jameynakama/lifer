@@ -1,14 +1,6 @@
 <script lang="ts">
-  import type { PresetDeck } from '../../../types'
-
-  interface UserDeck {
-    id: number
-    name: string
-    description: string
-    owner_name: string
-    owner_email: string
-    species_count: number
-  }
+  import { apiDelete, apiGet, apiPost } from '$lib/api'
+  import type { PresetDeck, UserDeck } from '../../../types'
 
   let presets: PresetDeck[] = $state([])
   let userDecks: UserDeck[] = $state([])
@@ -20,8 +12,7 @@
 
   async function loadPresets() {
     try {
-      const res = await fetch('/api/v1/decks/presets')
-      if (res.ok) presets = await res.json()
+      presets = await apiGet('/api/v1/decks/presets')
     } catch {
       // network error
     } finally {
@@ -31,8 +22,7 @@
 
   async function loadUserDecks() {
     try {
-      const res = await fetch('/api/v1/admin/decks')
-      if (res.ok) userDecks = await res.json()
+      userDecks = await apiGet('/api/v1/admin/decks')
     } catch {
       // network error
     } finally {
@@ -44,17 +34,15 @@
     if (!newName.trim()) return
     creating = true
     try {
-      const res = await fetch('/api/v1/admin/decks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), description: newDescription.trim() || undefined }),
+      const created = await apiPost<PresetDeck>('/api/v1/admin/decks', {
+        name: newName.trim(),
+        description: newDescription.trim() || undefined,
       })
-      if (res.ok) {
-        const created = await res.json()
-        presets = [...presets, { ...created, species_count: 0 }]
-        newName = ''
-        newDescription = ''
-      }
+      presets = [...presets, { ...created, species_count: 0 }]
+      newName = ''
+      newDescription = ''
+    } catch {
+      // creation failed; form stays filled for retry
     } finally {
       creating = false
     }
@@ -62,8 +50,12 @@
 
   async function deletePreset(id: number) {
     if (!confirm('Delete this preset deck? This cannot be undone.')) return
-    const res = await fetch(`/api/v1/admin/decks/${id}`, { method: 'DELETE' })
-    if (res.ok) presets = presets.filter((p) => p.id !== id)
+    try {
+      await apiDelete(`/api/v1/admin/decks/${id}`)
+      presets = presets.filter((p) => p.id !== id)
+    } catch {
+      // leave list unchanged
+    }
   }
 
   loadPresets()

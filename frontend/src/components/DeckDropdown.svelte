@@ -1,5 +1,8 @@
 <script lang="ts">
   import { createQuery, createMutation, useQueryClient } from '@tanstack/svelte-query'
+  import { apiDelete, apiGet, apiPost } from '$lib/api'
+  import { createDecksQuery, queryKeys } from '$lib/queries'
+  import type { Deck } from '../types'
 
   let {
     ebird_code,
@@ -11,53 +14,38 @@
 
   const queryClient = useQueryClient()
 
-  const decksQuery = createQuery(() => ({
-    queryKey: ['decks'],
-    queryFn: () => fetch('/api/v1/decks').then((r) => r.json()).then((d) => d.decks ?? []),
-  }))
+  const decksQuery = createDecksQuery()
+  const decks = $derived(decksQuery.data?.decks ?? [])
 
   const membershipQuery = createQuery(() => ({
-    queryKey: ['species', ebird_code, 'decks'],
+    queryKey: queryKeys.speciesDecks(ebird_code),
     queryFn: () =>
-      fetch(`/api/v1/species/${ebird_code}/decks`)
-        .then((r) => r.json())
-        .then((d) => (d.deck_ids as number[]) ?? []),
+      apiGet<{ deck_ids: number[] | null }>(`/api/v1/species/${ebird_code}/decks`).then(
+        (d) => d.deck_ids ?? []
+      ),
   }))
 
   const addMutation = createMutation(() => ({
-    mutationFn: (deckId: number) =>
-      fetch(`/api/v1/decks/${deckId}/species`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ebird_code }),
-      }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['species', ebird_code, 'decks'] }),
+    mutationFn: (deckId: number) => apiPost(`/api/v1/decks/${deckId}/species`, { ebird_code }),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.speciesDecks(ebird_code) }),
   }))
 
   const removeMutation = createMutation(() => ({
-    mutationFn: (deckId: number) =>
-      fetch(`/api/v1/decks/${deckId}/species/${ebird_code}`, { method: 'DELETE' }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['species', ebird_code, 'decks'] }),
+    mutationFn: (deckId: number) => apiDelete(`/api/v1/decks/${deckId}/species/${ebird_code}`),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: queryKeys.speciesDecks(ebird_code) }),
   }))
 
   const createDeckMutation = createMutation(() => ({
     mutationFn: async (name: string) => {
-      const res = await fetch('/api/v1/decks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      })
-      const deck = await res.json()
-      await fetch(`/api/v1/decks/${deck.id}/species`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ebird_code }),
-      })
+      const deck = await apiPost<Deck>('/api/v1/decks', { name })
+      await apiPost(`/api/v1/decks/${deck.id}/species`, { ebird_code })
       return deck
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['decks'] })
-      queryClient.invalidateQueries({ queryKey: ['species', ebird_code, 'decks'] })
+      queryClient.invalidateQueries({ queryKey: queryKeys.decks })
+      queryClient.invalidateQueries({ queryKey: queryKeys.speciesDecks(ebird_code) })
       newDeckName = ''
     },
   }))
@@ -120,10 +108,10 @@
   <div class="decks-list">
     {#if decksQuery.isPending || membershipQuery.isPending}
       <p class="loading-msg">Loading…</p>
-    {:else if !decksQuery.data || decksQuery.data.length === 0}
+    {:else if decks.length === 0}
       <p class="loading-msg">No decks yet.</p>
     {:else}
-      {#each decksQuery.data as deck (deck.id)}
+      {#each decks as deck (deck.id)}
         {@const isMember = (membershipQuery.data ?? []).includes(deck.id)}
         <label class="deck-item">
           <input

@@ -1,5 +1,8 @@
 <script lang="ts">
-  import type { Deck, DecksResponse } from '../types'
+  import { useQueryClient } from '@tanstack/svelte-query'
+  import { apiPost } from '$lib/api'
+  import { createDecksQuery, queryKeys } from '$lib/queries'
+  import type { Deck } from '../types'
 
   interface Props {
     onPick: (deckId: number) => void
@@ -7,36 +10,25 @@
   }
   let { onPick, onClose }: Props = $props()
 
-  let decks: Deck[] = $state([])
-  let loading = $state(true)
+  const queryClient = useQueryClient()
+  const decksQuery = createDecksQuery()
+
+  const decks = $derived(decksQuery.data?.decks ?? [])
+  const loading = $derived(decksQuery.isPending)
+
   let newDeckName = $state('')
   let creating = $state(false)
-
-  $effect(() => {
-    fetch('/api/v1/decks')
-      .then(async (res) => {
-        if (res.ok) {
-          const data: DecksResponse = await res.json()
-          decks = data.decks
-        }
-      })
-      .finally(() => { loading = false })
-  })
 
   async function createAndPick() {
     const name = newDeckName.trim()
     if (!name) return
     creating = true
     try {
-      const res = await fetch('/api/v1/decks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      })
-      if (res.ok) {
-        const deck = await res.json()
-        onPick(deck.id)
-      }
+      const deck = await apiPost<Deck>('/api/v1/decks', { name })
+      queryClient.invalidateQueries({ queryKey: queryKeys.decks })
+      onPick(deck.id)
+    } catch {
+      // creation failed; input stays for retry
     } finally {
       creating = false
     }

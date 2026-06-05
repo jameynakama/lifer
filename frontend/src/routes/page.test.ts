@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/svelte'
+import { screen, fireEvent } from '@testing-library/svelte'
+import { renderWithClient } from '../test-utils'
 import { goto } from '$app/navigation'
 import Dashboard from './+page.svelte'
 
@@ -23,7 +24,7 @@ describe('Dashboard page', () => {
       ok: true,
       json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
-    render(Dashboard)
+    renderWithClient(Dashboard)
     await vi.waitFor(() => {
       expect(screen.getAllByText(/pacific northwest/i).length).toBeGreaterThan(0)
     })
@@ -35,7 +36,7 @@ describe('Dashboard page', () => {
       ok: true,
       json: () => Promise.resolve({ decks: [], next_due_at: null }),
     }))
-    render(Dashboard)
+    renderWithClient(Dashboard)
     await vi.waitFor(() => {
       expect(screen.getByText(/no decks yet/i)).toBeInTheDocument()
     })
@@ -46,7 +47,7 @@ describe('Dashboard page', () => {
       ok: true,
       json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
-    render(Dashboard)
+    renderWithClient(Dashboard)
     await vi.waitFor(() => screen.getAllByRole('button', { name: /audio/i }))
     await fireEvent.click(screen.getAllByRole('button', { name: /audio/i })[0])
     expect(goto).toHaveBeenCalledWith('/decks/1/quiz?lane=audio')
@@ -57,7 +58,7 @@ describe('Dashboard page', () => {
       ok: true,
       json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
-    render(Dashboard)
+    renderWithClient(Dashboard)
     await vi.waitFor(() => screen.getAllByRole('button', { name: /image/i }))
     await fireEvent.click(screen.getAllByRole('button', { name: /image/i })[0])
     expect(goto).toHaveBeenCalledWith('/decks/1/quiz?lane=image')

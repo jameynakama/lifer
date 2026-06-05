@@ -1,21 +1,10 @@
 <script lang="ts">
   import { page } from '$app/state'
 
-  interface SpeciesResult {
-    ebird_code: string
-    common_name: string
-    scientific_name: string
-    image_url: string | null
-  }
+  import { apiGet } from '$lib/api'
+  import type { SpeciesListItem, SpeciesPage } from '../../../types'
 
-  interface SpeciesPage {
-    results: SpeciesResult[]
-    count: number
-    next: string | null
-    previous: string | null
-  }
-
-  let results: SpeciesResult[] = $state([])
+  let results: SpeciesListItem[] = $state([])
   let count = $state(0)
   let next: string | null = $state(null)
   let previous: string | null = $state(null)
@@ -31,12 +20,8 @@
     if (q) params.set('q', q)
     loading = true
     error = ''
-    fetch(`/api/v1/species?${params}`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`Failed to load: ${r.status}`)
-        return r.json()
-      })
-      .then((data: SpeciesPage) => {
+    apiGet<SpeciesPage>(`/api/v1/species?${params}`)
+      .then((data) => {
         results = data.results
         count = data.count
         next = data.next

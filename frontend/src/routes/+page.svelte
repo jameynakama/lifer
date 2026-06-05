@@ -1,44 +1,34 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
-  import type { Deck, DecksResponse, PresetDeck } from '../types'
+  import { useQueryClient } from '@tanstack/svelte-query'
+  import { apiPost } from '$lib/api'
+  import { createDecksQuery, createPresetsQuery, queryKeys } from '$lib/queries'
+  import type { Deck } from '../types'
   import DashboardStats from '$components/DashboardStats.svelte'
   import DeckList from '$components/DeckList.svelte'
   import InstallPrompt from '$components/InstallPrompt.svelte'
   import PresetDeckList from '$components/PresetDeckList.svelte'
 
-  let decks: Deck[] = $state([])
-  let nextDueAt: string | null = $state(null)
-  let loading = $state(true)
-  let presetDecks: PresetDeck[] = $state([])
-  let presetsLoading = $state(true)
+  const queryClient = useQueryClient()
+  const decksQuery = createDecksQuery()
+  const presetsQuery = createPresetsQuery()
+
   let cloning: Set<number> = $state(new Set())
 
-  $effect(() => {
-    fetch('/api/v1/decks')
-      .then(async (res) => {
-        if (res.ok) {
-          const data: DecksResponse = await res.json()
-          decks = data.decks
-          nextDueAt = data.next_due_at
-        }
-      })
-      .finally(() => { loading = false })
-  })
-
-  $effect(() => {
-    fetch('/api/v1/decks/presets')
-      .then(async (res) => { if (res.ok) presetDecks = await res.json() })
-      .finally(() => { presetsLoading = false })
-  })
+  const decks = $derived(decksQuery.data?.decks ?? [])
+  const nextDueAt = $derived(decksQuery.data?.next_due_at ?? null)
+  const loading = $derived(decksQuery.isPending)
+  const presetDecks = $derived(presetsQuery.data ?? [])
+  const presetsLoading = $derived(presetsQuery.isPending)
 
   async function cloneDeck(id: number) {
     cloning = new Set([...cloning, id])
     try {
-      const res = await fetch(`/api/v1/decks/${id}/clone`, { method: 'POST' })
-      if (res.ok) {
-        const created = await res.json()
-        goto(`/decks/${created.id}`)
-      }
+      const created = await apiPost<{ id: number }>(`/api/v1/decks/${id}/clone`)
+      queryClient.invalidateQueries({ queryKey: queryKeys.decks })
+      goto(`/decks/${created.id}`)
+    } catch {
+      // leave the dashboard as-is; the clone button simply re-enables
     } finally {
       cloning = new Set([...cloning].filter((c) => c !== id))
     }

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { createQuery } from '@tanstack/svelte-query'
+  import { apiGet, apiPost } from '$lib/api'
+  import { queryKeys } from '$lib/queries'
   import type { SpeciesListItem } from '../../types'
   import SpeciesRow from '$components/SpeciesRow.svelte'
   import PaginationBar from '$components/PaginationBar.svelte'
@@ -14,9 +16,8 @@
   let showDeckPicker = $state(false)
 
   const allSpeciesQuery = createQuery(() => ({
-    queryKey: ['species', 'all'],
-    queryFn: (): Promise<SpeciesListItem[]> =>
-      fetch('/api/v1/species/all').then((r) => r.json()),
+    queryKey: queryKeys.speciesAll,
+    queryFn: (): Promise<SpeciesListItem[]> => apiGet('/api/v1/species/all'),
     staleTime: Infinity,
   }))
 
@@ -62,11 +63,7 @@
   async function bulkAddToDeck(deckId: number) {
     showDeckPicker = false
     const codes = [...selectedCodes]
-    await fetch(`/api/v1/decks/${deckId}/species/bulk`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ species_codes: codes }),
-    })
+    await apiPost(`/api/v1/decks/${deckId}/species/bulk`, { species_codes: codes }).catch(() => {})
     clearSelection()
   }
 </script>

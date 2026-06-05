@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
   import { page } from '$app/state'
+  import { apiGet } from '$lib/api'
   import type { BirdCard, Species, Stat } from '../../../../types'
   import QuizCard from '$components/QuizCard.svelte'
   import ImageQuizCard from '$components/ImageQuizCard.svelte'
@@ -48,9 +49,7 @@
     cards = []
     index = 0
     try {
-      const res = await fetch(`/api/v1/decks/${deckId}/practice?lane=${lane}`)
-      if (!res.ok) throw new Error(`Server error ${res.status}`)
-      const data: BirdCard[] = await res.json()
+      const data = await apiGet<BirdCard[]>(`/api/v1/decks/${deckId}/practice?lane=${lane}`)
       if (data.length === 0) {
         noMedia = true
         return

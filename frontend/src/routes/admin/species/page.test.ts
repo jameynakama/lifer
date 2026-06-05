@@ -96,14 +96,15 @@ describe('Admin species page', () => {
   })
 
   it('handles fetch errors and displays error message', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: false,
-      status: 500,
-      json: () => Promise.resolve({ error: 'Internal server error' }),
-    }))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: 'Internal server error' }), { status: 500 })
+      )
+    )
     render(Page)
     await vi.waitFor(() => {
-      expect(screen.getByText(/failed to load: 500/i)).toBeInTheDocument()
+      expect(screen.getByText(/internal server error/i)).toBeInTheDocument()
     })
   })
 })

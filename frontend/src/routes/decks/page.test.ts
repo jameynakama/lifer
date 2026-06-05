@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/svelte'
+import { screen, fireEvent } from '@testing-library/svelte'
+import { renderWithClient } from '../../test-utils'
 import { goto } from '$app/navigation'
 import DecksPage from './+page.svelte'
 
@@ -21,7 +22,7 @@ describe('Decks page', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => {
       expect(screen.getAllByText(/my warblers/i).length).toBeGreaterThan(0)
     })
@@ -36,7 +37,7 @@ describe('Decks page', () => {
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks, next_due_at: null }) })
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/deck name/i))
     await fireEvent.input(screen.getByPlaceholderText(/deck name/i), { target: { value: 'New Deck' } })
     await fireEvent.click(screen.getByRole('button', { name: /create/i }))
@@ -50,7 +51,7 @@ describe('Decks page', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => screen.getByRole('link', { name: /my warblers/i }))
     // Link navigates via href, not goto -- just verify the link exists with correct href
     const link = screen.getByRole('link', { name: /my warblers/i })
@@ -63,11 +64,11 @@ describe('Decks page', () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       if (opts?.method === 'DELETE') {
         deleteCalled = true
-        return Promise.resolve({ ok: true })
+        return Promise.resolve({ ok: true, status: 204 })
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks, next_due_at: null }) })
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /delete/i }))
     await fireEvent.click(screen.getByRole('button', { name: /delete/i }))
     await vi.waitFor(() => { expect(deleteCalled).toBe(true) })
@@ -80,7 +81,7 @@ describe('Decks page', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => {
       expect(screen.getByRole('button', { name: /free practice/i })).toBeInTheDocument()
     })
@@ -90,7 +91,7 @@ describe('Decks page', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /free practice/i }))
     await fireEvent.click(screen.getByRole('button', { name: /free practice/i }))
     await vi.waitFor(() => {
@@ -102,7 +103,7 @@ describe('Decks page', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /free practice/i }))
     await fireEvent.click(screen.getByRole('button', { name: /free practice/i }))
     await vi.waitFor(() => {
@@ -114,7 +115,7 @@ describe('Decks page', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /free practice/i }))
     await fireEvent.click(screen.getByRole('button', { name: /free practice/i }))
     await vi.waitFor(() => screen.getByRole('button', { name: /▶ audio/i }))
@@ -127,7 +128,7 @@ describe('Decks page', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: () => Promise.resolve({ decks: decksWithDesc, next_due_at: null }),
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => {
       expect(screen.getByText(/confusing laughing calls/i)).toBeInTheDocument()
     })
@@ -142,7 +143,7 @@ describe('Decks page', () => {
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks, next_due_at: null }) })
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => screen.getByPlaceholderText(/deck name/i))
     await fireEvent.input(screen.getByPlaceholderText(/deck name/i), { target: { value: 'New Deck' } })
     await fireEvent.input(screen.getByPlaceholderText(/description/i), { target: { value: 'A description' } })
@@ -160,7 +161,7 @@ describe('Decks page', () => {
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks: [], next_due_at: null }) })
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => {
       expect(screen.getByText(/starter decks/i)).toBeInTheDocument()
       expect(screen.getByText(/confusing woodpeckers/i)).toBeInTheDocument()
@@ -179,7 +180,7 @@ describe('Decks page', () => {
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks: [], next_due_at: null }) })
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     await vi.waitFor(() => screen.getByRole('button', { name: /clone/i }))
     await fireEvent.click(screen.getByRole('button', { name: /clone/i }))
     await vi.waitFor(() => {
@@ -192,7 +193,7 @@ describe('Decks page', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true, json: () => Promise.resolve({ decks: deckWithDue, next_due_at: null }),
     }))
-    render(DecksPage)
+    renderWithClient(DecksPage)
     // Due buttons visible normally
     await vi.waitFor(() => screen.getByRole('button', { name: /🔊 audio/i }))
     // Toggle practice mode

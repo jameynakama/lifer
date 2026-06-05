@@ -1,21 +1,11 @@
 <script lang="ts">
   import { page } from '$app/state'
 
-  interface DeckInfo {
-    id: number
-    name: string
-    owner_name: string
-    owner_email: string
-  }
+  import { apiGet } from '$lib/api'
+  import type { AdminDeckInfo, Species } from '../../../../types'
 
-  interface SpeciesItem {
-    ebird_code: string
-    common_name: string
-    scientific_name: string
-  }
-
-  let deck: DeckInfo | null = $state(null)
-  let species: SpeciesItem[] = $state([])
+  let deck: AdminDeckInfo | null = $state(null)
+  let species: Species[] = $state([])
   let loading = $state(true)
   let error = $state('')
 
@@ -24,11 +14,7 @@
   $effect(() => {
     loading = true
     error = ''
-    fetch(`/api/v1/admin/decks/${deckID}/species`)
-      .then((r) => {
-        if (!r.ok) throw new Error(`Failed to load: ${r.status}`)
-        return r.json()
-      })
+    apiGet<{ deck: AdminDeckInfo; species: Species[] | null }>(`/api/v1/admin/decks/${deckID}/species`)
       .then((data) => {
         deck = data.deck
         species = data.species ?? []

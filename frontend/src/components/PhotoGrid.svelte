@@ -1,9 +1,7 @@
 <script lang="ts">
-  let {
-    images,
-  }: {
-    images: { macaulay_id: string; file_path: string; credit: string }[]
-  } = $props()
+  import type { SpeciesImage } from '../types'
+
+  let { images }: { images: SpeciesImage[] } = $props()
 </script>
 
 {#if images.length > 0}

@@ -1,51 +1,38 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
-  import type { Deck, DecksResponse, PresetDeck } from '../../types'
+  import { useQueryClient } from '@tanstack/svelte-query'
+  import { apiDelete, apiPost } from '$lib/api'
+  import { createDecksQuery, createPresetsQuery, queryKeys } from '$lib/queries'
+  import type { Deck } from '../../types'
   import PresetDeckList from '$components/PresetDeckList.svelte'
 
-  let decks: Deck[] = $state([])
-  let presetDecks: PresetDeck[] = $state([])
-  let loading = $state(true)
-  let presetsLoading = $state(true)
+  const queryClient = useQueryClient()
+  const decksQuery = createDecksQuery()
+  const presetsQuery = createPresetsQuery()
+
   let newName = $state('')
   let newDescription = $state('')
   let creating = $state(false)
   let practiceMode = $state(false)
   let cloning: Set<number> = $state(new Set())
 
-  async function loadDecks() {
-    try {
-      const res = await fetch('/api/v1/decks')
-      if (res.ok) {
-        const data: DecksResponse = await res.json()
-        decks = data.decks
-      }
-    } catch {
-      // network error, loading still ends
-    } finally {
-      loading = false
-    }
-  }
+  const decks = $derived(decksQuery.data?.decks ?? [])
+  const loading = $derived(decksQuery.isPending)
+  const presetDecks = $derived(presetsQuery.data ?? [])
+  const presetsLoading = $derived(presetsQuery.isPending)
 
-  async function loadPresetDecks() {
-    try {
-      const res = await fetch('/api/v1/decks/presets')
-      if (res.ok) presetDecks = await res.json()
-    } catch {
-      // network error
-    } finally {
-      presetsLoading = false
-    }
+  function invalidateDecks() {
+    queryClient.invalidateQueries({ queryKey: queryKeys.decks })
   }
 
   async function cloneDeck(id: number) {
     cloning = new Set([...cloning, id])
     try {
-      const res = await fetch(`/api/v1/decks/${id}/clone`, { method: 'POST' })
-      if (res.ok) {
-        const created = await res.json()
-        goto(`/decks/${created.id}`)
-      }
+      const created = await apiPost<{ id: number }>(`/api/v1/decks/${id}/clone`)
+      invalidateDecks()
+      goto(`/decks/${created.id}`)
+    } catch {
+      // clone button simply re-enables
     } finally {
       cloning = new Set([...cloning].filter((c) => c !== id))
     }
@@ -55,36 +42,35 @@
     if (!newName.trim()) return
     creating = true
     try {
-      const res = await fetch('/api/v1/decks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName.trim(), description: newDescription.trim() || undefined }),
+      const created = await apiPost<Deck>('/api/v1/decks', {
+        name: newName.trim(),
+        description: newDescription.trim() || undefined,
       })
-      if (res.ok) {
-        const created = await res.json()
-        decks = [...decks, { ...created, audio_due: 0, image_due: 0 }]
-        newName = ''
-        newDescription = ''
-      }
+      queryClient.setQueryData(queryKeys.decks, (prev: { decks: Deck[] } | undefined) => ({
+        ...prev,
+        decks: [...(prev?.decks ?? []), { ...created, audio_due: 0, image_due: 0 }],
+      }))
+    } catch {
+      // creation failed; form stays filled for retry
+      return
     } finally {
       creating = false
     }
+    newName = ''
+    newDescription = ''
   }
 
   async function deleteDeck(id: number) {
     if (!confirm('Delete this deck? This cannot be undone.')) return
     try {
-      const res = await fetch(`/api/v1/decks/${id}`, { method: 'DELETE' })
-      if (res.ok) {
-        decks = decks.filter((d) => d.id !== id)
-      }
+      await apiDelete(`/api/v1/decks/${id}`)
+      queryClient.setQueryData(queryKeys.decks, (prev: { decks: Deck[] } | undefined) =>
+        prev ? { ...prev, decks: prev.decks.filter((d) => d.id !== id) } : prev
+      )
     } catch {
       // network error, leave state unchanged
     }
   }
-
-  loadDecks()
-  loadPresetDecks()
 </script>
 
 <div class="decks-page">

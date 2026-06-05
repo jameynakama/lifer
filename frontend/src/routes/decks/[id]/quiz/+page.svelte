@@ -1,6 +1,7 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
   import { page } from '$app/state'
+  import { apiGet, apiPost } from '$lib/api'
   import type { BirdCard, Species } from '../../../../types'
   import QuizCard from '$components/QuizCard.svelte'
   import ImageQuizCard from '$components/ImageQuizCard.svelte'
@@ -24,8 +25,7 @@
 
   async function loadDeckSpecies() {
     try {
-      const res = await fetch(`/api/v1/decks/${deckId}/species`)
-      if (res.ok) deckSpecies = await res.json()
+      deckSpecies = await apiGet(`/api/v1/decks/${deckId}/species`)
     } catch {
       // non-fatal -- typeahead will be empty but quiz still works
     }
@@ -35,14 +35,13 @@
     loading = true
     error = ''
     try {
-      const res = await fetch(`/api/v1/decks/${deckId}/next?lane=${lane}`)
-      if (res.status === 204) {
+      const next = await apiGet<BirdCard | undefined>(`/api/v1/decks/${deckId}/next?lane=${lane}`)
+      if (!next) {
         done = true
         card = null
         return
       }
-      if (!res.ok) throw new Error(`Server error ${res.status}`)
-      card = await res.json()
+      card = next
     } catch {
       error = 'Failed to load next card.'
     } finally {
@@ -60,10 +59,10 @@
     if (!card) return
     const rating = correct ? 3 : 1
     try {
-      await fetch(`/api/v1/decks/${deckId}/rate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ebird_code: card.ebird_code, lane: card.lane, rating }),
+      await apiPost(`/api/v1/decks/${deckId}/rate`, {
+        ebird_code: card.ebird_code,
+        lane: card.lane,
+        rating,
       })
     } catch {
       // non-fatal

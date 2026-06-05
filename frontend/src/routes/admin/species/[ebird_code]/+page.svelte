@@ -1,26 +1,13 @@
 <script lang="ts">
   import { page } from '$app/state'
 
-  interface SpeciesImage {
-    macaulay_id: string
-    file_path: string
-    credit: string
-    locked: boolean
-  }
-
-  interface SpeciesRecording {
-    xeno_canto_id: string
-    file_path: string
-    quality: string
-    type: string
-    credit: string
-    locked: boolean
-  }
+  import { ApiError, apiDelete, apiGet, apiPatch } from '$lib/api'
+  import type { AdminSpeciesImage, AdminSpeciesRecording } from '../../../../types'
 
   const ebirdCode = $derived(page.params.ebird_code)
 
-  let images: SpeciesImage[] = $state([])
-  let recordings: SpeciesRecording[] = $state([])
+  let images: AdminSpeciesImage[] = $state([])
+  let recordings: AdminSpeciesRecording[] = $state([])
   let loading = $state(true)
   let error = $state('')
 
@@ -28,9 +15,10 @@
     loading = true
     error = ''
     try {
-      const res = await fetch(`/api/v1/admin/species/${ebirdCode}`)
-      if (!res.ok) throw new Error(`Failed to load: ${res.status}`)
-      const data = await res.json()
+      const data = await apiGet<{
+        images: AdminSpeciesImage[] | null
+        recordings: AdminSpeciesRecording[] | null
+      }>(`/api/v1/admin/species/${ebirdCode}`)
       images = data.images ?? []
       recordings = data.recordings ?? []
     } catch (e: unknown) {
@@ -46,50 +34,51 @@
 
   async function deleteImage(macaulayID: string) {
     if (!confirm(`Delete image ${macaulayID}?`)) return
-    const res = await fetch(`/api/v1/admin/species/${ebirdCode}/images/${macaulayID}`, { method: 'DELETE' })
-    if (res.ok) {
+    try {
+      await apiDelete(`/api/v1/admin/species/${ebirdCode}/images/${macaulayID}`)
       images = images.filter(i => i.macaulay_id !== macaulayID)
-    } else if (res.status === 409) {
-      alert('This image is locked and cannot be deleted.')
-    } else {
-      alert('Delete failed')
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        alert('This image is locked and cannot be deleted.')
+      } else {
+        alert('Delete failed')
+      }
     }
   }
 
   async function toggleImageLocked(macaulayID: string, locked: boolean) {
-    const res = await fetch(`/api/v1/admin/species/${ebirdCode}/images/${macaulayID}/locked`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locked }),
-    })
-    if (res.ok) {
+    try {
+      await apiPatch(`/api/v1/admin/species/${ebirdCode}/images/${macaulayID}/locked`, { locked })
       images = images.map(i => i.macaulay_id === macaulayID ? { ...i, locked } : i)
+    } catch {
+      // leave toggle unchanged
     }
   }
 
   async function deleteRecording(xenoCantoID: string) {
     if (!confirm(`Delete recording ${xenoCantoID}?`)) return
-    const res = await fetch(`/api/v1/admin/species/${ebirdCode}/recordings/${xenoCantoID}`, { method: 'DELETE' })
-    if (res.ok) {
+    try {
+      await apiDelete(`/api/v1/admin/species/${ebirdCode}/recordings/${xenoCantoID}`)
       recordings = recordings.filter(r => r.xeno_canto_id !== xenoCantoID)
-    } else if (res.status === 409) {
-      alert('This recording is locked and cannot be deleted.')
-    } else {
-      alert('Delete failed')
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        alert('This recording is locked and cannot be deleted.')
+      } else {
+        alert('Delete failed')
+      }
     }
   }
 
   async function toggleRecordingLocked(xenoCantoID: string, locked: boolean) {
-    const res = await fetch(`/api/v1/admin/species/${ebirdCode}/recordings/${xenoCantoID}/locked`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locked }),
-    })
-    if (res.ok) {
+    try {
+      await apiPatch(`/api/v1/admin/species/${ebirdCode}/recordings/${xenoCantoID}/locked`, { locked })
       recordings = recordings.map(r => r.xeno_canto_id === xenoCantoID ? { ...r, locked } : r)
+    } catch {
+      // leave toggle unchanged
     }
   }
 
+  // Uploads stay on raw fetch: FormData must not go through the JSON client.
   async function uploadImage(e: SubmitEvent) {
     e.preventDefault()
     const form = e.target as HTMLFormElement
@@ -98,7 +87,7 @@
       body: new FormData(form),
     })
     if (res.ok) {
-      const img: SpeciesImage = await res.json()
+      const img: AdminSpeciesImage = await res.json()
       images = [...images, img]
       form.reset()
     } else {
@@ -114,7 +103,7 @@
       body: new FormData(form),
     })
     if (res.ok) {
-      const rec: SpeciesRecording = await res.json()
+      const rec: AdminSpeciesRecording = await res.json()
       recordings = [...recordings, rec]
       form.reset()
     } else {

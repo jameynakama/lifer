@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { apiGet, apiPatch } from '$lib/api'
   import type { User } from '../../../types'
 
   let users: User[] = $state([])
@@ -7,9 +8,7 @@
 
   async function loadUsers() {
     try {
-      const res = await fetch('/api/v1/admin/users')
-      if (!res.ok) throw new Error(`Failed to load: ${res.status}`)
-      users = await res.json()
+      users = await apiGet<User[]>('/api/v1/admin/users')
     } catch (e) {
       error = (e as Error).message
     } finally {
@@ -19,13 +18,11 @@
 
   async function toggleAdmin(user: User) {
     const next = !user.is_admin
-    const res = await fetch(`/api/v1/admin/users/${user.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ is_admin: next }),
-    })
-    if (res.ok) {
+    try {
+      await apiPatch(`/api/v1/admin/users/${user.id}`, { is_admin: next })
       users = users.map((u) => (u.id === user.id ? { ...u, is_admin: next } : u))
+    } catch {
+      // leave toggle unchanged
     }
   }
 

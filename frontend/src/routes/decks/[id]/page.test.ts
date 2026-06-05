@@ -9,6 +9,7 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
   return {
     ...actual,
     createQuery: vi.fn(),
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
   }
 })
 
@@ -25,7 +26,7 @@ const speciesWithPrefs = [
 function makeFetch(overrides: Record<string, unknown> = {}) {
   return vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
     if (opts?.method === 'DELETE') {
-      return Promise.resolve({ ok: true })
+      return Promise.resolve({ ok: true, status: 204 })
     }
     if (opts?.method === 'POST') {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
@@ -127,7 +128,7 @@ describe('Deck detail page', () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       if (opts?.method === 'DELETE') {
         deleteCalled = true
-        return Promise.resolve({ ok: true })
+        return Promise.resolve({ ok: true, status: 204 })
       }
       if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve(speciesWithPrefs) })
@@ -273,7 +274,7 @@ describe('Deck detail page', () => {
 
   it('shows description returned from API', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-      if (opts?.method === 'DELETE') return Promise.resolve({ ok: true })
+      if (opts?.method === 'DELETE') return Promise.resolve({ ok: true, status: 204 })
       if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
       }
@@ -371,9 +372,9 @@ describe('Deck detail page', () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
       if (opts?.method === 'PATCH') {
         patchBody = JSON.parse(opts.body as string)
-        return Promise.resolve({ ok: true })
+        return Promise.resolve({ ok: true, status: 204 })
       }
-      if (opts?.method === 'DELETE') return Promise.resolve({ ok: true })
+      if (opts?.method === 'DELETE') return Promise.resolve({ ok: true, status: 204 })
       if (url.match(/\/api\/v1\/decks\/\d+\/species/)) {
         return Promise.resolve({ ok: true, json: () => Promise.resolve([]) })
       }

@@ -12,10 +12,10 @@ const userDecks = [
 
 function makeFetchWithUserDecks() {
   return vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-    if (url === '/api/v1/admin/decks' && !opts?.method) {
+    if (url === '/api/v1/admin/decks' && (!opts?.method || opts.method === 'GET')) {
       return Promise.resolve({ ok: true, json: () => Promise.resolve(userDecks) })
     }
-    if (opts?.method === 'DELETE') return Promise.resolve({ ok: true })
+    if (opts?.method === 'DELETE') return Promise.resolve({ ok: true, status: 204 })
     if (opts?.method === 'POST') {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 99, name: 'New Preset', description: '' }) })
     }
@@ -25,7 +25,7 @@ function makeFetchWithUserDecks() {
 
 function makeFetch(overrides: Record<string, unknown> = {}) {
   return vi.fn().mockImplementation((url: string, opts?: RequestInit) => {
-    if (opts?.method === 'DELETE') return Promise.resolve({ ok: true })
+    if (opts?.method === 'DELETE') return Promise.resolve({ ok: true, status: 204 })
     if (opts?.method === 'POST') {
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ id: 99, name: 'New Preset', description: '' }) })
     }

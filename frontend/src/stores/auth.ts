@@ -1,12 +1,6 @@
 import { writable, type Writable } from "svelte/store";
+import type { SessionUser } from "../types";
 
-interface User {
-    id: number;
-    email: string;
-    name: string;
-    is_admin: boolean;
-}
-
-type Auth = User | null;
+type Auth = SessionUser | null;
 
 export const auth: Writable<Auth> = writable(null);

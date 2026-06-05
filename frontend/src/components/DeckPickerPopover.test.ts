@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/svelte'
+import { screen, fireEvent } from '@testing-library/svelte'
+import { renderWithClient } from '../test-utils'
 import DeckPickerPopover from './DeckPickerPopover.svelte'
 
 afterEach(() => {
@@ -18,7 +19,7 @@ describe('DeckPickerPopover', () => {
       ok: true,
       json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
-    render(DeckPickerPopover, { onPick: vi.fn(), onClose: vi.fn() })
+    renderWithClient(DeckPickerPopover, { onPick: vi.fn(), onClose: vi.fn() })
     await vi.waitFor(() => {
       expect(screen.getByText(/my warblers/i)).toBeInTheDocument()
       expect(screen.getByText(/sparrows/i)).toBeInTheDocument()
@@ -31,7 +32,7 @@ describe('DeckPickerPopover', () => {
       ok: true,
       json: () => Promise.resolve({ decks, next_due_at: null }),
     }))
-    render(DeckPickerPopover, { onPick, onClose: vi.fn() })
+    renderWithClient(DeckPickerPopover, { onPick, onClose: vi.fn() })
     await vi.waitFor(() => screen.getByText(/my warblers/i))
     await fireEvent.click(screen.getByText(/my warblers/i))
     expect(onPick).toHaveBeenCalledWith(1)
@@ -45,7 +46,7 @@ describe('DeckPickerPopover', () => {
       }
       return Promise.resolve({ ok: true, json: () => Promise.resolve({ decks: [], next_due_at: null }) })
     }))
-    render(DeckPickerPopover, { onPick, onClose: vi.fn() })
+    renderWithClient(DeckPickerPopover, { onPick, onClose: vi.fn() })
     await vi.waitFor(() => screen.getByPlaceholderText(/new deck name/i))
     await fireEvent.input(screen.getByPlaceholderText(/new deck name/i), { target: { value: 'Sparrows' } })
     await fireEvent.click(screen.getByRole('button', { name: /create/i }))
@@ -60,7 +61,7 @@ describe('DeckPickerPopover', () => {
       ok: true,
       json: () => Promise.resolve({ decks: [], next_due_at: null }),
     }))
-    render(DeckPickerPopover, { onPick: vi.fn(), onClose })
+    renderWithClient(DeckPickerPopover, { onPick: vi.fn(), onClose })
     await vi.waitFor(() => screen.getByRole('dialog'))
     await fireEvent.click(screen.getByTestId('backdrop'))
     expect(onClose).toHaveBeenCalledOnce()

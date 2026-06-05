@@ -1,11 +1,8 @@
 <script lang="ts">
+  import type { SpeciesRecording } from '../types'
   import WavePlayer from './WavePlayer.svelte'
 
-  let {
-    recordings,
-  }: {
-    recordings: { xeno_canto_id: string; file_path: string; quality: string; type: string; credit: string }[]
-  } = $props()
+  let { recordings }: { recordings: SpeciesRecording[] } = $props()
 </script>
 
 {#if recordings.length > 0}

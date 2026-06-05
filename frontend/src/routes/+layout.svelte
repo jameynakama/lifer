@@ -1,8 +1,10 @@
 <script lang="ts">
   import '../app.css'
   import { QueryClient, QueryClientProvider } from '@tanstack/svelte-query'
+  import { apiGet, apiPost } from '$lib/api'
   import { auth } from '$stores/auth'
   import { getCurrentTheme, toggleTheme } from '$lib/theme'
+  import type { SessionUser } from '../types'
   import Login from '../views/Login.svelte'
 
   let { children } = $props()
@@ -12,13 +14,9 @@
   const queryClient = new QueryClient({ defaultOptions: { queries: { staleTime: 60_000 } } })
 
   $effect(() => {
-    fetch('/api/v1/me')
-      .then(async (res) => {
-        if (res.ok) {
-          $auth = await res.json()
-        }
-      })
-      .catch(() => {})
+    apiGet<SessionUser>('/api/v1/me')
+      .then((user) => { $auth = user })
+      .catch(() => {}) // not signed in
       .finally(() => { checking = false })
   })
 
@@ -28,7 +26,7 @@
   }
 
   async function handleLogout() {
-    await fetch('/api/v1/auth/logout', { method: 'POST' })
+    await apiPost('/api/v1/auth/logout').catch(() => {})
     $auth = null
   }
 </script>

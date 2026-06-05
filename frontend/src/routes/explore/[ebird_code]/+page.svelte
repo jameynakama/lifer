@@ -1,22 +1,20 @@
 <script lang="ts">
   import { createQuery } from '@tanstack/svelte-query'
+  import { apiGet } from '$lib/api'
+  import { queryKeys } from '$lib/queries'
   import { goto } from '$app/navigation'
   import { page } from '$app/state'
+  import type { SpeciesDetail } from '../../../types'
   import DeckDropdown from '$components/DeckDropdown.svelte'
   import RecordingsList from '$components/RecordingsList.svelte'
   import PhotoGrid from '$components/PhotoGrid.svelte'
 
-  let ebirdCode = $derived(page.params.ebird_code)
+  let ebirdCode = $derived(page.params.ebird_code ?? '')
   let dropdownOpen = $state(false)
 
   const detailQuery = createQuery(() => ({
-    queryKey: ['species', ebirdCode],
-    queryFn: async () => {
-      const res = await fetch(`/api/v1/species/${ebirdCode}`)
-      if (res.status === 404) throw { status: 404 }
-      if (!res.ok) throw new Error('server error')
-      return res.json()
-    },
+    queryKey: queryKeys.species(ebirdCode),
+    queryFn: (): Promise<SpeciesDetail> => apiGet(`/api/v1/species/${ebirdCode}`),
   }))
 
   $effect(() => {

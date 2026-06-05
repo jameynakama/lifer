@@ -1,18 +1,12 @@
 <script lang="ts">
   import { goto } from '$app/navigation'
   import { page } from '$app/state'
-  import { createQuery } from '@tanstack/svelte-query'
-  import type { SpeciesListItem } from '../../../types'
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query'
+  import { apiDelete, apiGet, apiPatch, apiPost, apiPut } from '$lib/api'
+  import { queryKeys } from '$lib/queries'
+  import type { Deck, DeckSpecies, SpeciesListItem } from '../../../types'
   import BulkAddBar from '$components/BulkAddBar.svelte'
   import SpeciesSearchList from '$components/SpeciesSearchList.svelte'
-
-  interface Species {
-    ebird_code: string
-    common_name: string
-    scientific_name: string
-    audio_enabled: boolean
-    image_enabled: boolean
-  }
 
   let deckId = $derived(page.params.id)
   let deckName = $state('')
@@ -21,7 +15,7 @@
   let editingDescription = $state(false)
   let nameInput = $state('')
   let descriptionInput = $state('')
-  let deckSpecies: Species[] = $state([])
+  let deckSpecies: DeckSpecies[] = $state([])
   let audioDue = $state(0)
   let imageDue = $state(0)
   let searchQuery = $state('')
@@ -32,11 +26,13 @@
   let selectedSearchCodes: Set<string> = $state(new Set())
 
   const allSpeciesQuery = createQuery(() => ({
-    queryKey: ['species', 'all'],
-    queryFn: (): Promise<SpeciesListItem[]> =>
-      fetch('/api/v1/species/all').then((r) => r.json()),
+    queryKey: queryKeys.speciesAll,
+    queryFn: (): Promise<SpeciesListItem[]> => apiGet('/api/v1/species/all'),
     staleTime: Infinity,
   }))
+
+  const queryClient = useQueryClient()
+  const invalidateDecks = () => queryClient.invalidateQueries({ queryKey: queryKeys.decks })
 
   const searchResults = $derived(
     searchQuery.length < 2
@@ -60,18 +56,15 @@
 
   async function loadDeck() {
     try {
-      const [deckRes, speciesRes] = await Promise.all([
-        fetch(`/api/v1/decks/${deckId}`),
-        fetch(`/api/v1/decks/${deckId}/species`),
+      const [d, species] = await Promise.all([
+        apiGet<Deck>(`/api/v1/decks/${deckId}`),
+        apiGet<DeckSpecies[]>(`/api/v1/decks/${deckId}/species`),
       ])
-      if (deckRes.ok) {
-        const d = await deckRes.json()
-        deckName = d.name ?? ''
-        deckDescription = d.description ?? ''
-        audioDue = d.audio_due ?? 0
-        imageDue = d.image_due ?? 0
-      }
-      if (speciesRes.ok) deckSpecies = await speciesRes.json()
+      deckName = d.name ?? ''
+      deckDescription = d.description ?? ''
+      audioDue = d.audio_due ?? 0
+      imageDue = d.image_due ?? 0
+      deckSpecies = species
     } catch {
       // network error
     } finally {
@@ -87,12 +80,13 @@
   async function saveName() {
     const trimmed = nameInput.trim()
     if (!trimmed || trimmed === deckName) { editingName = false; return }
-    const res = await fetch(`/api/v1/decks/${deckId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: trimmed, description: deckDescription }),
-    })
-    if (res.ok) deckName = trimmed
+    try {
+      await apiPatch(`/api/v1/decks/${deckId}`, { name: trimmed, description: deckDescription })
+      deckName = trimmed
+      invalidateDecks()
+    } catch {
+      // keep the old name
+    }
     editingName = false
   }
 
@@ -109,12 +103,12 @@
   async function saveDescription() {
     const trimmed = descriptionInput.trim()
     if (trimmed === deckDescription) { editingDescription = false; return }
-    const res = await fetch(`/api/v1/decks/${deckId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: deckName, description: trimmed }),
-    })
-    if (res.ok) deckDescription = trimmed
+    try {
+      await apiPatch(`/api/v1/decks/${deckId}`, { name: deckName, description: trimmed })
+      deckDescription = trimmed
+    } catch {
+      // keep the old description
+    }
     editingDescription = false
   }
 
@@ -132,33 +126,32 @@
 
   async function bulkAddToThisDeck() {
     const codes = [...selectedSearchCodes]
-    const res = await fetch(`/api/v1/decks/${deckId}/species/bulk`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ species_codes: codes }),
-    })
-    if (res.ok) {
-      const newSpecies = codes
-        .filter((c) => !addedCodes.has(c))
-        .map((c) => {
-          const s = (allSpeciesQuery.data ?? []).find((sp) => sp.ebird_code === c)
-          return s
-            ? { ebird_code: s.ebird_code, common_name: s.common_name, scientific_name: s.scientific_name, audio_enabled: true, image_enabled: true }
-            : null
-        })
-        .filter((s): s is Species => s !== null)
-      deckSpecies = [...deckSpecies, ...newSpecies]
-      selectedSearchCodes = new Set()
+    try {
+      await apiPost(`/api/v1/decks/${deckId}/species/bulk`, { species_codes: codes })
+    } catch {
+      return
     }
+    const newSpecies = codes
+      .filter((c) => !addedCodes.has(c))
+      .map((c) => {
+        const s = (allSpeciesQuery.data ?? []).find((sp) => sp.ebird_code === c)
+        return s
+          ? { ebird_code: s.ebird_code, common_name: s.common_name, scientific_name: s.scientific_name, audio_enabled: true, image_enabled: true }
+          : null
+      })
+      .filter((s): s is DeckSpecies => s !== null)
+    deckSpecies = [...deckSpecies, ...newSpecies]
+    selectedSearchCodes = new Set()
+    invalidateDecks()
   }
 
   async function addSpecies(ebirdCode: string) {
-    const res = await fetch(`/api/v1/decks/${deckId}/species`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ebird_code: ebirdCode }),
-    })
-    if (res.ok) {
+    try {
+      await apiPost(`/api/v1/decks/${deckId}/species`, { ebird_code: ebirdCode })
+    } catch {
+      return
+    }
+    {
       const added = searchResults.find((s) => s.ebird_code === ebirdCode)
       if (added) deckSpecies = [...deckSpecies, {
         ebird_code: added.ebird_code,
@@ -172,20 +165,26 @@
 
   async function deleteDeck() {
     if (!confirm(`Delete "${deckName}"? This cannot be undone.`)) return
-    const res = await fetch(`/api/v1/decks/${deckId}`, { method: 'DELETE' })
-    if (res.ok) goto('/decks')
+    try {
+      await apiDelete(`/api/v1/decks/${deckId}`)
+    } catch {
+      return
+    }
+    invalidateDecks()
+    goto('/decks')
   }
 
   async function removeSpecies(ebirdCode: string) {
-    const res = await fetch(`/api/v1/decks/${deckId}/species/${ebirdCode}`, {
-      method: 'DELETE',
-    })
-    if (res.ok) {
-      deckSpecies = deckSpecies.filter((s) => s.ebird_code !== ebirdCode)
+    try {
+      await apiDelete(`/api/v1/decks/${deckId}/species/${ebirdCode}`)
+    } catch {
+      return
     }
+    deckSpecies = deckSpecies.filter((s) => s.ebird_code !== ebirdCode)
+    invalidateDecks()
   }
 
-  async function toggleLane(species: Species, lane: 'audio' | 'image') {
+  async function toggleLane(species: DeckSpecies, lane: 'audio' | 'image') {
     if (togglingCodes.has(species.ebird_code)) return
     togglingCodes = new Set([...togglingCodes, species.ebird_code])
 
@@ -200,24 +199,19 @@
     )
 
     try {
-      const res = await fetch(`/api/v1/species/${species.ebird_code}/preferences`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(next),
-      })
-
-      if (res.ok) {
-        const updated = await res.json()
-        deckSpecies = deckSpecies.map((s) =>
-          s.ebird_code === species.ebird_code
-            ? { ...s, audio_enabled: updated.audio_enabled, image_enabled: updated.image_enabled }
-            : s
-        )
-      } else {
-        deckSpecies = deckSpecies.map((s) =>
-          s.ebird_code === species.ebird_code ? { ...s, ...prev } : s
-        )
-      }
+      const updated = await apiPut<{ audio_enabled: boolean; image_enabled: boolean }>(
+        `/api/v1/species/${species.ebird_code}/preferences`,
+        next
+      )
+      deckSpecies = deckSpecies.map((s) =>
+        s.ebird_code === species.ebird_code
+          ? { ...s, audio_enabled: updated.audio_enabled, image_enabled: updated.image_enabled }
+          : s
+      )
+    } catch {
+      deckSpecies = deckSpecies.map((s) =>
+        s.ebird_code === species.ebird_code ? { ...s, ...prev } : s
+      )
     } finally {
       togglingCodes = new Set([...togglingCodes].filter((c) => c !== species.ebird_code))
     }
