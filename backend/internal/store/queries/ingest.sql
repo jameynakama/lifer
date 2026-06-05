@@ -1,9 +1,10 @@
 -- name: UpsertSpecies :one
-INSERT INTO species (ebird_code, common_name, scientific_name)
-VALUES ($1, $2, $3)
+INSERT INTO species (ebird_code, common_name, scientific_name, family)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (ebird_code) DO UPDATE
     SET common_name     = EXCLUDED.common_name,
-        scientific_name = EXCLUDED.scientific_name
+        scientific_name = EXCLUDED.scientific_name,
+        family          = EXCLUDED.family
 RETURNING *;
 
 -- "locked" protects media from REMOVAL only (see the cleanup path and the

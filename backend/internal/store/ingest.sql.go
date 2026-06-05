@@ -7,6 +7,8 @@ package store
 
 import (
 	"context"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const deleteRecordingsBySpeciesCode = `-- name: DeleteRecordingsBySpeciesCode :exec
@@ -164,28 +166,36 @@ func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams
 }
 
 const upsertSpecies = `-- name: UpsertSpecies :one
-INSERT INTO species (ebird_code, common_name, scientific_name)
-VALUES ($1, $2, $3)
+INSERT INTO species (ebird_code, common_name, scientific_name, family)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (ebird_code) DO UPDATE
     SET common_name     = EXCLUDED.common_name,
-        scientific_name = EXCLUDED.scientific_name
-RETURNING ebird_code, common_name, scientific_name, created_at
+        scientific_name = EXCLUDED.scientific_name,
+        family          = EXCLUDED.family
+RETURNING ebird_code, common_name, scientific_name, created_at, family
 `
 
 type UpsertSpeciesParams struct {
-	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
-	CommonName     string `db:"common_name" json:"common_name"`
-	ScientificName string `db:"scientific_name" json:"scientific_name"`
+	EbirdCode      string      `db:"ebird_code" json:"ebird_code"`
+	CommonName     string      `db:"common_name" json:"common_name"`
+	ScientificName string      `db:"scientific_name" json:"scientific_name"`
+	Family         pgtype.Text `db:"family" json:"family"`
 }
 
 func (q *Queries) UpsertSpecies(ctx context.Context, arg UpsertSpeciesParams) (Species, error) {
-	row := q.db.QueryRow(ctx, upsertSpecies, arg.EbirdCode, arg.CommonName, arg.ScientificName)
+	row := q.db.QueryRow(ctx, upsertSpecies,
+		arg.EbirdCode,
+		arg.CommonName,
+		arg.ScientificName,
+		arg.Family,
+	)
 	var i Species
 	err := row.Scan(
 		&i.EbirdCode,
 		&i.CommonName,
 		&i.ScientificName,
 		&i.CreatedAt,
+		&i.Family,
 	)
 	return i, err
 }

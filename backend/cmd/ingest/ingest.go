@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jameynakama/flockdeck/internal/ebird"
 	"github.com/jameynakama/flockdeck/internal/macaulay"
 	"github.com/jameynakama/flockdeck/internal/r2"
@@ -62,10 +63,15 @@ func ingestSpecies(
 
 	send(speciesStartedMsg{workerID: workerID, code: entry.SpeciesCode, name: entry.CommonName})
 
+	var family pgtype.Text
+	if entry.FamilyComName != "" {
+		family = pgtype.Text{String: entry.FamilyComName, Valid: true}
+	}
 	sp, err := q.UpsertSpecies(ctx, store.UpsertSpeciesParams{
 		EbirdCode:      entry.SpeciesCode,
 		CommonName:     entry.CommonName,
 		ScientificName: entry.SciName,
+		Family:         family,
 	})
 	if err != nil {
 		err = fmt.Errorf("upsert species: %w", err)

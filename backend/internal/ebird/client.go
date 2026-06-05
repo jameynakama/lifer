@@ -10,10 +10,11 @@ import (
 )
 
 type TaxonomyEntry struct {
-	SpeciesCode string `json:"speciesCode"`
-	CommonName  string `json:"comName"`
-	SciName     string `json:"sciName"`
-	Category    string `json:"category"`
+	SpeciesCode   string `json:"speciesCode"`
+	CommonName    string `json:"comName"`
+	SciName       string `json:"sciName"`
+	Category      string `json:"category"`
+	FamilyComName string `json:"familyComName"`
 }
 
 type Client struct {

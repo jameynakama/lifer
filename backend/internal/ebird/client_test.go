@@ -17,9 +17,9 @@ func TestTaxonomy(t *testing.T) {
 		assert.Equal(t, "json", r.URL.Query().Get("fmt"))
 		assert.Equal(t, "species", r.URL.Query().Get("cat"))
 		assert.Equal(t, "testkey", r.Header.Get("X-eBirdApiToken"))
-		json.NewEncoder(w).Encode([]TaxonomyEntry{
-			{SpeciesCode: "soospa", CommonName: "Song Sparrow", SciName: "Melospiza melodia", Category: "species"},
-			{SpeciesCode: "norcaw", CommonName: "Northwestern Crow", SciName: "Corvus caurinus", Category: "species"},
+		json.NewEncoder(w).Encode([]map[string]any{
+			{"speciesCode": "soospa", "comName": "Song Sparrow", "sciName": "Melospiza melodia", "category": "species", "familyComName": "New World Sparrows"},
+			{"speciesCode": "norcaw", "comName": "Northwestern Crow", "sciName": "Corvus caurinus", "category": "species"},
 		})
 	}))
 	defer srv.Close()
@@ -30,6 +30,7 @@ func TestTaxonomy(t *testing.T) {
 	assert.Len(t, entries, 2)
 	assert.Equal(t, "soospa", entries[0].SpeciesCode)
 	assert.Equal(t, "Melospiza melodia", entries[0].SciName)
+	assert.Equal(t, "New World Sparrows", entries[0].FamilyComName)
 }
 
 func TestTaxonomyHTTPError(t *testing.T) {

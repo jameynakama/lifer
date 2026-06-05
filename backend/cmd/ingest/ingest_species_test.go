@@ -15,9 +15,10 @@ import (
 )
 
 var testEntry = ebird.TaxonomyEntry{
-	SpeciesCode: "sonspa",
-	CommonName:  "Song Sparrow",
-	SciName:     "Melospiza melodia",
+	SpeciesCode:   "sonspa",
+	CommonName:    "Song Sparrow",
+	SciName:       "Melospiza melodia",
+	FamilyComName: "New World Sparrows",
 }
 
 // xcServer serves one A-quality song and no calls.
@@ -150,5 +151,41 @@ func TestIngestSpecies_UpsertSpeciesError_IsFatal(t *testing.T) {
 		testEntry, 4, 3, 0, nil, nil, nil, 0, discard)
 	if err == nil || !strings.Contains(err.Error(), "upsert species") {
 		t.Errorf("Should fail fast when the species row can't be written, got %v", err)
+	}
+}
+
+func TestIngestSpecies_UpsertsFamily(t *testing.T) {
+	var got store.UpsertSpeciesParams
+	q, _, _ := happyStore(t)
+	q.upsertSpecies = func(arg store.UpsertSpeciesParams) (store.Species, error) {
+		got = arg
+		return store.Species{EbirdCode: arg.EbirdCode}, nil
+	}
+	_, err := ingestSpecies(context.Background(), q, xcServer(t), macServer(t, 0),
+		testEntry, 4, 3, 0, nil, nil, nil, 0, discard)
+	if err != nil {
+		t.Fatalf("Should ingest without error, got %v", err)
+	}
+	if !got.Family.Valid || got.Family.String != "New World Sparrows" {
+		t.Errorf("Should upsert the eBird family name, got %+v", got.Family)
+	}
+}
+
+func TestIngestSpecies_EmptyFamily_UpsertsNull(t *testing.T) {
+	entry := testEntry
+	entry.FamilyComName = ""
+	var got store.UpsertSpeciesParams
+	q, _, _ := happyStore(t)
+	q.upsertSpecies = func(arg store.UpsertSpeciesParams) (store.Species, error) {
+		got = arg
+		return store.Species{EbirdCode: arg.EbirdCode}, nil
+	}
+	_, err := ingestSpecies(context.Background(), q, xcServer(t), macServer(t, 0),
+		entry, 4, 3, 0, nil, nil, nil, 0, discard)
+	if err != nil {
+		t.Fatalf("Should ingest without error, got %v", err)
+	}
+	if got.Family.Valid {
+		t.Errorf("Should upsert NULL family when eBird has none, got %+v", got.Family)
 	}
 }

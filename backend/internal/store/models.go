@@ -36,11 +36,23 @@ type DeckSpecy struct {
 	SpeciesCode string `db:"species_code" json:"species_code"`
 }
 
+type ReviewLog struct {
+	ID                 int64              `db:"id" json:"id"`
+	UserID             int64              `db:"user_id" json:"user_id"`
+	SpeciesCode        string             `db:"species_code" json:"species_code"`
+	Lane               string             `db:"lane" json:"lane"`
+	Rating             int16              `db:"rating" json:"rating"`
+	GuessedSpeciesCode pgtype.Text        `db:"guessed_species_code" json:"guessed_species_code"`
+	MediaID            pgtype.Text        `db:"media_id" json:"media_id"`
+	ReviewedAt         pgtype.Timestamptz `db:"reviewed_at" json:"reviewed_at"`
+}
+
 type Species struct {
 	EbirdCode      string             `db:"ebird_code" json:"ebird_code"`
 	CommonName     string             `db:"common_name" json:"common_name"`
 	ScientificName string             `db:"scientific_name" json:"scientific_name"`
 	CreatedAt      pgtype.Timestamptz `db:"created_at" json:"created_at"`
+	Family         pgtype.Text        `db:"family" json:"family"`
 }
 
 type SpeciesImage struct {
