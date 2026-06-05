@@ -1,0 +1,22 @@
+version: "2"
+
+# Standard set: errcheck, govet, ineffassign, staticcheck, unused.
+linters:
+  default: standard
+  settings:
+    errcheck:
+      check-type-assertions: true
+      # Never-actionable categories; everything else gets checked or an
+      # explicit //nolint:errcheck with a reason.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (io.Closer).Close
+        - (*os.File).Close
+  exclusions:
+    rules:
+      # In tests an unchecked error surfaces as a test failure.
+      - path: _test\.go
+        linters:
+          - errcheck
