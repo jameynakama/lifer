@@ -10,6 +10,7 @@
   import FamilyAccuracy from '$components/FamilyAccuracy.svelte'
   import FadingSoonest from '$components/FadingSoonest.svelte'
   import HardMedia from '$components/HardMedia.svelte'
+  import DangerZone from '$components/DangerZone.svelte'
 
   let lane = $derived(
     page.url.searchParams.get('lane') === 'audio'
@@ -75,6 +76,7 @@
     </div>
     <HardMedia media={stats.hard_media} />
   {/if}
+  <DangerZone />
 </div>
 
 <style>

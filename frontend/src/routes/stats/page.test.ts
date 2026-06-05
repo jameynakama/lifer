@@ -149,4 +149,14 @@ describe('Stats page', () => {
       expect(screen.getByText(/no confusions/i)).toBeInTheDocument()
     })
   })
+
+  it('renders the danger zone even when stats fail to load', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')))
+    renderWithClient(StatsPage)
+    await vi.waitFor(() => {
+      expect(screen.getByText(/couldn't load stats/i)).toBeInTheDocument()
+    })
+    expect(screen.getByText(/danger zone/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /reset everything/i })).toBeInTheDocument()
+  })
 })
