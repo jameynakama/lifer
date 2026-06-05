@@ -48,4 +48,8 @@ func TestRequireLocalhost(t *testing.T) {
 	assert.Error(t, requireLocalhost("postgres://u:p@db.example.com:5432/db"))
 	assert.Error(t, requireLocalhost("postgres://u:p@164.92.10.10:25060/db"))
 	assert.Error(t, requireLocalhost("not a url at all ::"))
+	// pgx honors ?host= over the URL host -- the guard must see what the dialer sees.
+	assert.Error(t, requireLocalhost("postgres://localhost:5435/db?host=prod.example.com"))
+	// Multi-host fallbacks must all be local.
+	assert.Error(t, requireLocalhost("postgres://localhost,prod.example.com:5432/db"))
 }

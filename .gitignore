@@ -10,6 +10,7 @@ backend/bin/
 backend/flockdeck
 backend/server
 backend/ingest
+backend/seed
 
 # Superpowers brainstorm sessions + in-flight plans/specs (durable plans live in CLAUDE.md)
 .superpowers/

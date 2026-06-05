@@ -208,9 +208,20 @@ ON CONFLICT (user_id, species_code, lane) DO NOTHING;
 
 -- Seeder: every card of the user's due at the given instant, all decks,
 -- both lanes (the quiz path's GetNextDueCard is deck- and lane-scoped).
+-- Mirrors the quiz's media filter: never simulate a review the real app
+-- could not serve.
 -- name: GetDueCardsForUser :many
 SELECT id, user_id, species_code, lane, stability, difficulty, due,
        last_review, reps, lapses, state, created_at
-FROM cards
-WHERE user_id = $1 AND due <= sqlc.arg(as_of)
-ORDER BY due, id;
+FROM cards c
+WHERE c.user_id = $1 AND c.due <= sqlc.arg(as_of)
+  AND (
+    (c.lane = 'audio' AND EXISTS (
+      SELECT 1 FROM species_recordings sr
+      WHERE sr.species_code = c.species_code AND sr.quality IN ('A', 'B')))
+    OR
+    (c.lane = 'image' AND EXISTS (
+      SELECT 1 FROM species_images si
+      WHERE si.species_code = c.species_code))
+  )
+ORDER BY c.due, c.id;

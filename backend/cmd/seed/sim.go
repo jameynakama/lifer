@@ -3,7 +3,8 @@ package main
 import (
 	"fmt"
 	"math/rand"
-	"net/url"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // Simulation shape: opinionated constants, not flags (per spec).
@@ -59,16 +60,25 @@ func pickConfusable(rng *rand.Rand, species []deckSpecies, actual string) string
 	return ""
 }
 
-// requireLocalhost refuses any DATABASE_URL whose host isn't local. There is
-// deliberately no override: DATABASE_URL on this machine sometimes points at
-// prod (ingest workflow), and the seeder starts by deleting a user's data.
+// requireLocalhost refuses any DATABASE_URL that pgx would resolve to a
+// non-local host. Parses with pgxpool so ?host= query params, PGHOST, and
+// multi-host fallbacks are all seen exactly as the dialer will see them.
+// There is deliberately no override: DATABASE_URL on this machine sometimes
+// points at prod (ingest workflow), and the seeder starts by deleting a
+// user's data.
 func requireLocalhost(dbURL string) error {
-	u, err := url.Parse(dbURL)
-	if err != nil || u.Hostname() == "" {
-		return fmt.Errorf("cannot parse DATABASE_URL host: %q", dbURL)
+	cfg, err := pgxpool.ParseConfig(dbURL)
+	if err != nil {
+		return fmt.Errorf("cannot parse DATABASE_URL: %w", err)
 	}
-	if host := u.Hostname(); host != "localhost" && host != "127.0.0.1" {
-		return fmt.Errorf("refusing to seed non-local database host %q (no override exists)", host)
+	hosts := []string{cfg.ConnConfig.Host}
+	for _, fb := range cfg.ConnConfig.Fallbacks {
+		hosts = append(hosts, fb.Host)
+	}
+	for _, h := range hosts {
+		if h != "localhost" && h != "127.0.0.1" {
+			return fmt.Errorf("refusing to seed non-local database host %q (no override exists)", h)
+		}
 	}
 	return nil
 }

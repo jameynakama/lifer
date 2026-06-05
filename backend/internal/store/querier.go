@@ -42,6 +42,8 @@ type Querier interface {
 	GetDecksForSpecies(ctx context.Context, arg GetDecksForSpeciesParams) ([]int64, error)
 	// Seeder: every card of the user's due at the given instant, all decks,
 	// both lanes (the quiz path's GetNextDueCard is deck- and lane-scoped).
+	// Mirrors the quiz's media filter: never simulate a review the real app
+	// could not serve.
 	GetDueCardsForUser(ctx context.Context, arg GetDueCardsForUserParams) ([]Card, error)
 	// Stats: accuracy by eBird family; species without a backfilled family are omitted.
 	GetFamilyAccuracy(ctx context.Context, arg GetFamilyAccuracyParams) ([]GetFamilyAccuracyRow, error)

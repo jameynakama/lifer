@@ -64,6 +64,10 @@ migration name:
 ingest *args:
     cd backend && go run ./cmd/ingest {{ args }}
 
+# Seed a local user with simulated study history (usage: just seed you@example.com --days 30)
+seed email *args:
+    cd backend && go run ./cmd/seed {{ args }} {{ email }}
+
 # Start the backend server (hot-reload via air)
 be:
     cd backend && air
