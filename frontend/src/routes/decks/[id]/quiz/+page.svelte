@@ -22,6 +22,9 @@
   let error = $state('')
   let guessed: Species | null = $state(null)
   let correct = $state(false)
+  // Pins the session: cards FSRS re-dues mid-session (short learning steps)
+  // must not repeat within the same quiz run.
+  let sessionStart = $state(new Date().toISOString())
 
   async function loadDeckSpecies() {
     try {
@@ -35,7 +38,9 @@
     loading = true
     error = ''
     try {
-      const next = await apiGet<BirdCard | undefined>(`/api/v1/decks/${deckId}/next?lane=${lane}`)
+      const next = await apiGet<BirdCard | undefined>(
+        `/api/v1/decks/${deckId}/next?lane=${lane}&due_before=${encodeURIComponent(sessionStart)}`
+      )
       if (!next) {
         done = true
         card = null
@@ -89,6 +94,7 @@
       guessed = null
       correct = false
       deckSpecies = []
+      sessionStart = new Date().toISOString()
       loadDeckSpecies()
       fetchNext()
     }

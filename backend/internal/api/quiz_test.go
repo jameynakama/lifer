@@ -130,6 +130,65 @@ func TestGetNextCard_Audio_ReturnsDueCard(t *testing.T) {
 	assert.Equal(t, int64(3), body.DueRemaining)
 }
 
+func TestGetNextCard_DueBefore_ForwardedToQuery(t *testing.T) {
+	// Milliseconds included: this is exactly what the FE's toISOString() sends.
+	snapshot := "2026-06-04T19:00:00.000Z"
+	var gotDueBefore pgtype.Timestamptz
+	q := &stubQuerier{
+		getDeck: deckOwnedBy(1),
+		getNextDueCard: func(_ context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
+			gotDueBefore = arg.DueBefore
+			return store.GetNextDueCardRow{}, pgx.ErrNoRows
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet,
+		"/api/v1/decks/42/next?lane=audio&due_before="+snapshot, nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getNextCard(w, r)
+
+	require.True(t, gotDueBefore.Valid, "due_before must reach the query")
+	assert.Equal(t, "2026-06-04T19:00:00Z", gotDueBefore.Time.UTC().Format(time.RFC3339))
+}
+
+func TestGetNextCard_OmittedDueBefore_QueryGetsNull(t *testing.T) {
+	var gotDueBefore pgtype.Timestamptz
+	q := &stubQuerier{
+		getDeck: deckOwnedBy(1),
+		getNextDueCard: func(_ context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
+			gotDueBefore = arg.DueBefore
+			return store.GetNextDueCardRow{}, pgx.ErrNoRows
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/next?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getNextCard(w, r)
+
+	assert.False(t, gotDueBefore.Valid, "omitted due_before must stay NULL (falls back to NOW())")
+}
+
+func TestGetNextCard_InvalidDueBefore_Returns400(t *testing.T) {
+	h := makeHandler(&stubQuerier{getDeck: deckOwnedBy(1)})
+	r := httptest.NewRequest(http.MethodGet,
+		"/api/v1/decks/42/next?lane=audio&due_before=notatime", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getNextCard(w, r)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
 func TestGetNextCard_NothingDue_Returns204(t *testing.T) {
 	q := &stubQuerier{
 		getDeck: deckOwnedBy(1),

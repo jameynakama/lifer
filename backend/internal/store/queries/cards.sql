@@ -12,7 +12,9 @@ LEFT JOIN user_species_preferences usp
 WHERE c.user_id = $1
   AND ds.deck_id = $2
   AND c.lane = $3
-  AND c.due <= NOW()
+  -- due_before pins a quiz session to its start time: cards FSRS re-dues
+  -- mid-session (1-10min learning steps) don't repeat within the session.
+  AND c.due <= COALESCE(sqlc.narg('due_before'), NOW())
   AND (
     ($3 = 'audio' AND COALESCE(usp.audio_enabled, true))
     OR

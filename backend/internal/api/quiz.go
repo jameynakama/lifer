@@ -41,10 +41,26 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// due_before pins the session: cards FSRS re-dues mid-session (short
+	// learning steps) don't repeat within the same quiz run.
+	var dueBefore pgtype.Timestamptz
+	if raw := r.URL.Query().Get("due_before"); raw != "" {
+		ts, err := time.Parse(time.RFC3339, raw)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "due_before must be RFC3339")
+			return
+		}
+		if err := dueBefore.Scan(ts); err != nil {
+			writeError(w, http.StatusBadRequest, "due_before must be RFC3339")
+			return
+		}
+	}
+
 	card, err := h.queries.GetNextDueCard(r.Context(), store.GetNextDueCardParams{
-		UserID: userID,
-		DeckID: deckID,
-		Lane:   lane,
+		UserID:    userID,
+		DeckID:    deckID,
+		Lane:      lane,
+		DueBefore: dueBefore,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		w.WriteHeader(http.StatusNoContent)

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jameynakama/flockdeck/internal/store"
 	"github.com/stretchr/testify/assert"
@@ -223,6 +225,64 @@ func TestGetNextDueCard_NonQuizQualityRecording_SkipsCard(t *testing.T) {
 	})
 	assert.True(t, errors.Is(err, pgx.ErrNoRows),
 		"want ErrNoRows when the only due species has no A/B recording, got %v", err)
+}
+
+// due_before session snapshot
+
+func TestGetNextDueCard_DueBefore_ExcludesCardsDueAfterSnapshot(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+
+	// Snapshot taken an hour ago: the card (due NOW()) re-dued after the
+	// session started, so it must not be served.
+	snapshot := pgtype.Timestamptz{}
+	require.NoError(t, snapshot.Scan(time.Now().Add(-time.Hour)))
+
+	_, err := q.GetNextDueCard(context.Background(), store.GetNextDueCardParams{
+		UserID:    f.userID,
+		DeckID:    f.deckID,
+		Lane:      "image",
+		DueBefore: snapshot,
+	})
+	assert.True(t, errors.Is(err, pgx.ErrNoRows),
+		"want ErrNoRows for cards that became due after the session snapshot, got %v", err)
+}
+
+func TestGetNextDueCard_DueBefore_IncludesCardsDueBeforeSnapshot(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+
+	snapshot := pgtype.Timestamptz{}
+	require.NoError(t, snapshot.Scan(time.Now().Add(time.Minute)))
+
+	card, err := q.GetNextDueCard(context.Background(), store.GetNextDueCardParams{
+		UserID:    f.userID,
+		DeckID:    f.deckID,
+		Lane:      "image",
+		DueBefore: snapshot,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "_tst1", card.SpeciesCode)
+}
+
+func TestGetNextDueCard_NoDueBefore_FallsBackToNow(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+
+	card, err := q.GetNextDueCard(context.Background(), store.GetNextDueCardParams{
+		UserID: f.userID,
+		DeckID: f.deckID,
+		Lane:   "image",
+		// DueBefore zero-value: NULL -> COALESCE(NOW())
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "_tst1", card.SpeciesCode)
 }
 
 // due_remaining (window count folded into GetNextDueCard)

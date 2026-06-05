@@ -76,6 +76,26 @@ describe('Quiz page', () => {
     })
   })
 
+  it('pins the session with a stable due_before on every /next call', async () => {
+    const fetchMock = makeFetch()
+    vi.stubGlobal('fetch', fetchMock)
+    render(QuizPage)
+    await vi.waitFor(() => {
+      const calls = fetchMock.mock.calls.map((c: unknown[]) => c[0] as string)
+      expect(calls.some((url) => url.includes('/next'))).toBe(true)
+    })
+
+    const nextCalls = fetchMock.mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .filter((url) => url.includes('/next'))
+    for (const url of nextCalls) {
+      // RFC3339 timestamp pinned at session start so cards FSRS re-dues
+      // mid-session never repeat.
+      expect(url).toMatch(/due_before=[^&]*\d{4}-\d{2}-\d{2}T/)
+    }
+    expect(new Set(nextCalls.map((u) => u.split('due_before=')[1])).size).toBe(1)
+  })
+
   it('shows QuizCard with play button when a card is returned', async () => {
     vi.stubGlobal('fetch', makeFetch())
     render(QuizPage)

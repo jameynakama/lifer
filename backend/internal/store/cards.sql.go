@@ -168,7 +168,9 @@ LEFT JOIN user_species_preferences usp
 WHERE c.user_id = $1
   AND ds.deck_id = $2
   AND c.lane = $3
-  AND c.due <= NOW()
+  -- due_before pins a quiz session to its start time: cards FSRS re-dues
+  -- mid-session (1-10min learning steps) don't repeat within the session.
+  AND c.due <= COALESCE($4, NOW())
   AND (
     ($3 = 'audio' AND COALESCE(usp.audio_enabled, true))
     OR
@@ -190,9 +192,10 @@ LIMIT 1
 `
 
 type GetNextDueCardParams struct {
-	UserID int64  `db:"user_id" json:"user_id"`
-	DeckID int64  `db:"deck_id" json:"deck_id"`
-	Lane   string `db:"lane" json:"lane"`
+	UserID    int64              `db:"user_id" json:"user_id"`
+	DeckID    int64              `db:"deck_id" json:"deck_id"`
+	Lane      string             `db:"lane" json:"lane"`
+	DueBefore pgtype.Timestamptz `db:"due_before" json:"due_before"`
 }
 
 type GetNextDueCardRow struct {
@@ -214,7 +217,12 @@ type GetNextDueCardRow struct {
 }
 
 func (q *Queries) GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error) {
-	row := q.db.QueryRow(ctx, getNextDueCard, arg.UserID, arg.DeckID, arg.Lane)
+	row := q.db.QueryRow(ctx, getNextDueCard,
+		arg.UserID,
+		arg.DeckID,
+		arg.Lane,
+		arg.DueBefore,
+	)
 	var i GetNextDueCardRow
 	err := row.Scan(
 		&i.ID,
