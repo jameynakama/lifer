@@ -4,7 +4,7 @@
   import { queryKeys } from '$lib/queries'
 
   type Scope = 'schedule' | 'everything'
-  type ResetResponse = { cards_deleted: number; reviews_deleted: number }
+  type ResetResponse = { cards_deleted: number; reviews_deleted: number; cards_seeded: number }
 
   const rows: { scope: Scope; label: string; copy: string }[] = [
     {
@@ -39,10 +39,11 @@
     failed = false
     try {
       const res = await apiPost<ResetResponse>('/api/v1/reset', { scope })
-      message =
+      const deleted =
         scope === 'everything'
           ? `Deleted ${res.cards_deleted.toLocaleString()} cards and ${res.reviews_deleted.toLocaleString()} reviews.`
           : `Deleted ${res.cards_deleted.toLocaleString()} cards.`
+      message = `${deleted} ${res.cards_seeded.toLocaleString()} fresh cards ready.`
       armed = null
       confirmText = ''
       // Card deletion changes due counts app-wide; review_log deletion

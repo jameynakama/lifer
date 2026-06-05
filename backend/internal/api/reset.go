@@ -15,14 +15,17 @@ type resetRequest struct {
 type resetResponse struct {
 	CardsDeleted   int64 `json:"cards_deleted"`
 	ReviewsDeleted int64 `json:"reviews_deleted"`
+	CardsSeeded    int64 `json:"cards_seeded"`
 }
 
 // resetUserData irreversibly deletes the authenticated user's learning data.
 // "schedule" wipes FSRS card state (history-derived stats survive);
 // "everything" also wipes review_log. Decks, deck_species, and
-// user_species_preferences are never touched -- cards re-create lazily on
-// the next practice. Both scopes run in inTx; for "everything" atomicity
-// matters (no half-nuked state), for "schedule" it's one statement either way.
+// user_species_preferences are never touched. After the delete, blank cards
+// are re-seeded in the same tx for every species in the user's decks
+// (respecting lane preferences) -- card creation otherwise only happens when
+// species are ADDED to a deck, so without the re-seed a reset would leave
+// existing decks permanently card-less.
 func (h *Handler) resetUserData(w http.ResponseWriter, r *http.Request) {
 	userID := auth.UserIDFromCtx(r.Context())
 
@@ -44,7 +47,11 @@ func (h *Handler) resetUserData(w http.ResponseWriter, r *http.Request) {
 		}
 		if req.Scope == "everything" {
 			resp.ReviewsDeleted, err = q.DeleteAllReviewsForUser(r.Context(), userID)
+			if err != nil {
+				return err
+			}
 		}
+		resp.CardsSeeded, err = q.SeedCardsForUserDecks(r.Context(), userID)
 		return err
 	})
 	if err != nil {

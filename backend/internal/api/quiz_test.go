@@ -44,6 +44,7 @@ type stubQuerier struct {
 	// reset stubs
 	deleteAllCardsForUser   func(ctx context.Context, userID int64) (int64, error)
 	deleteAllReviewsForUser func(ctx context.Context, userID int64) (int64, error)
+	seedCardsForUserDecks   func(ctx context.Context, userID int64) (int64, error)
 }
 
 func (s *stubQuerier) GetNextDueCard(ctx context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
@@ -105,6 +106,9 @@ func (s *stubQuerier) DeleteAllCardsForUser(ctx context.Context, userID int64) (
 }
 func (s *stubQuerier) DeleteAllReviewsForUser(ctx context.Context, userID int64) (int64, error) {
 	return s.deleteAllReviewsForUser(ctx, userID)
+}
+func (s *stubQuerier) SeedCardsForUserDecks(ctx context.Context, userID int64) (int64, error) {
+	return s.seedCardsForUserDecks(ctx, userID)
 }
 
 func makeHandler(q store.Querier) *Handler {

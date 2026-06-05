@@ -8,7 +8,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-function okFetch(body = { cards_deleted: 412, reviews_deleted: 1038 }) {
+function okFetch(body = { cards_deleted: 412, reviews_deleted: 1038, cards_seeded: 224 }) {
   return vi.fn().mockResolvedValue({
     ok: true,
     status: 200,
@@ -70,8 +70,8 @@ describe('DangerZone', () => {
     expect(screen.getAllByRole('textbox')).toHaveLength(1)
   })
 
-  it('POSTs scope schedule and shows the cards count', async () => {
-    const fetchMock = okFetch({ cards_deleted: 412, reviews_deleted: 0 })
+  it('POSTs scope schedule and shows the deleted and re-seeded counts', async () => {
+    const fetchMock = okFetch({ cards_deleted: 412, reviews_deleted: 0, cards_seeded: 224 })
     vi.stubGlobal('fetch', fetchMock)
     renderWithClient(DangerZone)
 
@@ -79,7 +79,7 @@ describe('DangerZone', () => {
     await fireEvent.click(confirm)
 
     await vi.waitFor(() => {
-      expect(screen.getByText(/deleted 412 cards\./i)).toBeInTheDocument()
+      expect(screen.getByText(/deleted 412 cards\. 224 fresh cards ready\./i)).toBeInTheDocument()
     })
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe('/api/v1/reset')
@@ -95,7 +95,9 @@ describe('DangerZone', () => {
     await fireEvent.click(confirm)
 
     await vi.waitFor(() => {
-      expect(screen.getByText(/deleted 412 cards and 1,038 reviews\./i)).toBeInTheDocument()
+      expect(
+        screen.getByText(/deleted 412 cards and 1,038 reviews\. 224 fresh cards ready\./i),
+      ).toBeInTheDocument()
     })
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['decks'] })
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['stats'] })
@@ -114,7 +116,7 @@ describe('DangerZone', () => {
     resolveFetch({
       ok: true,
       status: 200,
-      json: () => Promise.resolve({ cards_deleted: 1, reviews_deleted: 2 }),
+      json: () => Promise.resolve({ cards_deleted: 1, reviews_deleted: 2, cards_seeded: 3 }),
     })
     await vi.waitFor(() => {
       expect(screen.getByText(/deleted 1 cards and 2 reviews\./i)).toBeInTheDocument()

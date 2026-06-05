@@ -188,3 +188,20 @@ LIMIT 10;
 -- name: DeleteAllCardsForUser :execrows
 DELETE FROM cards
 WHERE user_id = $1;
+
+-- Re-seed blank cards for every species in the user's decks (both lanes,
+-- minus preference-disabled ones). Used by reset: nothing else re-creates
+-- cards for already-added species, so without this a reset leaves existing
+-- decks permanently card-less.
+-- name: SeedCardsForUserDecks :execrows
+INSERT INTO cards (user_id, species_code, lane)
+SELECT DISTINCT d.owner_id, ds.species_code, l.lane
+FROM decks d
+JOIN deck_species ds ON ds.deck_id = d.id
+CROSS JOIN (VALUES ('audio'::text), ('image'::text)) AS l(lane)
+LEFT JOIN user_species_preferences p
+       ON p.user_id = d.owner_id AND p.species_code = ds.species_code
+WHERE d.owner_id = sqlc.arg(user_id)::bigint
+  AND ((l.lane = 'audio' AND COALESCE(p.audio_enabled, TRUE))
+    OR (l.lane = 'image' AND COALESCE(p.image_enabled, TRUE)))
+ON CONFLICT (user_id, species_code, lane) DO NOTHING;

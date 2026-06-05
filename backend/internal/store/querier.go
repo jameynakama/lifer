@@ -87,6 +87,11 @@ type Querier interface {
 	ListUserDecks(ctx context.Context, userID int64) ([]ListUserDecksRow, error)
 	RemoveSpeciesFromDeck(ctx context.Context, arg RemoveSpeciesFromDeckParams) error
 	SearchSpecies(ctx context.Context, dollar_1 pgtype.Text) ([]SearchSpeciesRow, error)
+	// Re-seed blank cards for every species in the user's decks (both lanes,
+	// minus preference-disabled ones). Used by reset: nothing else re-creates
+	// cards for already-added species, so without this a reset leaves existing
+	// decks permanently card-less.
+	SeedCardsForUserDecks(ctx context.Context, userID int64) (int64, error)
 	SetImageLocked(ctx context.Context, arg SetImageLockedParams) error
 	SetRecordingLocked(ctx context.Context, arg SetRecordingLockedParams) error
 	SetUserIsAdmin(ctx context.Context, arg SetUserIsAdminParams) error

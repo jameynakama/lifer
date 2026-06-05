@@ -46,7 +46,7 @@ func TestResetUserData_MalformedJSON_400(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
-func TestResetUserData_Schedule_DeletesOnlyCards(t *testing.T) {
+func TestResetUserData_Schedule_DeletesOnlyCards_ThenReseeds(t *testing.T) {
 	reviewsCalled := false
 	q := &stubQuerier{
 		deleteAllCardsForUser: func(_ context.Context, userID int64) (int64, error) {
@@ -57,15 +57,19 @@ func TestResetUserData_Schedule_DeletesOnlyCards(t *testing.T) {
 			reviewsCalled = true
 			return 0, nil
 		},
+		seedCardsForUserDecks: func(_ context.Context, userID int64) (int64, error) {
+			assert.Equal(t, int64(7), userID)
+			return 38, nil
+		},
 	}
 	rec := postReset(makeHandler(q), 7, `{"scope":"schedule"}`)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
 	assert.False(t, reviewsCalled, "schedule scope must not touch review_log")
-	assert.JSONEq(t, `{"cards_deleted":42,"reviews_deleted":0}`, rec.Body.String())
+	assert.JSONEq(t, `{"cards_deleted":42,"reviews_deleted":0,"cards_seeded":38}`, rec.Body.String())
 }
 
-func TestResetUserData_Everything_DeletesBoth(t *testing.T) {
+func TestResetUserData_Everything_DeletesBoth_ThenReseeds(t *testing.T) {
 	q := &stubQuerier{
 		deleteAllCardsForUser: func(_ context.Context, userID int64) (int64, error) {
 			assert.Equal(t, int64(7), userID)
@@ -75,11 +79,15 @@ func TestResetUserData_Everything_DeletesBoth(t *testing.T) {
 			assert.Equal(t, int64(7), userID)
 			return 99, nil
 		},
+		seedCardsForUserDecks: func(_ context.Context, userID int64) (int64, error) {
+			assert.Equal(t, int64(7), userID)
+			return 38, nil
+		},
 	}
 	rec := postReset(makeHandler(q), 7, `{"scope":"everything"}`)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"cards_deleted":42,"reviews_deleted":99}`, rec.Body.String())
+	assert.JSONEq(t, `{"cards_deleted":42,"reviews_deleted":99,"cards_seeded":38}`, rec.Body.String())
 }
 
 func TestResetUserData_DBError_500(t *testing.T) {
@@ -157,11 +165,43 @@ func TestResetUserData_Schedule_DB_LeavesReviewLog(t *testing.T) {
 	rec := postReset(h, userID, `{"scope":"schedule"}`)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
+	// The fixture's single audio card is deleted, then both lanes re-seed
+	// fresh for the deck's one species -- the deck stays practicable.
+	assert.JSONEq(t, `{"cards_deleted":1,"reviews_deleted":0,"cards_seeded":2}`, rec.Body.String())
+	assert.Equal(t, 2, countRows(t, pool,
+		`SELECT COUNT(*) FROM cards WHERE user_id = $1`, userID),
+		"reset must re-seed blank cards for deck species")
 	assert.Equal(t, 0, countRows(t, pool,
-		`SELECT COUNT(*) FROM cards WHERE user_id = $1`, userID))
+		`SELECT COUNT(*) FROM cards WHERE user_id = $1 AND reps > 0`, userID),
+		"re-seeded cards must be blank (no FSRS history)")
 	assert.Equal(t, 1, countRows(t, pool,
 		`SELECT COUNT(*) FROM review_log WHERE user_id = $1`, userID),
 		"schedule reset must leave review history intact")
+}
+
+func TestResetUserData_Schedule_DB_ReseedRespectsPreferences(t *testing.T) {
+	pool := connectTestPool(t)
+	h := &Handler{queries: store.New(pool), db: pool}
+	userID := seedResetFixtures(t, pool, "d")
+
+	// Disable the image lane for the deck's species; the re-seed must skip it.
+	_, err := pool.Exec(context.Background(),
+		`INSERT INTO user_species_preferences (user_id, species_code, audio_enabled, image_enabled)
+		 VALUES ($1, '_rst', TRUE, FALSE)`, userID)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = pool.Exec(context.Background(),
+			`DELETE FROM user_species_preferences WHERE user_id = $1`, userID)
+	})
+
+	rec := postReset(h, userID, `{"scope":"schedule"}`)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, 1, countRows(t, pool,
+		`SELECT COUNT(*) FROM cards WHERE user_id = $1 AND lane = 'audio'`, userID))
+	assert.Equal(t, 0, countRows(t, pool,
+		`SELECT COUNT(*) FROM cards WHERE user_id = $1 AND lane = 'image'`, userID),
+		"re-seed must skip preference-disabled lanes")
 }
 
 func TestResetUserData_Everything_DB_WipesBoth_SparesOtherUsersAndDecks(t *testing.T) {
@@ -174,12 +214,14 @@ func TestResetUserData_Everything_DB_WipesBoth_SparesOtherUsersAndDecks(t *testi
 	rec := postReset(h, userID, `{"scope":"everything"}`)
 
 	assert.Equal(t, http.StatusOK, rec.Code)
-	assert.JSONEq(t, `{"cards_deleted":1,"reviews_deleted":1}`, rec.Body.String(),
-		"counts must reflect the rows actually deleted")
+	assert.JSONEq(t, `{"cards_deleted":1,"reviews_deleted":1,"cards_seeded":2}`, rec.Body.String(),
+		"counts must reflect the rows actually deleted and re-seeded")
 
-	// Target user wiped.
-	assert.Equal(t, 0, countRows(t, pool,
+	// Target user wiped, then re-seeded blank for the deck's species.
+	assert.Equal(t, 2, countRows(t, pool,
 		`SELECT COUNT(*) FROM cards WHERE user_id = $1`, userID))
+	assert.Equal(t, 0, countRows(t, pool,
+		`SELECT COUNT(*) FROM cards WHERE user_id = $1 AND reps > 0`, userID))
 	assert.Equal(t, 0, countRows(t, pool,
 		`SELECT COUNT(*) FROM review_log WHERE user_id = $1`, userID))
 
