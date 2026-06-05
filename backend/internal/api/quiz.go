@@ -20,6 +20,7 @@ type nextCardResponse struct {
 	CommonName      string `json:"common_name"`
 	ScientificName  string `json:"scientific_name"`
 	MediaURL        string `json:"media_url"`
+	MediaID         string `json:"media_id"`
 	PhotoURL        string `json:"photo_url"`
 	Lane            string `json:"lane"`
 	RecordingType   string `json:"recording_type"`
@@ -80,7 +81,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var mediaURL, recordingType, recordingCredit, photoURL, photoCredit string
+	var mediaURL, mediaID, recordingType, recordingCredit, photoURL, photoCredit string
 	if lane == "audio" {
 		if media.AudioPath == "" {
 			// Defensive: GetNextDueCard's media filter should prevent this.
@@ -89,6 +90,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		mediaURL = media.AudioPath
+		mediaID = media.AudioID
 		recordingType = media.AudioType
 		recordingCredit = media.AudioCredit
 		photoURL = media.ImagePath
@@ -100,6 +102,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		mediaURL = media.ImagePath
+		mediaID = media.ImageID
 		photoURL = media.ImagePath
 		photoCredit = media.ImageCredit
 	}
@@ -109,6 +112,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		CommonName:      card.CommonName,
 		ScientificName:  card.ScientificName,
 		MediaURL:        mediaURL,
+		MediaID:         mediaID,
 		PhotoURL:        photoURL,
 		Lane:            lane,
 		RecordingType:   recordingType,
@@ -139,18 +143,20 @@ func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
 
 	cards := make([]nextCardResponse, 0, len(rows))
 	for _, row := range rows {
-		var mediaURL, photoURL string
+		var mediaURL, mediaID, photoURL string
 		if lane == "audio" {
 			if row.AudioUrl == "" {
 				continue
 			}
 			mediaURL = row.AudioUrl
+			mediaID = row.AudioID
 			photoURL = row.ImageUrl
 		} else {
 			if row.ImageUrl == "" {
 				continue
 			}
 			mediaURL = row.ImageUrl
+			mediaID = row.ImageID
 			photoURL = row.ImageUrl
 		}
 		var recordingCredit, photoCredit string
@@ -165,6 +171,7 @@ func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
 			CommonName:      row.CommonName,
 			ScientificName:  row.ScientificName,
 			MediaURL:        mediaURL,
+			MediaID:         mediaID,
 			PhotoURL:        photoURL,
 			Lane:            lane,
 			RecordingCredit: recordingCredit,

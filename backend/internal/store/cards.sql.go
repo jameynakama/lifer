@@ -80,19 +80,21 @@ func (q *Queries) GetCard(ctx context.Context, arg GetCardParams) (Card, error) 
 
 const getDeckPracticeCards = `-- name: GetDeckPracticeCards :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,
-       COALESCE(rec.file_path, '') AS audio_url,
-       COALESCE(rec.credit, '')    AS audio_credit,
-       COALESCE(img.file_path, '') AS image_url,
-       COALESCE(img.credit, '')    AS image_credit
+       COALESCE(rec.file_path, '')     AS audio_url,
+       COALESCE(rec.credit, '')        AS audio_credit,
+       COALESCE(rec.xeno_canto_id, '') AS audio_id,
+       COALESCE(img.file_path, '')     AS image_url,
+       COALESCE(img.credit, '')        AS image_credit,
+       COALESCE(img.macaulay_id, '')   AS image_id
 FROM species s
 JOIN deck_species ds ON ds.species_code = s.ebird_code
 LEFT JOIN LATERAL (
-    SELECT file_path, credit FROM species_recordings
+    SELECT file_path, credit, xeno_canto_id FROM species_recordings
     WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
     ORDER BY random() LIMIT 1
 ) rec ON true
 LEFT JOIN LATERAL (
-    SELECT file_path, credit FROM species_images
+    SELECT file_path, credit, macaulay_id FROM species_images
     WHERE species_code = s.ebird_code
     ORDER BY random() LIMIT 1
 ) img ON true
@@ -106,8 +108,10 @@ type GetDeckPracticeCardsRow struct {
 	ScientificName string `db:"scientific_name" json:"scientific_name"`
 	AudioUrl       string `db:"audio_url" json:"audio_url"`
 	AudioCredit    string `db:"audio_credit" json:"audio_credit"`
+	AudioID        string `db:"audio_id" json:"audio_id"`
 	ImageUrl       string `db:"image_url" json:"image_url"`
 	ImageCredit    string `db:"image_credit" json:"image_credit"`
+	ImageID        string `db:"image_id" json:"image_id"`
 }
 
 func (q *Queries) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]GetDeckPracticeCardsRow, error) {
@@ -125,8 +129,10 @@ func (q *Queries) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]Get
 			&i.ScientificName,
 			&i.AudioUrl,
 			&i.AudioCredit,
+			&i.AudioID,
 			&i.ImageUrl,
 			&i.ImageCredit,
+			&i.ImageID,
 		); err != nil {
 			return nil, err
 		}
@@ -245,19 +251,21 @@ func (q *Queries) GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) 
 }
 
 const getRandomMediaForSpecies = `-- name: GetRandomMediaForSpecies :one
-SELECT COALESCE(rec.file_path, '') AS audio_path,
-       COALESCE(rec.type, '')      AS audio_type,
-       COALESCE(rec.credit, '')    AS audio_credit,
-       COALESCE(img.file_path, '') AS image_path,
-       COALESCE(img.credit, '')    AS image_credit
+SELECT COALESCE(rec.file_path, '')      AS audio_path,
+       COALESCE(rec.type, '')           AS audio_type,
+       COALESCE(rec.credit, '')         AS audio_credit,
+       COALESCE(rec.xeno_canto_id, '')  AS audio_id,
+       COALESCE(img.file_path, '')      AS image_path,
+       COALESCE(img.credit, '')         AS image_credit,
+       COALESCE(img.macaulay_id, '')    AS image_id
 FROM (SELECT $1::text AS code) sp
 LEFT JOIN LATERAL (
-    SELECT file_path, type, credit FROM species_recordings
+    SELECT file_path, type, credit, xeno_canto_id FROM species_recordings
     WHERE species_code = sp.code AND quality IN ('A', 'B')
     ORDER BY random() LIMIT 1
 ) rec ON true
 LEFT JOIN LATERAL (
-    SELECT file_path, credit FROM species_images
+    SELECT file_path, credit, macaulay_id FROM species_images
     WHERE species_code = sp.code
     ORDER BY random() LIMIT 1
 ) img ON true
@@ -267,8 +275,10 @@ type GetRandomMediaForSpeciesRow struct {
 	AudioPath   string `db:"audio_path" json:"audio_path"`
 	AudioType   string `db:"audio_type" json:"audio_type"`
 	AudioCredit string `db:"audio_credit" json:"audio_credit"`
+	AudioID     string `db:"audio_id" json:"audio_id"`
 	ImagePath   string `db:"image_path" json:"image_path"`
 	ImageCredit string `db:"image_credit" json:"image_credit"`
+	ImageID     string `db:"image_id" json:"image_id"`
 }
 
 // GetRandomMediaForSpecies picks a random quiz-quality recording and a random
@@ -281,8 +291,10 @@ func (q *Queries) GetRandomMediaForSpecies(ctx context.Context, dollar_1 string)
 		&i.AudioPath,
 		&i.AudioType,
 		&i.AudioCredit,
+		&i.AudioID,
 		&i.ImagePath,
 		&i.ImageCredit,
+		&i.ImageID,
 	)
 	return i, err
 }

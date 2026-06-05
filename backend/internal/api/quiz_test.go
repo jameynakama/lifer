@@ -118,7 +118,9 @@ func TestGetNextCard_Audio_ReturnsDueCard(t *testing.T) {
 			return store.GetRandomMediaForSpeciesRow{
 				AudioPath: "https://r2.example.com/recordings/spotto/123.mp3",
 				AudioType: "song",
+				AudioID:   "XC1",
 				ImagePath: "https://r2.example.com/images/spotto/456.jpg",
+				ImageID:   "ML1",
 			}, nil
 		},
 	}
@@ -140,6 +142,50 @@ func TestGetNextCard_Audio_ReturnsDueCard(t *testing.T) {
 	assert.Equal(t, "https://r2.example.com/images/spotto/456.jpg", body.PhotoURL)
 	assert.Equal(t, "audio", body.Lane)
 	assert.Equal(t, int64(3), body.DueRemaining)
+	assert.Equal(t, "XC1", body.MediaID, "audio lane should expose the recording ID")
+}
+
+func TestGetNextCard_Image_ExposesImageMediaID(t *testing.T) {
+	due := pgtype.Timestamptz{}
+	require.NoError(t, due.Scan(time.Now().Add(-time.Hour)))
+
+	q := &stubQuerier{
+		getDeck: deckOwnedBy(1),
+		getNextDueCard: func(_ context.Context, arg store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
+			assert.Equal(t, "image", arg.Lane)
+			return store.GetNextDueCardRow{
+				SpeciesCode:    "spotto",
+				Lane:           "image",
+				CommonName:     "Spotted Towhee",
+				ScientificName: "Pipilo maculatus",
+				Due:            due,
+				DueRemaining:   1,
+			}, nil
+		},
+		getRandomMedia: func(_ context.Context, speciesCode string) (store.GetRandomMediaForSpeciesRow, error) {
+			return store.GetRandomMediaForSpeciesRow{
+				AudioPath: "https://r2.example.com/recordings/spotto/123.mp3",
+				AudioID:   "XC1",
+				ImagePath: "https://r2.example.com/images/spotto/456.jpg",
+				ImageID:   "ML1",
+			}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/next?lane=image", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getNextCard(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body nextCardResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	assert.Equal(t, "image", body.Lane)
+	assert.Equal(t, "https://r2.example.com/images/spotto/456.jpg", body.MediaURL)
+	assert.Equal(t, "ML1", body.MediaID, "image lane should expose the image's macaulay ID")
 }
 
 func TestGetNextCard_DueBefore_ForwardedToQuery(t *testing.T) {
@@ -357,7 +403,9 @@ func TestGetPracticeCards_Audio_ReturnsAllSpecies(t *testing.T) {
 					CommonName:     "Spotted Towhee",
 					ScientificName: "Pipilo maculatus",
 					AudioUrl:       "https://r2.example.com/rec.mp3",
+					AudioID:        "XC1",
 					ImageUrl:       "https://r2.example.com/img.jpg",
+					ImageID:        "ML1",
 				},
 			}, nil
 		},
@@ -379,6 +427,7 @@ func TestGetPracticeCards_Audio_ReturnsAllSpecies(t *testing.T) {
 	assert.Equal(t, "https://r2.example.com/rec.mp3", body[0].MediaURL)
 	assert.Equal(t, "https://r2.example.com/img.jpg", body[0].PhotoURL)
 	assert.Equal(t, "audio", body[0].Lane)
+	assert.Equal(t, "XC1", body[0].MediaID, "audio practice lane should expose the recording ID")
 }
 
 func TestGetPracticeCards_Image_UsesImageAsMediaURL(t *testing.T) {
@@ -396,7 +445,9 @@ func TestGetPracticeCards_Image_UsesImageAsMediaURL(t *testing.T) {
 					CommonName:     "Spotted Towhee",
 					ScientificName: "Pipilo maculatus",
 					AudioUrl:       "",
+					AudioID:        "XC1",
 					ImageUrl:       "https://r2.example.com/img.jpg",
+					ImageID:        "ML1",
 				},
 			}, nil
 		},
@@ -417,6 +468,7 @@ func TestGetPracticeCards_Image_UsesImageAsMediaURL(t *testing.T) {
 	assert.Equal(t, "https://r2.example.com/img.jpg", body[0].MediaURL)
 	assert.Equal(t, "https://r2.example.com/img.jpg", body[0].PhotoURL)
 	assert.Equal(t, "image", body[0].Lane)
+	assert.Equal(t, "ML1", body[0].MediaID, "image practice lane should expose the image's macaulay ID")
 }
 
 func TestGetPracticeCards_FiltersSpeciesWithNoMedia(t *testing.T) {

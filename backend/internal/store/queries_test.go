@@ -332,8 +332,10 @@ func TestGetRandomMediaForSpecies_ReturnsBothLanes(t *testing.T) {
 	assert.Equal(t, "https://r2.example.com/rec.mp3", media.AudioPath)
 	assert.Equal(t, "song", media.AudioType)
 	assert.Equal(t, "tester", media.AudioCredit)
+	assert.Equal(t, "_xc_tst1", media.AudioID, "Should return the recording's xeno-canto ID")
 	assert.Equal(t, "https://r2.example.com/img.jpg", media.ImagePath)
 	assert.Equal(t, "tester", media.ImageCredit)
+	assert.Equal(t, "_ml_tst1", media.ImageID, "Should return the image's macaulay ID")
 }
 
 func TestGetRandomMediaForSpecies_NoMedia_ReturnsEmptyFields(t *testing.T) {
@@ -347,6 +349,8 @@ func TestGetRandomMediaForSpecies_NoMedia_ReturnsEmptyFields(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, media.AudioPath)
 	assert.Empty(t, media.ImagePath)
+	assert.Empty(t, media.AudioID, "Should return empty audio ID when no media")
+	assert.Empty(t, media.ImageID, "Should return empty image ID when no media")
 }
 
 func TestGetRandomMediaForSpecies_LowQualityRecording_Excluded(t *testing.T) {
