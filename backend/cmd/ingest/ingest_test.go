@@ -12,11 +12,19 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// stubUpserter implements mediaUpserter; nil funcs fail the test if called.
+// stubUpserter implements ingestStore; nil funcs fail the test if called.
 type stubUpserter struct {
 	t                  *testing.T
+	upsertSpecies      func(arg store.UpsertSpeciesParams) (store.Species, error)
 	upsertRecording    func(arg store.UpsertRecordingParams) (store.SpeciesRecording, error)
 	upsertSpeciesImage func(arg store.UpsertSpeciesImageParams) (store.SpeciesImage, error)
+}
+
+func (s *stubUpserter) UpsertSpecies(_ context.Context, arg store.UpsertSpeciesParams) (store.Species, error) {
+	if s.upsertSpecies == nil {
+		s.t.Fatal("unexpected UpsertSpecies call")
+	}
+	return s.upsertSpecies(arg)
 }
 
 func (s *stubUpserter) UpsertRecording(_ context.Context, arg store.UpsertRecordingParams) (store.SpeciesRecording, error) {

@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -394,6 +396,61 @@ func TestFetchAndUpload_SendsMessageSequence(t *testing.T) {
 	}
 	if done.workerID != 2 {
 		t.Errorf("Should carry workerID 2, got %d", done.workerID)
+	}
+}
+
+func TestRecordOutcome(t *testing.T) {
+	tests := []struct {
+		name        string
+		stats       ingestStats
+		err         error
+		wantFailed  []string
+		wantMissing bool
+	}{
+		{
+			name:       "ingest error appends to recorded failures",
+			stats:      ingestStats{failures: []string{"recording XC1: boom"}},
+			err:        fmt.Errorf("upsert species: db down"),
+			wantFailed: []string{"recording XC1: boom", "ingest: upsert species: db down"},
+		},
+		{
+			name:       "partial failures alone mark the species failed",
+			stats:      ingestStats{failures: []string{"image ML1: 404"}, recordings: 2, images: 1},
+			wantFailed: []string{"image ML1: 404"},
+		},
+		{
+			name:        "no failures but zero recordings is missing media",
+			stats:       ingestStats{recordings: 0, images: 3},
+			wantMissing: true,
+		},
+		{
+			name:        "no failures but zero images is missing media",
+			stats:       ingestStats{recordings: 2, images: 0},
+			wantMissing: true,
+		},
+		{
+			name:  "full success records nothing",
+			stats: ingestStats{recordings: 2, images: 3},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			failed := map[string][]string{}
+			missing := map[string]ingestStats{}
+			recordOutcome(failed, missing, "sonspa", tt.stats, tt.err)
+
+			if tt.wantFailed == nil {
+				if _, ok := failed["sonspa"]; ok {
+					t.Errorf("Should not mark species failed, got %v", failed["sonspa"])
+				}
+			} else if !slices.Equal(failed["sonspa"], tt.wantFailed) {
+				t.Errorf("Should record failures %v, got %v", tt.wantFailed, failed["sonspa"])
+			}
+
+			if _, ok := missing["sonspa"]; ok != tt.wantMissing {
+				t.Errorf("Should have missing-media entry = %v, got %v", tt.wantMissing, ok)
+			}
+		})
 	}
 }
 

@@ -30,10 +30,11 @@ type Client struct {
 }
 
 func New(apiKey string) *Client {
-	return newWithBaseURL(apiKey, "https://search.macaulaylibrary.org")
+	return NewWithBaseURL(apiKey, "https://search.macaulaylibrary.org")
 }
 
-func newWithBaseURL(apiKey, baseURL string) *Client {
+// NewWithBaseURL constructs a client against an alternate host (httptest servers in tests).
+func NewWithBaseURL(apiKey, baseURL string) *Client {
 	return &Client{
 		apiKey:     apiKey,
 		baseURL:    baseURL,

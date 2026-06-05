@@ -28,7 +28,7 @@ func TestSearch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newWithBaseURL("", srv.URL)
+	c := NewWithBaseURL("", srv.URL)
 	recs, err := c.Search(context.Background(), "Melospiza", "melodia", "song", 0)
 	require.NoError(t, err)
 	// quality C is filtered out
@@ -75,7 +75,7 @@ func TestSearchHTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newWithBaseURL("", srv.URL)
+	c := NewWithBaseURL("", srv.URL)
 	_, err := c.Search(context.Background(), "Melospiza", "melodia", "song", 0)
 	assert.ErrorContains(t, err, "429")
 }
@@ -87,7 +87,7 @@ func TestSearchIncludesAPIKey(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newWithBaseURL("mykey", srv.URL)
+	c := NewWithBaseURL("mykey", srv.URL)
 	recs, err := c.Search(context.Background(), "Melospiza", "melodia", "song", 0)
 	require.NoError(t, err)
 	assert.Empty(t, recs)

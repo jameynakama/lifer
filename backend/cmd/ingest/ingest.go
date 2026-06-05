@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -27,11 +28,17 @@ type ingestStats struct {
 // Overridable in tests.
 var retryDelays = []time.Duration{2 * time.Second, 4 * time.Second, 8 * time.Second}
 
+// ingestStore is the slice of store.Querier ingestSpecies needs.
+type ingestStore interface {
+	mediaUpserter
+	UpsertSpecies(ctx context.Context, arg store.UpsertSpeciesParams) (store.Species, error)
+}
+
 // ingestSpecies fetches and uploads media for one species.
 // xcOverrides maps ebird codes to [genus, species] pairs for xeno-canto taxonomy overrides.
 func ingestSpecies(
 	ctx context.Context,
-	q *store.Queries,
+	q ingestStore,
 	xc *xenocanto.Client,
 	mac *macaulay.Client,
 	entry ebird.TaxonomyEntry,
@@ -342,25 +349,39 @@ func filterBySpecies(codes []string, taxMap map[string]ebird.TaxonomyEntry, want
 	return out
 }
 
-// cleanupSpecies removes each species' R2 objects and DB rows. Callers must
-// pre-filter locked-media species via partitionProtected.
-func cleanupSpecies(ctx context.Context, q *store.Queries, r2c *r2.Client, codes []string) {
+// cleanupStore is the slice of store.Querier cleanup needs.
+type cleanupStore interface {
+	DeleteRecordingsBySpeciesCode(ctx context.Context, speciesCode string) error
+	DeleteSpeciesImagesBySpeciesCode(ctx context.Context, speciesCode string) error
+	DeleteSpeciesByCode(ctx context.Context, ebirdCode string) error
+}
+
+// prefixDeleter is the slice of *r2.Client cleanup needs. Pass a nil
+// *interface* (not a nil *r2.Client in an interface) to skip R2 deletes.
+type prefixDeleter interface {
+	DeletePrefix(ctx context.Context, prefix string) error
+}
+
+// cleanupSpecies removes each species' R2 objects and DB rows, warning on w
+// and continuing past individual failures. Callers must pre-filter
+// locked-media species via partitionProtected.
+func cleanupSpecies(ctx context.Context, w io.Writer, q cleanupStore, r2d prefixDeleter, codes []string) {
 	for _, code := range codes {
-		if r2c != nil {
+		if r2d != nil {
 			for _, prefix := range []string{"recordings/" + code + "/", "images/" + code + "/"} {
-				if err := r2c.DeletePrefix(ctx, prefix); err != nil {
-					fmt.Fprintf(os.Stderr, "  warn: cleanup R2 %s: %v\n", prefix, err)
+				if err := r2d.DeletePrefix(ctx, prefix); err != nil {
+					fmt.Fprintf(w, "  warn: cleanup R2 %s: %v\n", prefix, err)
 				}
 			}
 		}
 		if err := q.DeleteRecordingsBySpeciesCode(ctx, code); err != nil {
-			fmt.Fprintf(os.Stderr, "  warn: cleanup recordings %s: %v\n", code, err)
+			fmt.Fprintf(w, "  warn: cleanup recordings %s: %v\n", code, err)
 		}
 		if err := q.DeleteSpeciesImagesBySpeciesCode(ctx, code); err != nil {
-			fmt.Fprintf(os.Stderr, "  warn: cleanup images %s: %v\n", code, err)
+			fmt.Fprintf(w, "  warn: cleanup images %s: %v\n", code, err)
 		}
 		if err := q.DeleteSpeciesByCode(ctx, code); err != nil {
-			fmt.Fprintf(os.Stderr, "  warn: cleanup species %s: %v\n", code, err)
+			fmt.Fprintf(w, "  warn: cleanup species %s: %v\n", code, err)
 		}
 	}
 }

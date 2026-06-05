@@ -24,7 +24,7 @@ func TestTaxonomy(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newWithBaseURL("testkey", srv.URL)
+	c := NewWithBaseURL("testkey", srv.URL)
 	entries, err := c.Taxonomy(context.Background())
 	require.NoError(t, err)
 	assert.Len(t, entries, 2)
@@ -38,7 +38,7 @@ func TestTaxonomyHTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newWithBaseURL("bad", srv.URL)
+	c := NewWithBaseURL("bad", srv.URL)
 	_, err := c.Taxonomy(context.Background())
 	assert.ErrorContains(t, err, "401")
 }
@@ -51,7 +51,7 @@ func TestSpeciesList(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newWithBaseURL("testkey", srv.URL)
+	c := NewWithBaseURL("testkey", srv.URL)
 	codes, err := c.SpeciesList(context.Background(), "US-OR")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"soospa", "norcaw", "mallar"}, codes)
@@ -63,7 +63,7 @@ func TestSpeciesListHTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newWithBaseURL("bad", srv.URL)
+	c := NewWithBaseURL("bad", srv.URL)
 	_, err := c.SpeciesList(context.Background(), "US-OR")
 	assert.ErrorContains(t, err, "401")
 }

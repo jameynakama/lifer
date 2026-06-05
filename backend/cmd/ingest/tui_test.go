@@ -161,6 +161,28 @@ func TestUpdate_AllDone_ReturnsQuit(t *testing.T) {
 	}
 }
 
+func TestUpdate_AllDone_IsNotInterrupted(t *testing.T) {
+	m := baseModel(t)
+	next, _ := m.Update(allDoneMsg{})
+	if next.(model).interrupted {
+		t.Error("Should not mark a completed run as interrupted")
+	}
+}
+
+func TestUpdate_CtrlC_QuitsInterrupted(t *testing.T) {
+	m := baseModel(t)
+	next, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
+	if !next.(model).interrupted {
+		t.Error("Should mark the run interrupted so main can cancel in-flight work")
+	}
+	if cmd == nil {
+		t.Fatal("Should return a command")
+	}
+	if _, ok := cmd().(tea.QuitMsg); !ok {
+		t.Errorf("Should return tea.Quit command, got %T", cmd())
+	}
+}
+
 func TestUpdate_Tick_ReturnsTick(t *testing.T) {
 	m := baseModel(t)
 	_, cmd := m.Update(tickMsg(time.Now()))

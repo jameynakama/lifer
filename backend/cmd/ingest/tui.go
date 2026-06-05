@@ -86,6 +86,9 @@ type model struct {
 	width     int
 	height    int
 	progress  progress.Model
+	// interrupted is set when the user quits early (ctrl+c) so main can
+	// cancel in-flight work instead of proceeding to cleanup and reports.
+	interrupted bool
 }
 
 var (
@@ -185,6 +188,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
+			m.interrupted = true
 			return m, tea.Quit
 		}
 		return m, nil

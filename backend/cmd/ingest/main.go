@@ -8,9 +8,11 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -72,7 +74,14 @@ func main() {
 	xcKey := mustEnv("XENO_CANTO_API_KEY")
 	dbURL := mustEnv("DATABASE_URL")
 
-	ctx := context.Background()
+	// Cancellation has two triggers: signals outside the TUI (SIGTERM, or
+	// SIGINT before/after it runs -- the TUI's raw mode turns ctrl+c into a
+	// key event), and the TUI's own quit, which calls cancel below.
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "db connect: %v\n", err)
@@ -201,6 +210,9 @@ func main() {
 
 	go func() {
 		for _, ce := range processable {
+			if ctx.Err() != nil {
+				break // interrupted: stop spawning, let in-flight workers drain
+			}
 			workerID := <-slots
 			wg.Add(1)
 			go func(ce codeEntry, workerID int) {
@@ -208,13 +220,7 @@ func main() {
 				defer func() { slots <- workerID }()
 				stats, err := ingestSpecies(ctx, q, xcClient, macaulayClient, ce.entry, *maxRecordings, *maxImages, *maxRecordingSecs, r2c, xcOverrides, bannedImages, workerID, send)
 				mu.Lock()
-				if err != nil {
-					failedSpecies[ce.code] = append(stats.failures, fmt.Sprintf("ingest: %v", err))
-				} else if len(stats.failures) > 0 {
-					failedSpecies[ce.code] = stats.failures
-				} else if stats.recordings == 0 || stats.images == 0 {
-					missingMedia[ce.code] = stats
-				}
+				recordOutcome(failedSpecies, missingMedia, ce.code, stats, err)
 				mu.Unlock()
 			}(ce, workerID)
 		}
@@ -222,9 +228,17 @@ func main() {
 		p.Send(allDoneMsg{})
 	}()
 
-	if _, err := p.Run(); err != nil {
+	finalModel, err := p.Run()
+	if err != nil {
 		fmt.Fprintf(os.Stderr, "tui: %v\n", err)
 		os.Exit(1)
+	}
+	if fm, ok := finalModel.(model); ok && fm.interrupted {
+		fmt.Fprintln(os.Stderr, "interrupted: cancelling in-flight work...")
+		cancel()
+		wg.Wait()
+		fmt.Fprintln(os.Stderr, "interrupted: skipped cleanup and reports; incomplete species are cleaned up on the next run")
+		os.Exit(130)
 	}
 
 	// --- post-run cleanup and reports ---
@@ -243,6 +257,12 @@ func main() {
 	}
 	protectedSet := map[string]struct{}{}
 
+	// A nil *r2.Client wrapped in the interface would be non-nil; convert once.
+	var r2del prefixDeleter
+	if r2c != nil {
+		r2del = r2c
+	}
+
 	if !*noCleanup {
 		fmt.Fprintln(os.Stderr, "cleaning up species missing recordings or images...")
 		incomplete, err := q.ListIncompleteSpecies(ctx)
@@ -254,7 +274,7 @@ func main() {
 		for _, c := range protected {
 			protectedSet[c] = struct{}{}
 		}
-		cleanupSpecies(ctx, q, r2c, deletable)
+		cleanupSpecies(ctx, os.Stderr, q, r2del, deletable)
 		fmt.Fprintf(os.Stderr, "cleanup: removed %d incomplete species (%d protected by locked media)\n",
 			len(deletable), len(protected))
 	} else {
@@ -280,7 +300,7 @@ func main() {
 		for _, c := range protected {
 			protectedSet[c] = struct{}{}
 		}
-		cleanupSpecies(ctx, q, r2c, deletable)
+		cleanupSpecies(ctx, os.Stderr, q, r2del, deletable)
 		fmt.Printf("re-run failed species with:\n")
 		fmt.Printf("  just ingest --species %s <region>\n", strings.Join(failedCodes, ","))
 	}
@@ -324,6 +344,21 @@ func main() {
 			fmt.Printf("  just ingest --xc-override \"<code>=Genus:species,...\" --skip-complete <region>\n")
 			fmt.Printf("  missing codes: %s\n", strings.Join(xcMisses, ","))
 		}
+	}
+}
+
+// recordOutcome classifies one species' ingest result into the post-run
+// reports: a hard error or any partial failure lands in failed (hard errors
+// appended after the partial failures that preceded them); an error-free run
+// that still produced no recordings or no images lands in missing.
+func recordOutcome(failed map[string][]string, missing map[string]ingestStats, code string, stats ingestStats, err error) {
+	switch {
+	case err != nil:
+		failed[code] = append(stats.failures, fmt.Sprintf("ingest: %v", err))
+	case len(stats.failures) > 0:
+		failed[code] = stats.failures
+	case stats.recordings == 0 || stats.images == 0:
+		missing[code] = stats
 	}
 }
 

@@ -27,7 +27,7 @@ func TestPhotos(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newWithBaseURL("testkey", srv.URL)
+	c := NewWithBaseURL("testkey", srv.URL)
 	photos, err := c.Photos(context.Background(), "soospa", 3)
 	require.NoError(t, err)
 	assert.Len(t, photos, 3)
@@ -41,7 +41,7 @@ func TestPhotosHTTPError(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := newWithBaseURL("bad", srv.URL)
+	c := NewWithBaseURL("bad", srv.URL)
 	_, err := c.Photos(context.Background(), "soospa", 3)
 	assert.ErrorContains(t, err, "403")
 }
