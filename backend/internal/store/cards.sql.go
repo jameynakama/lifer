@@ -78,6 +78,88 @@ func (q *Queries) GetCard(ctx context.Context, arg GetCardParams) (Card, error) 
 	return i, err
 }
 
+const getCardStateCounts = `-- name: GetCardStateCounts :many
+SELECT
+    CASE
+        -- reps = 0 wins by definition: a never-reviewed card is not_seen regardless of state.
+        WHEN reps = 0  THEN 'not_seen'
+        WHEN state = 2 THEN 'known'
+        WHEN state = 3 THEN 'relearning'
+        ELSE 'learning'
+    END AS bucket,
+    COUNT(*) AS count
+FROM cards
+WHERE user_id = $1
+  AND lane = COALESCE($2, lane)
+GROUP BY bucket
+`
+
+type GetCardStateCountsParams struct {
+	UserID int64       `db:"user_id" json:"user_id"`
+	Lane   pgtype.Text `db:"lane" json:"lane"`
+}
+
+type GetCardStateCountsRow struct {
+	Bucket string `db:"bucket" json:"bucket"`
+	Count  int64  `db:"count" json:"count"`
+}
+
+// Stats: per-card bucket counts. Buckets per the stats spec: not_seen = never
+// reviewed; known = FSRS Review state; relearning = lapsed; else learning.
+func (q *Queries) GetCardStateCounts(ctx context.Context, arg GetCardStateCountsParams) ([]GetCardStateCountsRow, error) {
+	rows, err := q.db.Query(ctx, getCardStateCounts, arg.UserID, arg.Lane)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCardStateCountsRow
+	for rows.Next() {
+		var i GetCardStateCountsRow
+		if err := rows.Scan(&i.Bucket, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getCardTotals = `-- name: GetCardTotals :one
+SELECT COUNT(DISTINCT species_code)      AS species,
+       COUNT(*)                          AS cards,
+       COALESCE(SUM(reps), 0)::bigint    AS reviews,
+       COALESCE(SUM(lapses), 0)::bigint  AS lapses
+FROM cards
+WHERE user_id = $1
+  AND lane = COALESCE($2, lane)
+`
+
+type GetCardTotalsParams struct {
+	UserID int64       `db:"user_id" json:"user_id"`
+	Lane   pgtype.Text `db:"lane" json:"lane"`
+}
+
+type GetCardTotalsRow struct {
+	Species int64 `db:"species" json:"species"`
+	Cards   int64 `db:"cards" json:"cards"`
+	Reviews int64 `db:"reviews" json:"reviews"`
+	Lapses  int64 `db:"lapses" json:"lapses"`
+}
+
+func (q *Queries) GetCardTotals(ctx context.Context, arg GetCardTotalsParams) (GetCardTotalsRow, error) {
+	row := q.db.QueryRow(ctx, getCardTotals, arg.UserID, arg.Lane)
+	var i GetCardTotalsRow
+	err := row.Scan(
+		&i.Species,
+		&i.Cards,
+		&i.Reviews,
+		&i.Lapses,
+	)
+	return i, err
+}
+
 const getDeckPracticeCards = `-- name: GetDeckPracticeCards :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,
        COALESCE(rec.file_path, '')     AS audio_url,
@@ -133,6 +215,115 @@ func (q *Queries) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]Get
 			&i.ImageUrl,
 			&i.ImageCredit,
 			&i.ImageID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getKnownCards = `-- name: GetKnownCards :many
+SELECT c.species_code, s.common_name, s.scientific_name, c.lane,
+       c.stability, c.due, c.last_review
+FROM cards c
+JOIN species s ON s.ebird_code = c.species_code
+WHERE c.user_id = $1
+  AND c.state = 2
+  AND c.lane = COALESCE($2, c.lane)
+`
+
+type GetKnownCardsParams struct {
+	UserID int64       `db:"user_id" json:"user_id"`
+	Lane   pgtype.Text `db:"lane" json:"lane"`
+}
+
+type GetKnownCardsRow struct {
+	SpeciesCode    string             `db:"species_code" json:"species_code"`
+	CommonName     string             `db:"common_name" json:"common_name"`
+	ScientificName string             `db:"scientific_name" json:"scientific_name"`
+	Lane           string             `db:"lane" json:"lane"`
+	Stability      float64            `db:"stability" json:"stability"`
+	Due            pgtype.Timestamptz `db:"due" json:"due"`
+	LastReview     pgtype.Timestamptz `db:"last_review" json:"last_review"`
+}
+
+// Stats: known cards with FSRS fields for retrievability math in Go.
+// "Known" here (state = 2) is intentionally equivalent to GetCardStateCounts'
+// known bucket: FSRS cannot produce state 2 with reps = 0, so the two
+// predicates cannot diverge. Keep them in sync if either changes.
+func (q *Queries) GetKnownCards(ctx context.Context, arg GetKnownCardsParams) ([]GetKnownCardsRow, error) {
+	rows, err := q.db.Query(ctx, getKnownCards, arg.UserID, arg.Lane)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetKnownCardsRow
+	for rows.Next() {
+		var i GetKnownCardsRow
+		if err := rows.Scan(
+			&i.SpeciesCode,
+			&i.CommonName,
+			&i.ScientificName,
+			&i.Lane,
+			&i.Stability,
+			&i.Due,
+			&i.LastReview,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getLaneGaps = `-- name: GetLaneGaps :many
+SELECT a.species_code, s.common_name, s.scientific_name,
+       CASE WHEN a.state = 2 THEN 'audio' ELSE 'image' END AS known_lane,
+       CASE WHEN a.state = 2 THEN 'image' ELSE 'audio' END AS weak_lane,
+       ABS(a.stability - i.stability)::float AS stability_gap
+FROM cards a
+JOIN cards i   ON i.user_id = a.user_id AND i.species_code = a.species_code AND i.lane = 'image'
+JOIN species s ON s.ebird_code = a.species_code
+WHERE a.user_id = $1
+  AND a.lane = 'audio'
+  AND ((a.state = 2 AND i.state <> 2) OR (i.state = 2 AND a.state <> 2))
+ORDER BY stability_gap DESC
+LIMIT 10
+`
+
+type GetLaneGapsRow struct {
+	SpeciesCode    string  `db:"species_code" json:"species_code"`
+	CommonName     string  `db:"common_name" json:"common_name"`
+	ScientificName string  `db:"scientific_name" json:"scientific_name"`
+	KnownLane      string  `db:"known_lane" json:"known_lane"`
+	WeakLane       string  `db:"weak_lane" json:"weak_lane"`
+	StabilityGap   float64 `db:"stability_gap" json:"stability_gap"`
+}
+
+// Stats: species known in exactly one lane, biggest stability gap first.
+func (q *Queries) GetLaneGaps(ctx context.Context, userID int64) ([]GetLaneGapsRow, error) {
+	rows, err := q.db.Query(ctx, getLaneGaps, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetLaneGapsRow
+	for rows.Next() {
+		var i GetLaneGapsRow
+		if err := rows.Scan(
+			&i.SpeciesCode,
+			&i.CommonName,
+			&i.ScientificName,
+			&i.KnownLane,
+			&i.WeakLane,
+			&i.StabilityGap,
 		); err != nil {
 			return nil, err
 		}

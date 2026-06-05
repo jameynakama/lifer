@@ -26,12 +26,23 @@ type Querier interface {
 	DeleteSpeciesByCode(ctx context.Context, ebirdCode string) error
 	DeleteSpeciesImagesBySpeciesCode(ctx context.Context, speciesCode string) error
 	GetCard(ctx context.Context, arg GetCardParams) (Card, error)
+	// Stats: per-card bucket counts. Buckets per the stats spec: not_seen = never
+	// reviewed; known = FSRS Review state; relearning = lapsed; else learning.
+	GetCardStateCounts(ctx context.Context, arg GetCardStateCountsParams) ([]GetCardStateCountsRow, error)
+	GetCardTotals(ctx context.Context, arg GetCardTotalsParams) (GetCardTotalsRow, error)
 	GetDeck(ctx context.Context, id int64) (Deck, error)
 	GetDeckPracticeCards(ctx context.Context, deckID int64) ([]GetDeckPracticeCardsRow, error)
 	GetDeckWithDue(ctx context.Context, arg GetDeckWithDueParams) (GetDeckWithDueRow, error)
 	GetDeckWithOwner(ctx context.Context, id int64) (GetDeckWithOwnerRow, error)
 	GetDecksForSpecies(ctx context.Context, arg GetDecksForSpeciesParams) ([]int64, error)
 	GetImageByID(ctx context.Context, macaulayID string) (GetImageByIDRow, error)
+	// Stats: known cards with FSRS fields for retrievability math in Go.
+	// "Known" here (state = 2) is intentionally equivalent to GetCardStateCounts'
+	// known bucket: FSRS cannot produce state 2 with reps = 0, so the two
+	// predicates cannot diverge. Keep them in sync if either changes.
+	GetKnownCards(ctx context.Context, arg GetKnownCardsParams) ([]GetKnownCardsRow, error)
+	// Stats: species known in exactly one lane, biggest stability gap first.
+	GetLaneGaps(ctx context.Context, userID int64) ([]GetLaneGapsRow, error)
 	GetNextDueAt(ctx context.Context, userID int64) (pgtype.Timestamptz, error)
 	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
 	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)

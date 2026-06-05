@@ -507,3 +507,203 @@ func TestListSpeciesCodesWithLockedMedia_ReturnsCodesFromBothTables(t *testing.T
 	assert.Contains(t, codes, "_tst1")
 	assert.NotContains(t, codes, "_tst2")
 }
+
+// mustSchedule drives a card to a given FSRS state by calling UpdateCardSchedule.
+// stability is set to 10 (a reasonable "known" value); due is set one day ahead.
+func mustSchedule(t *testing.T, q *store.Queries, userID int64, speciesCode, lane string, state int16) {
+	t.Helper()
+	due := pgtype.Timestamptz{}
+	require.NoError(t, due.Scan(time.Now().Add(24*time.Hour)))
+	_, err := q.UpdateCardSchedule(context.Background(), store.UpdateCardScheduleParams{
+		UserID:      userID,
+		SpeciesCode: speciesCode,
+		Lane:        lane,
+		Stability:   10,
+		Difficulty:  5,
+		Due:         due,
+		Lapses:      0,
+		State:       state,
+	})
+	require.NoError(t, err)
+}
+
+// laneFilter returns a pgtype.Text suitable for use as a lane filter param.
+func laneFilter(lane string) pgtype.Text {
+	return pgtype.Text{String: lane, Valid: true}
+}
+
+// GetCardStateCounts
+
+func TestGetCardStateCounts_Buckets(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// seedFixtures creates audio+image cards with reps=0 (not_seen).
+	// Drive audio to Review (state=2) → becomes "known".
+	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+
+	rows, err := q.GetCardStateCounts(context.Background(), store.GetCardStateCountsParams{
+		UserID: f.userID,
+	})
+	require.NoError(t, err)
+
+	buckets := make(map[string]int64)
+	for _, r := range rows {
+		buckets[r.Bucket] = r.Count
+	}
+	assert.Equal(t, int64(1), buckets["known"], "Should count audio card in known bucket")
+	assert.GreaterOrEqual(t, buckets["not_seen"], int64(1), "Should count image card in not_seen bucket")
+}
+
+func TestGetCardStateCounts_LaneFilter(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// Drive audio to Review; image stays not_seen.
+	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+
+	rows, err := q.GetCardStateCounts(context.Background(), store.GetCardStateCountsParams{
+		UserID: f.userID,
+		Lane:   laneFilter("image"),
+	})
+	require.NoError(t, err)
+
+	buckets := make(map[string]int64)
+	for _, r := range rows {
+		buckets[r.Bucket] = r.Count
+	}
+	assert.NotContains(t, buckets, "known", "Should not see the audio review through the image filter")
+	assert.GreaterOrEqual(t, buckets["not_seen"], int64(1), "Should see not_seen for image lane")
+}
+
+// GetCardTotals
+
+func TestGetCardTotals(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// One review on audio card (reps increments to 1 in UpdateCardSchedule SQL).
+	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+
+	totals, err := q.GetCardTotals(context.Background(), store.GetCardTotalsParams{
+		UserID: f.userID,
+	})
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, totals.Species, int64(1), "Should count at least one species")
+	assert.GreaterOrEqual(t, totals.Cards, int64(1), "Should count at least one card")
+	assert.GreaterOrEqual(t, totals.Reviews, int64(1), "Should count at least one review")
+}
+
+// GetKnownCards
+
+func TestGetKnownCards_OnlyReviewState(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// Drive audio to Review; image stays not_seen (reps=0, state=0).
+	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+
+	known, err := q.GetKnownCards(context.Background(), store.GetKnownCardsParams{
+		UserID: f.userID,
+	})
+	require.NoError(t, err)
+
+	require.Len(t, known, 1, "Should return exactly one known card")
+	assert.Equal(t, "_tst1", known[0].SpeciesCode, "Should return the correct species")
+	assert.Equal(t, "audio", known[0].Lane, "Should return the audio lane")
+	assert.Equal(t, float64(10), known[0].Stability, "Should round-trip stability")
+}
+
+func TestGetKnownCards_NotSeenCardExcluded(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// No scheduling — both cards remain not_seen.
+
+	known, err := q.GetKnownCards(context.Background(), store.GetKnownCardsParams{
+		UserID: f.userID,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, known, "Should return no cards when none have been reviewed to state=2")
+}
+
+// GetLaneGaps
+
+func TestGetLaneGaps_OneLaneKnown(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// Audio known, image stays not_seen → should produce one gap row.
+	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+
+	gaps, err := q.GetLaneGaps(context.Background(), f.userID)
+	require.NoError(t, err)
+
+	require.Len(t, gaps, 1, "Should return one gap row when only audio is known")
+	assert.Equal(t, "_tst1", gaps[0].SpeciesCode)
+	assert.Equal(t, "audio", gaps[0].KnownLane, "Should identify audio as known lane")
+	assert.Equal(t, "image", gaps[0].WeakLane, "Should identify image as weak lane")
+}
+
+func TestGetLaneGaps_BothLanesKnown_NoGap(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// Both lanes known → should NOT appear in gaps.
+	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+	mustSchedule(t, q, f.userID, "_tst1", "image", 2)
+
+	gaps, err := q.GetLaneGaps(context.Background(), f.userID)
+	require.NoError(t, err)
+	assert.Empty(t, gaps, "Should return no gaps when both lanes are known")
+}
+
+func TestGetLaneGaps_ImageKnown_AudioWeak(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// Image known, audio stays not_seen → one gap with the reversed lanes.
+	mustSchedule(t, q, f.userID, "_tst1", "image", 2)
+
+	gaps, err := q.GetLaneGaps(context.Background(), f.userID)
+	require.NoError(t, err)
+
+	require.Len(t, gaps, 1, "Should return one gap row when only image is known")
+	assert.Equal(t, "_tst1", gaps[0].SpeciesCode)
+	assert.Equal(t, "image", gaps[0].KnownLane, "Should identify image as known lane")
+	assert.Equal(t, "audio", gaps[0].WeakLane, "Should identify audio as weak lane")
+}
+
+// GetCardTotals lane filter
+
+func TestGetCardTotals_LaneFilter(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// One review on audio card only.
+	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+
+	// Image-lane filter should report zero reviews.
+	imageTotals, err := q.GetCardTotals(context.Background(), store.GetCardTotalsParams{
+		UserID: f.userID,
+		Lane:   laneFilter("image"),
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(0), imageTotals.Reviews, "Should report zero reviews when filtering to image lane")
+
+	// Combined (no filter) should show the audio review.
+	allTotals, err := q.GetCardTotals(context.Background(), store.GetCardTotalsParams{
+		UserID: f.userID,
+	})
+	require.NoError(t, err)
+	assert.GreaterOrEqual(t, allTotals.Reviews, int64(1), "Should count the audio review in combined totals")
+}
