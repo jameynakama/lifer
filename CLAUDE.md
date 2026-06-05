@@ -28,6 +28,7 @@ Spaced repetition web app for bird song/call and image ID practice. Hear a recor
 - `deck_species` -- join table; PK `(deck_id, species_code)`
 - `cards` -- user × species × lane with FSRS fields; UNIQUE `(user_id, species_code, lane)`
 - `user_species_preferences` -- per-user audio/image lane toggles per species
+- `review_log` -- one row per quiz answer: rating, `guessed_species_code` (NULL = "I don't know"; SET NULL on species delete), `media_id` (xeno-canto/macaulay ID shown, deliberately no FK), reviewed_at. Written in the same tx as the FSRS card update; feeds `/stats`
 
 Natural text keys on species/recordings/images are stable across DB resets -- re-ingesting into a fresh DB produces identical IDs, so cards/deck memberships survive. Cards are user-scoped; the species catalog is global.
 
@@ -56,28 +57,28 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Credit/attribution for eBird, Xeno-canto (CC-licensed recordings), Macaulay Library photos
 - Link to source repos / contact
 
-### 5. Stats page (`/stats`)
-- Per-user aggregate stats pulled from `cards` table: total reviews, correct rate, cards by FSRS state (new/learning/review/relearning)
-- Needs a new backend endpoint (e.g. `GET /api/v1/stats`) -- no new schema required
-- Possible charts: reviews over time, due forecast, accuracy by deck or species
+### 5. species.family backfill in prod
+- `species.family` (eBird `familyComName`, feeds the stats "By family" panel) is populated by ingest's `UpsertSpecies` -- but only for species that get processed, and `--skip-complete` filters species out BEFORE the upsert runs
+- Backfill = run `just ingest US-OR` WITHOUT `--skip-complete` (R2 `Exists` checks make media work cheap) against each DB that needs it. **Order matters in prod: deploy (migration 004) must land before ingesting** -- the new upsert writes `family` and errors on an unmigrated DB. Until then the family panel is empty
 
 ## Key non-obvious choices
 - OAuth state stored as short-lived cookie (5min) to prevent CSRF -- verified on callback
 - `UpsertUser` updates name/picture on every login so Google profile changes sync
 - SvelteKit mounts into `<div style="display: contents">` -- `#app` CSS is dead; use `.app-container` in `+layout.svelte`
 - WaveSurfer: CDN URLs may lack CORS headers. Pass `media: audio` (native `<audio>`, no XHR) + fake `peaks` so bars draw immediately
-- Quiz auto-rating: no self-reporting; `correct ? 3 : 1` posted to `/rate`. Correct = `selected.ebird_code === card.ebird_code`
-- R2 ingest workflow: ingest locally (writes to shared R2 bucket) → dump DB → restore in prod. No per-environment media copies
+- Quiz auto-rating: no self-reporting; `correct ? 3 : 1` posted to `/rate` along with `guessed_species_code` (null = skip) and `media_id` -- both optional so old clients keep working
+- `/stats` is computed live per request (every query `WHERE user_id`); lane tabs are `?lane=` on the same endpoint, ear-vs-eye exists only on the combined view. FSRS retrievability via go-fsrs `GetRetrievability` (package-level `statsFSRS`), so stats use the exact scheduler curve
+- R2 ingest workflow: ingest runs from the laptop against whichever DB `DATABASE_URL` points at (these days usually prod directly); media goes to the one shared R2 bucket either way. No per-environment media copies
 - TanStack Query v6: `createQuery(() => ({...}))` -- options wrapped in a function so Svelte 5 rune reads are tracked. Returns a reactive object (not a store) -- access `.data`/`.isPending` without `$`. Same pattern for `createMutation`
 - `GET /api/v1/species` pagination: `next`/`previous` are absolute URLs built from `r.Host` + `X-Forwarded-Proto`; `count` via `COUNT(*) OVER()` window function
 - `GET /api/v1/species/all` (unpaginated) feeds all client-side filtering: TanStack key `['species', 'all']`, `staleTime: Infinity`, fetched once per session, shared by Explore and deck typeahead. If the catalog outgrows regional scale, revert to the server-side paginated search (still in place)
 - Admin routes: backend `requireAdmin` middleware + `/admin/+layout.svelte` redirects to `/` if `!$auth?.is_admin`. Toggle admin via `PATCH /api/v1/admin/users/{id}`
 
 ## Known issues (deferred)
-- **OAuth + installed Chrome PWA (mostly fixed)** -- per-flow `oauth_state_<state>` cookies (deleted on first use) fixed same-profile clobbering, and state failures now redirect to `/?error=auth_state` instead of white-screening. Remaining edge: PWA in a *different* Chrome profile (different cookie jar) still fails the state check, but now lands gracefully on the login page. The login page doesn't yet display the `error` param. If it resurfaces: the callback logs whether the cookie was missing (different profile) vs mismatched.
+- **OAuth + installed Chrome PWA (mostly fixed)** -- per-flow `oauth_state_<state>` cookies (deleted on first use) fixed same-profile clobbering, and state failures now redirect to `/?error=auth_state` instead of white-screening. Remaining edge: PWA in a *different* Chrome profile (different cookie jar) still fails the state check, but lands on the login page, which displays a "sign-in didn't complete" notice from the `error` param. If it resurfaces: the callback logs whether the cookie was missing (different profile) vs mismatched.
 
 ## Ingest workflow
-Ingest locally (writes to shared R2 bucket) → `pg_dump $DATABASE_URL | psql $PROD_DATABASE_URL`. See `just ingest --help` for flags (`--species`, `--skip-complete`, `--max-recordings`).
+Run from the laptop with `DATABASE_URL` pointed at the target DB (commonly prod directly; the old `pg_dump | psql` dump→restore also works). Media lands in the shared R2 bucket regardless. See `just ingest --help` for flags (`--species`, `--skip-complete`, `--max-recordings`). Ctrl+c cancels in-flight work cleanly.
 
 XC taxonomy overrides: when XC uses a different genus than eBird, run full ingest first -- the MISSING MEDIA report lists affected species -- then re-run with `--xc-override "code=Genus:species"`.
 
