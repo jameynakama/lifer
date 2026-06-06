@@ -30,7 +30,8 @@ function makeFetch(overrides: Record<string, unknown> = {}) {
       return Promise.resolve({ ok: true, status: 204 })
     }
     if (opts?.method === 'POST') {
-      return Promise.resolve({ ok: true, json: () => Promise.resolve({}) })
+      // Match the real backend: 201 Created with an empty body
+      return Promise.resolve(new Response(null, { status: 201 }))
     }
     if (
       opts?.method === 'PUT' &&
@@ -189,6 +190,38 @@ describe('Deck detail page', () => {
     await vi.waitFor(() => {
       expect(screen.getByDisplayValue('fox')).toBeInTheDocument()
       expect(screen.getAllByText(/fox sparrow/i).length).toBeGreaterThan(0)
+    })
+  })
+
+  it('adds the species to the deck list in place when Add is clicked', async () => {
+    const foxSparrow = {
+      ebird_code: 'foxspa',
+      common_name: 'Fox Sparrow',
+      scientific_name: 'Passerella iliaca',
+      image_url: null,
+    }
+    const { createQuery } = await import('@tanstack/svelte-query')
+    vi.mocked(createQuery).mockReturnValue(
+      queryResult({
+        data: [foxSparrow],
+        isPending: false,
+        isError: false,
+      }),
+    )
+    vi.stubGlobal('fetch', makeFetch())
+    render(DeckDetailPage)
+    await vi.waitFor(() => screen.getByPlaceholderText(/search species/i))
+    await fireEvent.input(screen.getByPlaceholderText(/search species/i), {
+      target: { value: 'fox' },
+    })
+    await vi.waitFor(() => screen.getByRole('button', { name: /^add$/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /^add$/i }))
+    await vi.waitFor(() => {
+      // species row appears in the deck list (Remove button) without a refresh
+      expect(screen.getAllByRole('button', { name: /remove/i }).length).toBeGreaterThan(1)
+      // and the search row flips from Add to Added
+      expect(screen.getByText(/added/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^add$/i })).toBeNull()
     })
   })
 

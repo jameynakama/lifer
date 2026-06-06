@@ -161,20 +161,19 @@
     } catch {
       return
     }
-    {
-      const added = searchResults.find((s) => s.ebird_code === ebirdCode)
-      if (added)
-        deckSpecies = [
-          ...deckSpecies,
-          {
-            ebird_code: added.ebird_code,
-            common_name: added.common_name,
-            scientific_name: added.scientific_name,
-            audio_enabled: true,
-            image_enabled: true,
-          },
-        ]
-    }
+    const added = (allSpeciesQuery.data ?? []).find((s) => s.ebird_code === ebirdCode)
+    if (added)
+      deckSpecies = [
+        ...deckSpecies,
+        {
+          ebird_code: added.ebird_code,
+          common_name: added.common_name,
+          scientific_name: added.scientific_name,
+          audio_enabled: true,
+          image_enabled: true,
+        },
+      ]
+    invalidateDecks()
   }
 
   async function deleteDeck() {

@@ -44,7 +44,9 @@ async function request<T>(method: string, url: string, body?: unknown): Promise<
   if (res.status === 204) {
     return undefined as T
   }
-  return (await res.json()) as T
+  // Some success responses have no body (e.g. 201 from POST /decks/{id}/species).
+  // res.json() rejects on an empty body -- treat that as "no payload", not failure.
+  return (await res.json().catch(() => undefined)) as T
 }
 
 export const apiGet = <T>(url: string): Promise<T> => request<T>('GET', url)

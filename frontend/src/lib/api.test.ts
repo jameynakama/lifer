@@ -91,6 +91,15 @@ describe('apiPost', () => {
 
     expect(data).toBeUndefined()
   })
+
+  it('should return undefined for a 201 with an empty body', async () => {
+    // POST /decks/{id}/species replies 201 Created with no body
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 201 })))
+
+    const data = await apiPost('/api/v1/decks/3/species', { ebird_code: 'amerob' })
+
+    expect(data).toBeUndefined()
+  })
 })
 
 describe('apiPut / apiPatch / apiDelete', () => {
