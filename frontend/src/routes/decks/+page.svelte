@@ -50,6 +50,7 @@
         ...prev,
         decks: [...(prev?.decks ?? []), { ...created, audio_due: 0, image_due: 0 }],
       }))
+      queryClient.invalidateQueries({ queryKey: queryKeys.decks })
     } catch {
       // creation failed; form stays filled for retry
       return
