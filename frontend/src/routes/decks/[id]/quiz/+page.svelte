@@ -6,6 +6,7 @@
   import { queryKeys } from '$lib/queries'
   import type { BirdCard, Species } from '../../../../types'
   import QuizSession from '$components/QuizSession.svelte'
+  import SessionConfetti from '$components/SessionConfetti.svelte'
 
   let deckId = $derived(page.params.id)
   let lane: 'audio' | 'image' = $derived(
@@ -109,6 +110,7 @@
     onRetry={fetchNext}
   >
     {#snippet doneScreen()}
+      <SessionConfetti />
       <div class="done">
         <p class="done-icon">🎉</p>
         <p class="done-title">All caught up!</p>

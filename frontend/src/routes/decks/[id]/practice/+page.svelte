@@ -4,6 +4,7 @@
   import { apiGet } from '$lib/api'
   import type { BirdCard, Species, Stat } from '../../../../types'
   import QuizSession from '$components/QuizSession.svelte'
+  import SessionConfetti from '$components/SessionConfetti.svelte'
 
   let deckId = $derived(page.params.id)
   let lane: 'audio' | 'image' = $derived(
@@ -100,6 +101,7 @@
           <button onclick={() => goto(`/decks/${deckId}`)}>Back to Deck</button>
         </div>
       {:else}
+        <SessionConfetti />
         <div class="done">
           <p class="done-icon">🎉</p>
           <p class="done-title">All done!</p>

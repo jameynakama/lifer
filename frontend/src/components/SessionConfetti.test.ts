@@ -1,12 +1,5 @@
 import { vi, describe, it, expect, afterEach } from 'vitest'
 import { render } from '@testing-library/svelte'
-
-vi.mock('canvas-confetti', () => ({
-  default: Object.assign(vi.fn(), {
-    shapeFromText: vi.fn().mockReturnValue({ type: 'text' }),
-  }),
-}))
-
 import confetti from 'canvas-confetti'
 import SessionConfetti from './SessionConfetti.svelte'
 
