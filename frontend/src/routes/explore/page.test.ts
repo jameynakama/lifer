@@ -8,6 +8,7 @@ vi.mock('@tanstack/svelte-query', async (importOriginal) => {
   return {
     ...actual,
     createQuery: vi.fn(),
+    useQueryClient: vi.fn().mockReturnValue({ invalidateQueries: vi.fn() }),
   }
 })
 

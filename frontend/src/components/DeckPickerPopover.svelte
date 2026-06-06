@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { useQueryClient } from '@tanstack/svelte-query'
   import { apiPost } from '$lib/api'
-  import { createDecksQuery, queryKeys } from '$lib/queries'
+  import { createDecksQuery } from '$lib/queries'
   import type { Deck } from '../types'
   import DeckCreateForm from './DeckCreateForm.svelte'
 
@@ -11,7 +10,6 @@
   }
   let { onPick, onClose }: Props = $props()
 
-  const queryClient = useQueryClient()
   const decksQuery = createDecksQuery()
 
   const decks = $derived(decksQuery.data?.decks ?? [])
@@ -19,7 +17,6 @@
 
   async function createAndPick(name: string) {
     const deck = await apiPost<Deck>('/api/v1/decks', { name })
-    queryClient.invalidateQueries({ queryKey: queryKeys.decks })
     onPick(deck.id)
   }
 </script>

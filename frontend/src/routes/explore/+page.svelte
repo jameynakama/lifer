@@ -1,6 +1,6 @@
 <script lang="ts">
   import { SvelteSet } from 'svelte/reactivity'
-  import { createQuery } from '@tanstack/svelte-query'
+  import { createQuery, useQueryClient } from '@tanstack/svelte-query'
   import { apiGet, apiPost } from '$lib/api'
   import { queryKeys } from '$lib/queries'
   import type { SpeciesListItem } from '../../types'
@@ -10,6 +10,8 @@
   import DeckPickerPopover from '$components/DeckPickerPopover.svelte'
 
   const defaultLimit = 20
+
+  const queryClient = useQueryClient()
 
   let q = $state('')
   let offset = $state(0)
@@ -58,6 +60,7 @@
     showDeckPicker = false
     const codes = [...selectedCodes]
     await apiPost(`/api/v1/decks/${deckId}/species/bulk`, { species_codes: codes }).catch(() => {})
+    queryClient.invalidateQueries({ queryKey: queryKeys.decks })
     clearSelection()
   }
 </script>
