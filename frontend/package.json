@@ -41,6 +41,7 @@
   },
   "dependencies": {
     "@tanstack/svelte-query": "^6.1.33",
+    "canvas-confetti": "^1.9.4",
     "wavesurfer.js": "^7.12.7"
   }
 }
