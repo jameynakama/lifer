@@ -76,11 +76,13 @@
     background: rgba(20, 83, 45, 0.15);
     color: #14532d;
     border: 1px solid rgba(20, 83, 45, 0.3);
+    animation: popIn 280ms ease-out;
   }
   .result-banner.incorrect {
     background: rgba(127, 29, 29, 0.15);
     color: #7f1d1d;
     border: 1px solid rgba(127, 29, 29, 0.3);
+    animation: shake 340ms ease-out;
   }
   :global([data-theme='dark']) .result-banner.correct {
     background: rgba(20, 83, 45, 0.25);
@@ -125,6 +127,7 @@
     object-fit: cover;
     object-position: center top;
     display: block;
+    animation: photoReveal 350ms ease-out;
   }
   .species-info {
     padding: 0.875rem 1rem;
@@ -153,5 +156,25 @@
   }
   .btn-next:active {
     opacity: 0.85;
+  }
+
+  @keyframes popIn {
+    0%   { transform: scale(0.88); }
+    60%  { transform: scale(1.05); }
+    100% { transform: scale(1.0); }
+  }
+
+  @keyframes shake {
+    0%   { transform: translateX(0); }
+    20%  { transform: translateX(-8px); }
+    40%  { transform: translateX(7px); }
+    60%  { transform: translateX(-5px); }
+    80%  { transform: translateX(4px); }
+    100% { transform: translateX(0); }
+  }
+
+  @keyframes photoReveal {
+    from { transform: scale(1.07); opacity: 0.6; }
+    to   { transform: scale(1.0);  opacity: 1; }
   }
 </style>
