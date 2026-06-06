@@ -121,7 +121,7 @@
           </p>
         {/if}
         <p class="done-sub">Come back later when more cards are due.</p>
-        <button class="btn-primary" onclick={() => goto(`/decks/${deckId}`)}>Back to deck</button>
+        <button class="btn-primary" onclick={() => goto('/')}>Back to home</button>
       </div>
     {/snippet}
   </QuizSession>

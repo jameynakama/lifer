@@ -137,12 +137,12 @@ describe('Quiz page', () => {
     })
   })
 
-  it('navigates to deck detail when Back to deck is clicked', async () => {
+  it('navigates to home when Back to home is clicked', async () => {
     vi.stubGlobal('fetch', makeFetch({ status: 204 }))
     renderWithClient(QuizPage)
-    await vi.waitFor(() => screen.getByRole('button', { name: /back to deck/i }))
-    await fireEvent.click(screen.getByRole('button', { name: /back to deck/i }))
-    expect(goto).toHaveBeenCalledWith('/decks/42')
+    await vi.waitFor(() => screen.getByRole('button', { name: /back to home/i }))
+    await fireEvent.click(screen.getByRole('button', { name: /back to home/i }))
+    expect(goto).toHaveBeenCalledWith('/')
   })
 
   it('passes correct=true to RevealCard when selected species matches card', async () => {
