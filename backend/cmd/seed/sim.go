@@ -13,6 +13,10 @@ const (
 	endAccuracy   = 0.90
 	skipDayOdds   = 1.0 / 7.0 // "regular-ish": about one missed day a week
 	dontKnowOdds  = 0.15      // fraction of wrong answers that are skips
+	// Anki-style introduction cap: at most this many never-seen cards enter
+	// a session. Without it every card starts on day 0 and the whole deck
+	// graduates in lockstep -- no human meets 60 new birds in one sitting.
+	newCardsPerDay = 8
 )
 
 // accuracyOn ramps linearly from startAccuracy on day 0 to endAccuracy on

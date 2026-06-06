@@ -91,8 +91,19 @@ func runSeed(ctx context.Context, pool *pgxpool.Pool, userID int64, days int, rn
 			return res, err
 		}
 
-		for i, c := range cards {
-			at := sessionStart.Add(time.Duration(i*20+rng.Intn(15)) * time.Second)
+		introduced := 0
+		reviewed := 0
+		for _, c := range cards {
+			// Cap introductions: previously-seen due cards always replay,
+			// but only newCardsPerDay never-seen cards join per session.
+			if c.Reps == 0 {
+				if introduced >= newCardsPerDay {
+					continue
+				}
+				introduced++
+			}
+			at := sessionStart.Add(time.Duration(reviewed*20+rng.Intn(15)) * time.Second)
+			reviewed++
 			correct := rng.Float64() < accuracyOn(day, days)
 
 			var guess *string

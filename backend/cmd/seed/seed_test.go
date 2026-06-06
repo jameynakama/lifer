@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -149,4 +150,74 @@ func TestRunSeed_NoDeckSpecies_Errors(t *testing.T) {
 	_, err := runSeed(ctx, pool, userID, 3, rand.New(rand.NewSource(1)), time.Now())
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "clone a preset deck")
+}
+
+// seedManySpeciesFixtures inserts a user with one deck holding n same-family
+// species, each with a recording and an image, and registers cleanup.
+func seedManySpeciesFixtures(t *testing.T, pool *pgxpool.Pool, n int) (userID int64) {
+	t.Helper()
+	ctx := context.Background()
+
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO users (google_id, email, name, picture)
+		 VALUES ('_seed_gid3', '_seed3@example.com', 'Seed Caps', '')
+		 RETURNING id`).Scan(&userID))
+
+	var deckID int64
+	require.NoError(t, pool.QueryRow(ctx,
+		`INSERT INTO decks (name, description, owner_id)
+		 VALUES ('_seed caps deck', '', $1) RETURNING id`, userID).Scan(&deckID))
+
+	for i := range n {
+		code := fmt.Sprintf("_sc%d", i)
+		_, err := pool.Exec(ctx,
+			`INSERT INTO species (ebird_code, common_name, scientific_name, family)
+			 VALUES ($1, $2, $3, 'Seed Caps') ON CONFLICT DO NOTHING`,
+			code, fmt.Sprintf("Cap Bird %d", i), fmt.Sprintf("Capus birdus%d", i))
+		require.NoError(t, err)
+		_, err = pool.Exec(ctx,
+			`INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type, credit)
+			 VALUES ($1, $2, $3, 'A', 'song', 'test') ON CONFLICT DO NOTHING`,
+			fmt.Sprintf("_scxc%d", i), code, fmt.Sprintf("placeholder://sc%d.mp3", i))
+		require.NoError(t, err)
+		_, err = pool.Exec(ctx,
+			`INSERT INTO species_images (macaulay_id, species_code, file_path, credit)
+			 VALUES ($1, $2, $3, 'test') ON CONFLICT DO NOTHING`,
+			fmt.Sprintf("_scml%d", i), code, fmt.Sprintf("placeholder://sc%d.jpg", i))
+		require.NoError(t, err)
+		_, err = pool.Exec(ctx,
+			`INSERT INTO deck_species (deck_id, species_code) VALUES ($1, $2)`, deckID, code)
+		require.NoError(t, err)
+	}
+
+	t.Cleanup(func() {
+		_, _ = pool.Exec(ctx, `DELETE FROM review_log WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(ctx, `DELETE FROM cards WHERE user_id = $1`, userID)
+		_, _ = pool.Exec(ctx, `DELETE FROM decks WHERE id = $1`, deckID)
+		_, _ = pool.Exec(ctx, `DELETE FROM users WHERE id = $1`, userID)
+		_, _ = pool.Exec(ctx, `DELETE FROM species_recordings WHERE species_code LIKE '\_sc%'`)
+		_, _ = pool.Exec(ctx, `DELETE FROM species_images WHERE species_code LIKE '\_sc%'`)
+		_, _ = pool.Exec(ctx, `DELETE FROM species WHERE ebird_code LIKE '\_sc%'`)
+	})
+
+	return userID
+}
+
+func TestRunSeed_CapsNewCardsPerDay(t *testing.T) {
+	pool := connectSeedTestPool(t)
+	ctx := context.Background()
+	userID := seedManySpeciesFixtures(t, pool, 10) // 10 species => 20 cards
+
+	// One un-skipped day (seed 7's first draw doesn't skip); only
+	// newCardsPerDay cards may be introduced in a single session.
+	res, err := runSeed(ctx, pool, userID, 1, rand.New(rand.NewSource(7)), time.Now())
+	require.NoError(t, err)
+	require.Equal(t, int64(20), res.Seeded)
+	require.Equal(t, 0, res.Skipped, "seed 7 must not skip the only day; pick another seed if rng use changes")
+
+	assert.Equal(t, newCardsPerDay, res.Reviews,
+		"a single session must introduce at most newCardsPerDay cards")
+	assert.Equal(t, 20-newCardsPerDay, countOne(t, pool,
+		`SELECT COUNT(*) FROM cards WHERE user_id = $1 AND reps = 0`, userID),
+		"unintroduced cards stay not-seen")
 }
