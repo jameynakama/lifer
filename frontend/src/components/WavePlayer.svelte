@@ -10,11 +10,12 @@
   let playing = $state(false)
   let ready = $state(false)
 
-  // WaveSurfer's default mode fetches the audio via XHR to decode waveform peaks.
-  // External audio URLs (xeno-canto CDN) don't have CORS headers, so that fetch
-  // fails. Instead: hand WaveSurfer a native <audio> element (loaded by the
-  // browser without CORS restrictions) and supply pre-generated peaks so it
-  // never needs to XHR-fetch anything.
+  // WaveSurfer's default mode fetches the audio via XHR to decode waveform peaks,
+  // which requires CORS headers our R2 bucket (media.flockdeck.com) doesn't
+  // currently send. So we skip the decode entirely: hand WaveSurfer a native
+  // <audio> element (loaded by the browser without CORS restrictions) and supply
+  // pre-generated peaks. These bars are cosmetic, not the real waveform -- see
+  // "Real audio waveforms" in CLAUDE.md for the precomputed-peaks plan.
   function generatePeaks(count: number): number[][] {
     return [
       Array.from({ length: count }, (_, i) => {

@@ -57,6 +57,13 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Credit/attribution for eBird, Xeno-canto (CC-licensed recordings), Macaulay Library photos
 - Link to source repos / contact
 
+### 5. Real audio waveforms (precomputed peaks)
+- Today `WavePlayer.svelte` draws *fake* peaks (`generatePeaks()`) -- cosmetic only. Real waveforms would make the player a navigation tool: scrub to a distinct phrase, or skip past the 3 background birds most XC recordings carry
+- Approach: precompute peaks at ingest (BBC `audiowaveform` or ffmpeg downsample) → store a small float array per recording (DB column or `.json` sidecar in R2) → serve with the card → hand to WaveSurfer's `peaks`. Keeps the instant draw AND native `<audio>` playback (no CORS needed)
+- Rejected alternative: enable CORS on R2 and let WaveSurfer fetch+decode client-side. Easier, zero BE work, but forces a full-file download + decode before drawing on *every* quiz card -- regresses the snappy card-to-card flip for accuracy nobody reads on a 4s clip. Precompute is the only option strictly better than today
+- Note: media is R2-owned (`media.flockdeck.com`), so CORS is fully ours to configure -- the WaveSurfer comment blaming "xeno-canto CDN" is stale
+- Backfill: existing recordings need a one-off peaks-extraction pass
+
 ## Key non-obvious choices
 - OAuth state stored as short-lived cookie (5min) to prevent CSRF -- verified on callback
 - `UpsertUser` updates name/picture on every login so Google profile changes sync
