@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -947,4 +948,60 @@ func TestCountReviewsSince(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), audioN)
+}
+
+// seedManyAudioSpecies adds n extra audio species to the deck, each with a
+// quiz-quality recording and a card due NOW(). Because they're inserted in one
+// transaction they all share an identical `due` timestamp -- the tie that
+// GetNextDueCard must shuffle rather than resolve deterministically.
+func seedManyAudioSpecies(t *testing.T, tx pgx.Tx, f fixtures, n int) {
+	t.Helper()
+	ctx := context.Background()
+	for i := 0; i < n; i++ {
+		code := fmt.Sprintf("_many%d", i)
+		_, err := tx.Exec(ctx,
+			`INSERT INTO species (ebird_code, common_name, scientific_name)
+			 VALUES ($1, $2, 'Manyus testus')`, code, "Many "+code)
+		require.NoError(t, err)
+		_, err = tx.Exec(ctx,
+			`INSERT INTO deck_species (deck_id, species_code) VALUES ($1, $2)`, f.deckID, code)
+		require.NoError(t, err)
+		_, err = tx.Exec(ctx,
+			`INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type, credit)
+			 VALUES ($1, $2, 'https://r2.example.com/rec.mp3', 'A', 'song', 'tester')`,
+			"_xc"+code, code)
+		require.NoError(t, err)
+		_, err = tx.Exec(ctx,
+			`INSERT INTO cards (user_id, species_code, lane) VALUES ($1, $2, 'audio')`, f.userID, code)
+		require.NoError(t, err)
+	}
+}
+
+// GetNextDueCard must not present tied-due cards in a fixed order: a fresh deck
+// seeds every card with the same `due`, and a deterministic tiebreak made the
+// quiz replay the identical species sequence every session. We bucket due by
+// minute and randomise within the bucket, so repeated draws should surface
+// more than one species.
+func TestGetNextDueCard_ShufflesTiedDueCards(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	seedManyAudioSpecies(t, tx, f, 8)
+	q := store.New(tx)
+
+	seen := map[string]struct{}{}
+	for i := 0; i < 25; i++ {
+		card, err := q.GetNextDueCard(context.Background(), store.GetNextDueCardParams{
+			UserID: f.userID,
+			DeckID: f.deckID,
+			Lane:   "audio",
+		})
+		require.NoError(t, err)
+		seen[card.SpeciesCode] = struct{}{}
+	}
+
+	// 9 tied audio species, 25 draws: a fixed order yields exactly 1 distinct
+	// species. Random-within-bucket makes all-same astronomically unlikely.
+	assert.Greater(t, len(seen), 1,
+		"GetNextDueCard returned the same species on every draw -- tied due cards are not being shuffled")
 }

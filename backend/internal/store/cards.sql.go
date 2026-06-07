@@ -456,7 +456,7 @@ WHERE c.user_id = $1
       SELECT 1 FROM species_images si
       WHERE si.species_code = c.species_code))
   )
-ORDER BY c.due
+ORDER BY date_trunc('minute', c.due), random()
 LIMIT 1
 `
 
@@ -485,6 +485,11 @@ type GetNextDueCardRow struct {
 	DueRemaining   int64              `db:"due_remaining" json:"due_remaining"`
 }
 
+// Bucket due-time by the minute, then shuffle within the bucket. A fresh deck
+// seeds every card with an identical `due`; a plain `ORDER BY c.due` left the
+// tiebreak to the scan order, so the quiz replayed the same species sequence
+// every session. Minute granularity keeps FSRS's 1-10min learning steps in
+// order while randomising the (always-tied) fresh cards.
 func (q *Queries) GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error) {
 	row := q.db.QueryRow(ctx, getNextDueCard,
 		arg.UserID,

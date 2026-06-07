@@ -59,6 +59,11 @@ type Querier interface {
 	// Stats: species known in exactly one lane, biggest stability gap first.
 	GetLaneGaps(ctx context.Context, userID int64) ([]GetLaneGapsRow, error)
 	GetNextDueAt(ctx context.Context, userID int64) (pgtype.Timestamptz, error)
+	// Bucket due-time by the minute, then shuffle within the bucket. A fresh deck
+	// seeds every card with an identical `due`; a plain `ORDER BY c.due` left the
+	// tiebreak to the scan order, so the quiz replayed the same species sequence
+	// every session. Minute granularity keeps FSRS's 1-10min learning steps in
+	// order while randomising the (always-tied) fresh cards.
 	GetNextDueCard(ctx context.Context, arg GetNextDueCardParams) (GetNextDueCardRow, error)
 	GetPreferences(ctx context.Context, arg GetPreferencesParams) (UserSpeciesPreference, error)
 	// GetRandomMediaForSpecies picks a random quiz-quality recording and a random
