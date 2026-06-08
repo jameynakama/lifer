@@ -29,11 +29,11 @@ type Querier interface {
 	DeleteSpeciesByCode(ctx context.Context, ebirdCode string) error
 	DeleteSpeciesImagesBySpeciesCode(ctx context.Context, speciesCode string) error
 	GetCard(ctx context.Context, arg GetCardParams) (Card, error)
-	// Stats: per-card bucket counts. Buckets per the stats spec: not_seen = never
-	// reviewed; known = FSRS Review state; relearning = lapsed; else learning.
-	// Preference-disabled lanes are excluded to match GetNextDueCard: a lane the
-	// user toggled off is never served, so its cards stay reps = 0 forever and
-	// would otherwise haunt the progress bar as permanent, unclearable not_seen.
+	// Stats: per-card mastery tier counts. Tiers are stability-based bird life-cycle
+	// stages (see api/tiers.go for the matching Go constants). Preference-disabled
+	// lanes are excluded to match GetNextDueCard: a lane the user toggled off is
+	// never served, so its cards stay reps = 0 forever and would otherwise haunt
+	// the progress bar as permanent, unclearable eggs.
 	GetCardStateCounts(ctx context.Context, arg GetCardStateCountsParams) ([]GetCardStateCountsRow, error)
 	// Totals mirror GetCardStateCounts' lane-preference filter so disabled lanes
 	// don't inflate card/species/review counts.

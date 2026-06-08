@@ -161,6 +161,31 @@ func disableImageLane(t *testing.T, tx pgx.Tx, userID int64) {
 	require.NoError(t, err)
 }
 
+// seedDeckSpeciesWithCards adds a species to the fixture deck with both-lane cards (no media needed; GetCardStateCounts has no media filter).
+func seedDeckSpeciesWithCards(t *testing.T, tx pgx.Tx, f fixtures, code string) {
+	t.Helper()
+	ctx := context.Background()
+	_, err := tx.Exec(ctx,
+		`INSERT INTO species (ebird_code, common_name, scientific_name)
+		 VALUES ($1, 'Tier Species', 'Testus gradus')`, code)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx, `INSERT INTO deck_species (deck_id, species_code) VALUES ($1, $2)`, f.deckID, code)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx,
+		`INSERT INTO cards (user_id, species_code, lane)
+		 VALUES ($1, $2, 'audio'), ($1, $2, 'image')`, f.userID, code)
+	require.NoError(t, err)
+}
+
+// disableImageForSpecies turns the image lane off for one species.
+func disableImageForSpecies(t *testing.T, tx pgx.Tx, userID int64, code string) {
+	t.Helper()
+	_, err := tx.Exec(context.Background(),
+		`INSERT INTO user_species_preferences (user_id, species_code, audio_enabled, image_enabled)
+		 VALUES ($1, $2, true, false)`, userID, code)
+	require.NoError(t, err)
+}
+
 // GetNextDueCard
 
 func TestGetNextDueCard_NoPreference_ReturnsDueCard(t *testing.T) {
@@ -566,6 +591,25 @@ func mustSchedule(t *testing.T, q *store.Queries, userID int64, speciesCode, lan
 	require.NoError(t, err)
 }
 
+// mustScheduleStability drives a card to a specific stability (and reps>0, valid
+// last_review) so tier-boundary tests can place a card in any stage.
+func mustScheduleStability(t *testing.T, q *store.Queries, userID int64, speciesCode, lane string, stability float64) {
+	t.Helper()
+	due := pgtype.Timestamptz{}
+	require.NoError(t, due.Scan(time.Now().Add(24*time.Hour)))
+	_, err := q.UpdateCardSchedule(context.Background(), store.UpdateCardScheduleParams{
+		UserID:      userID,
+		SpeciesCode: speciesCode,
+		Lane:        lane,
+		Stability:   stability,
+		Difficulty:  5,
+		Due:         due,
+		Lapses:      0,
+		State:       2,
+	})
+	require.NoError(t, err)
+}
+
 // laneFilter returns a pgtype.Text suitable for use as a lane filter param.
 func laneFilter(lane string) pgtype.Text {
 	return pgtype.Text{String: lane, Valid: true}
@@ -578,9 +622,9 @@ func TestGetCardStateCounts_Buckets(t *testing.T) {
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
-	// seedFixtures creates audio+image cards with reps=0 (not_seen).
-	// Drive audio to Review (state=2) → becomes "known".
-	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+	// seedFixtures creates audio+image cards with reps=0 (egg).
+	// Drive audio to stability 10 (juvenile tier [7,30)).
+	mustScheduleStability(t, q, f.userID, "_tst1", "audio", 10)
 
 	rows, err := q.GetCardStateCounts(context.Background(), store.GetCardStateCountsParams{
 		UserID: f.userID,
@@ -591,8 +635,8 @@ func TestGetCardStateCounts_Buckets(t *testing.T) {
 	for _, r := range rows {
 		buckets[r.Bucket] = r.Count
 	}
-	assert.Equal(t, int64(1), buckets["known"], "Should count audio card in known bucket")
-	assert.GreaterOrEqual(t, buckets["not_seen"], int64(1), "Should count image card in not_seen bucket")
+	assert.Equal(t, int64(1), buckets["juvenile"], "Should count audio card in juvenile bucket (stability=10)")
+	assert.GreaterOrEqual(t, buckets["egg"], int64(1), "Should count image card in egg bucket")
 }
 
 func TestGetCardStateCounts_LaneFilter(t *testing.T) {
@@ -600,7 +644,7 @@ func TestGetCardStateCounts_LaneFilter(t *testing.T) {
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
-	// Drive audio to Review; image stays not_seen.
+	// Drive audio to stability 10 (juvenile); image stays reps=0 (egg).
 	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
 
 	rows, err := q.GetCardStateCounts(context.Background(), store.GetCardStateCountsParams{
@@ -613,8 +657,8 @@ func TestGetCardStateCounts_LaneFilter(t *testing.T) {
 	for _, r := range rows {
 		buckets[r.Bucket] = r.Count
 	}
-	assert.NotContains(t, buckets, "known", "Should not see the audio review through the image filter")
-	assert.GreaterOrEqual(t, buckets["not_seen"], int64(1), "Should see not_seen for image lane")
+	assert.NotContains(t, buckets, "juvenile", "Should not see the audio card through the image filter")
+	assert.GreaterOrEqual(t, buckets["egg"], int64(1), "image lane card is egg")
 }
 
 func TestGetCardStateCounts_ExcludesDisabledLane(t *testing.T) {
@@ -622,9 +666,9 @@ func TestGetCardStateCounts_ExcludesDisabledLane(t *testing.T) {
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
-	// The user's bug: audio is known, image is toggled off. The quiz never
-	// serves the disabled image card, so its reps stay 0 forever -- it must not
-	// haunt the progress bar as a permanent not_seen.
+	// The user's bug: audio is juvenile (stability=10), image is toggled off. The quiz
+	// never serves the disabled image card, so its reps stay 0 forever -- it must not
+	// haunt the progress bar as a permanent egg.
 	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
 	disableImageLane(t, tx, f.userID)
 
@@ -637,8 +681,8 @@ func TestGetCardStateCounts_ExcludesDisabledLane(t *testing.T) {
 	for _, r := range rows {
 		buckets[r.Bucket] = r.Count
 	}
-	assert.Equal(t, int64(1), buckets["known"], "Should still count the enabled audio card")
-	assert.Equal(t, int64(0), buckets["not_seen"], "Should not count the disabled image card as not_seen")
+	assert.Equal(t, int64(1), buckets["juvenile"], "Should still count the enabled audio card")
+	assert.Equal(t, int64(0), buckets["egg"], "disabled image card excluded")
 }
 
 func TestGetCardStateCounts_ExcludesDecklessSpecies(t *testing.T) {
@@ -646,9 +690,9 @@ func TestGetCardStateCounts_ExcludesDecklessSpecies(t *testing.T) {
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
-	// _tst1 (in a deck) fully known; an orphaned species with reps=0 cards must
-	// not be counted -- removing a species from a deck leaves its cards behind,
-	// and the quiz can never serve a species that's in no deck.
+	// _tst1 (in a deck) both lanes at stability 10 (juvenile); an orphaned species
+	// with reps=0 cards must not be counted -- removing a species from a deck leaves
+	// its cards behind, and the quiz can never serve a species that's in no deck.
 	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
 	mustSchedule(t, q, f.userID, "_tst1", "image", 2)
 	seedDecklessSpecies(t, tx, f, "_tst3")
@@ -661,8 +705,64 @@ func TestGetCardStateCounts_ExcludesDecklessSpecies(t *testing.T) {
 	for _, r := range rows {
 		buckets[r.Bucket] = r.Count
 	}
-	assert.Equal(t, int64(2), buckets["known"], "Should count both in-deck lanes as known")
-	assert.Equal(t, int64(0), buckets["not_seen"], "Should not count the deckless orphan as not_seen")
+	assert.Equal(t, int64(2), buckets["juvenile"], "both in-deck lanes are juvenile")
+	assert.Equal(t, int64(0), buckets["egg"], "deckless egg orphan excluded")
+}
+
+func TestGetCardStateCounts_TierBuckets(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// _tst1 image stays reps=0 -> egg. Drive _tst1 audio to a juvenile stability.
+	mustScheduleStability(t, q, f.userID, "_tst1", "audio", 10) // 7<=10<30 -> juvenile
+
+	rows, err := q.GetCardStateCounts(context.Background(), store.GetCardStateCountsParams{
+		UserID: f.userID,
+	})
+	require.NoError(t, err)
+	buckets := make(map[string]int64)
+	for _, r := range rows {
+		buckets[r.Bucket] = r.Count
+	}
+	assert.Equal(t, int64(1), buckets["egg"], "image card never quizzed -> egg")
+	assert.Equal(t, int64(1), buckets["juvenile"], "audio at stability 10 -> juvenile")
+	assert.Equal(t, int64(0), buckets["known"], "old 'known' bucket must no longer exist")
+}
+
+func TestGetCardStateCounts_AllTierBoundaries(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// Five extra species, one per non-egg tier, each added to the deck (so the
+	// deck-membership filter keeps them) with both lanes; drive audio to a
+	// representative stability and disable image so only the audio card counts.
+	cases := []struct {
+		code      string
+		stability float64
+		want      string
+	}{
+		{"_tn", 0.5, "nestling"},
+		{"_tf", 1, "fledgling"},   // exactly 1.0 must be fledgling, not nestling
+		{"_tj", 7, "juvenile"},    // exactly 7.0 must be juvenile, not fledgling
+		{"_ti", 30, "immature"},   // exactly 30.0 must be immature, not juvenile
+		{"_ta", 90, "adult"},      // exactly 90.0 must be adult, not immature
+	}
+	for _, c := range cases {
+		seedDeckSpeciesWithCards(t, tx, f, c.code)
+		mustScheduleStability(t, q, f.userID, c.code, "audio", c.stability)
+		disableImageForSpecies(t, tx, f.userID, c.code)
+	}
+	rows, err := q.GetCardStateCounts(context.Background(), store.GetCardStateCountsParams{UserID: f.userID})
+	require.NoError(t, err)
+	buckets := map[string]int64{}
+	for _, r := range rows {
+		buckets[r.Bucket] = r.Count
+	}
+	for _, c := range cases {
+		assert.Equal(t, int64(1), buckets[c.want], "stability %v should land in %s", c.stability, c.want)
+	}
 }
 
 // GetCardTotals

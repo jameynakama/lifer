@@ -94,11 +94,13 @@ func (q *Queries) GetCard(ctx context.Context, arg GetCardParams) (Card, error) 
 const getCardStateCounts = `-- name: GetCardStateCounts :many
 SELECT
     CASE
-        -- reps = 0 wins by definition: a never-reviewed card is not_seen regardless of state.
-        WHEN c.reps = 0  THEN 'not_seen'
-        WHEN c.state = 2 THEN 'known'
-        WHEN c.state = 3 THEN 'relearning'
-        ELSE 'learning'
+        -- Mirrors api/tiers.go thresholds. reps=0 wins (never quizzed -> egg).
+        WHEN c.reps = 0        THEN 'egg'
+        WHEN c.stability < 1   THEN 'nestling'
+        WHEN c.stability < 7   THEN 'fledgling'
+        WHEN c.stability < 30  THEN 'juvenile'
+        WHEN c.stability < 90  THEN 'immature'
+        ELSE                        'adult'
     END AS bucket,
     COUNT(*) AS count
 FROM cards c
@@ -132,11 +134,11 @@ type GetCardStateCountsRow struct {
 	Count  int64  `db:"count" json:"count"`
 }
 
-// Stats: per-card bucket counts. Buckets per the stats spec: not_seen = never
-// reviewed; known = FSRS Review state; relearning = lapsed; else learning.
-// Preference-disabled lanes are excluded to match GetNextDueCard: a lane the
-// user toggled off is never served, so its cards stay reps = 0 forever and
-// would otherwise haunt the progress bar as permanent, unclearable not_seen.
+// Stats: per-card mastery tier counts. Tiers are stability-based bird life-cycle
+// stages (see api/tiers.go for the matching Go constants). Preference-disabled
+// lanes are excluded to match GetNextDueCard: a lane the user toggled off is
+// never served, so its cards stay reps = 0 forever and would otherwise haunt
+// the progress bar as permanent, unclearable eggs.
 func (q *Queries) GetCardStateCounts(ctx context.Context, arg GetCardStateCountsParams) ([]GetCardStateCountsRow, error) {
 	rows, err := q.db.Query(ctx, getCardStateCounts, arg.UserID, arg.Lane)
 	if err != nil {
