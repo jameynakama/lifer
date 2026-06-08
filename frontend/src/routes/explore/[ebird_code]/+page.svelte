@@ -45,7 +45,9 @@
 
     <div class="species-header">
       <div>
-        <h1 class="common-name">{sp.common_name}</h1>
+        <h1 class="common-name">
+          <a href="https://ebird.org/species/{ebirdCode}" target="_blank">{sp.common_name}</a>
+        </h1>
         <p class="scientific-name">{sp.scientific_name}</p>
       </div>
       <div class="deck-btn-wrapper">
