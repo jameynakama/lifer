@@ -590,6 +590,30 @@ func TestGetCardStateCounts_LaneFilter(t *testing.T) {
 	assert.GreaterOrEqual(t, buckets["not_seen"], int64(1), "Should see not_seen for image lane")
 }
 
+func TestGetCardStateCounts_ExcludesDisabledLane(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// The user's bug: audio is known, image is toggled off. The quiz never
+	// serves the disabled image card, so its reps stay 0 forever -- it must not
+	// haunt the progress bar as a permanent not_seen.
+	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+	disableImageLane(t, tx, f.userID)
+
+	rows, err := q.GetCardStateCounts(context.Background(), store.GetCardStateCountsParams{
+		UserID: f.userID,
+	})
+	require.NoError(t, err)
+
+	buckets := make(map[string]int64)
+	for _, r := range rows {
+		buckets[r.Bucket] = r.Count
+	}
+	assert.Equal(t, int64(1), buckets["known"], "Should still count the enabled audio card")
+	assert.Equal(t, int64(0), buckets["not_seen"], "Should not count the disabled image card as not_seen")
+}
+
 // GetCardTotals
 
 func TestGetCardTotals(t *testing.T) {
@@ -694,6 +718,21 @@ func TestGetLaneGaps_ImageKnown_AudioWeak(t *testing.T) {
 	assert.Equal(t, "audio", gaps[0].WeakLane, "Should identify audio as weak lane")
 }
 
+func TestGetLaneGaps_ExcludesDisabledLane(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// Audio known, image weak -- but image is disabled, so this is not an
+	// actionable gap: the user opted out of image practice for this species.
+	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+	disableImageLane(t, tx, f.userID)
+
+	gaps, err := q.GetLaneGaps(context.Background(), f.userID)
+	require.NoError(t, err)
+	assert.Empty(t, gaps, "Should not surface a gap for a lane the user disabled")
+}
+
 // GetCardTotals lane filter
 
 func TestGetCardTotals_LaneFilter(t *testing.T) {
@@ -718,6 +757,22 @@ func TestGetCardTotals_LaneFilter(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, allTotals.Reviews, int64(1), "Should count the audio review in combined totals")
+}
+
+func TestGetCardTotals_ExcludesDisabledLane(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+	disableImageLane(t, tx, f.userID)
+
+	totals, err := q.GetCardTotals(context.Background(), store.GetCardTotalsParams{
+		UserID: f.userID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), totals.Cards, "Should count only the enabled audio card, not the disabled image card")
+	assert.Equal(t, int64(1), totals.Species, "Should still count the species via its enabled lane")
 }
 
 // logReview is a test helper that inserts a review_log row with optional

@@ -138,44 +138,74 @@ LIMIT 1;
 
 -- Stats: per-card bucket counts. Buckets per the stats spec: not_seen = never
 -- reviewed; known = FSRS Review state; relearning = lapsed; else learning.
+-- Preference-disabled lanes are excluded to match GetNextDueCard: a lane the
+-- user toggled off is never served, so its cards stay reps = 0 forever and
+-- would otherwise haunt the progress bar as permanent, unclearable not_seen.
 -- name: GetCardStateCounts :many
 SELECT
     CASE
         -- reps = 0 wins by definition: a never-reviewed card is not_seen regardless of state.
-        WHEN reps = 0  THEN 'not_seen'
-        WHEN state = 2 THEN 'known'
-        WHEN state = 3 THEN 'relearning'
+        WHEN c.reps = 0  THEN 'not_seen'
+        WHEN c.state = 2 THEN 'known'
+        WHEN c.state = 3 THEN 'relearning'
         ELSE 'learning'
     END AS bucket,
     COUNT(*) AS count
-FROM cards
-WHERE user_id = $1
-  AND lane = COALESCE(sqlc.narg('lane'), lane)
+FROM cards c
+LEFT JOIN user_species_preferences usp
+       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
+WHERE c.user_id = $1
+  AND c.lane = COALESCE(sqlc.narg('lane'), c.lane)
+  AND (
+    (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
+    OR
+    (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
+  )
 GROUP BY bucket;
 
+-- Totals mirror GetCardStateCounts' lane-preference filter so disabled lanes
+-- don't inflate card/species/review counts.
 -- name: GetCardTotals :one
-SELECT COUNT(DISTINCT species_code)      AS species,
+SELECT COUNT(DISTINCT c.species_code)      AS species,
        COUNT(*)                          AS cards,
-       COALESCE(SUM(reps), 0)::bigint    AS reviews,
-       COALESCE(SUM(lapses), 0)::bigint  AS lapses
-FROM cards
-WHERE user_id = $1
-  AND lane = COALESCE(sqlc.narg('lane'), lane);
+       COALESCE(SUM(c.reps), 0)::bigint    AS reviews,
+       COALESCE(SUM(c.lapses), 0)::bigint  AS lapses
+FROM cards c
+LEFT JOIN user_species_preferences usp
+       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
+WHERE c.user_id = $1
+  AND c.lane = COALESCE(sqlc.narg('lane'), c.lane)
+  AND (
+    (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
+    OR
+    (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
+  );
 
 -- Stats: known cards with FSRS fields for retrievability math in Go.
 -- "Known" here (state = 2) is intentionally equivalent to GetCardStateCounts'
 -- known bucket: FSRS cannot produce state 2 with reps = 0, so the two
--- predicates cannot diverge. Keep them in sync if either changes.
+-- predicates cannot diverge. Keep them in sync if either changes -- including
+-- the lane-preference filter below, so a known-then-disabled card doesn't show
+-- in Fading/Remember while vanishing from the progress bar.
 -- name: GetKnownCards :many
 SELECT c.species_code, s.common_name, s.scientific_name, c.lane,
        c.stability, c.due, c.last_review
 FROM cards c
 JOIN species s ON s.ebird_code = c.species_code
+LEFT JOIN user_species_preferences usp
+       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
 WHERE c.user_id = $1
   AND c.state = 2
-  AND c.lane = COALESCE(sqlc.narg('lane'), c.lane);
+  AND c.lane = COALESCE(sqlc.narg('lane'), c.lane)
+  AND (
+    (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
+    OR
+    (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
+  );
 
 -- Stats: species known in exactly one lane, biggest stability gap first.
+-- Both lanes must be enabled for a gap to be actionable -- if the weak lane is
+-- disabled, the user opted out of practicing it, so it's not a gap to surface.
 -- name: GetLaneGaps :many
 SELECT a.species_code, s.common_name, s.scientific_name,
        CASE WHEN a.state = 2 THEN 'audio' ELSE 'image' END AS known_lane,
@@ -184,8 +214,12 @@ SELECT a.species_code, s.common_name, s.scientific_name,
 FROM cards a
 JOIN cards i   ON i.user_id = a.user_id AND i.species_code = a.species_code AND i.lane = 'image'
 JOIN species s ON s.ebird_code = a.species_code
+LEFT JOIN user_species_preferences usp
+       ON usp.user_id = a.user_id AND usp.species_code = a.species_code
 WHERE a.user_id = $1
   AND a.lane = 'audio'
+  AND COALESCE(usp.audio_enabled, true)
+  AND COALESCE(usp.image_enabled, true)
   AND ((a.state = 2 AND i.state <> 2) OR (i.state = 2 AND a.state <> 2))
 ORDER BY stability_gap DESC
 LIMIT 10;

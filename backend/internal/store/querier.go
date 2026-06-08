@@ -31,7 +31,12 @@ type Querier interface {
 	GetCard(ctx context.Context, arg GetCardParams) (Card, error)
 	// Stats: per-card bucket counts. Buckets per the stats spec: not_seen = never
 	// reviewed; known = FSRS Review state; relearning = lapsed; else learning.
+	// Preference-disabled lanes are excluded to match GetNextDueCard: a lane the
+	// user toggled off is never served, so its cards stay reps = 0 forever and
+	// would otherwise haunt the progress bar as permanent, unclearable not_seen.
 	GetCardStateCounts(ctx context.Context, arg GetCardStateCountsParams) ([]GetCardStateCountsRow, error)
+	// Totals mirror GetCardStateCounts' lane-preference filter so disabled lanes
+	// don't inflate card/species/review counts.
 	GetCardTotals(ctx context.Context, arg GetCardTotalsParams) (GetCardTotalsRow, error)
 	// Stats: actual misidentifications only (skips have NULL guesses).
 	GetConfusionPairs(ctx context.Context, arg GetConfusionPairsParams) ([]GetConfusionPairsRow, error)
@@ -54,9 +59,13 @@ type Querier interface {
 	// Stats: known cards with FSRS fields for retrievability math in Go.
 	// "Known" here (state = 2) is intentionally equivalent to GetCardStateCounts'
 	// known bucket: FSRS cannot produce state 2 with reps = 0, so the two
-	// predicates cannot diverge. Keep them in sync if either changes.
+	// predicates cannot diverge. Keep them in sync if either changes -- including
+	// the lane-preference filter below, so a known-then-disabled card doesn't show
+	// in Fading/Remember while vanishing from the progress bar.
 	GetKnownCards(ctx context.Context, arg GetKnownCardsParams) ([]GetKnownCardsRow, error)
 	// Stats: species known in exactly one lane, biggest stability gap first.
+	// Both lanes must be enabled for a gap to be actionable -- if the weak lane is
+	// disabled, the user opted out of practicing it, so it's not a gap to surface.
 	GetLaneGaps(ctx context.Context, userID int64) ([]GetLaneGapsRow, error)
 	GetNextDueAt(ctx context.Context, userID int64) (pgtype.Timestamptz, error)
 	// Bucket due-time by the minute, then shuffle within the bucket. A fresh deck
