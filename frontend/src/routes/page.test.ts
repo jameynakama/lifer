@@ -48,6 +48,22 @@ describe('Dashboard page', () => {
     })
   })
 
+  it('links to the about guide from the empty state', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ decks: [], next_due_at: null }),
+      }),
+    )
+    renderWithClient(Dashboard)
+    await vi.waitFor(() => {
+      expect(screen.getByText(/no decks yet/i)).toBeInTheDocument()
+    })
+    const link = screen.getByRole('link', { name: /how flockdeck works/i })
+    expect(link).toHaveAttribute('href', '/about#getting-started')
+  })
+
   it('navigates to quiz when Audio button clicked', async () => {
     vi.stubGlobal(
       'fetch',
