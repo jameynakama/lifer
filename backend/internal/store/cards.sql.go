@@ -58,6 +58,75 @@ func (q *Queries) DeleteCard(ctx context.Context, arg DeleteCardParams) error {
 	return err
 }
 
+const getBankedCards = `-- name: GetBankedCards :many
+SELECT c.species_code, s.common_name, s.scientific_name, c.lane,
+       c.stability, c.due, c.last_review
+FROM cards c
+JOIN species s ON s.ebird_code = c.species_code
+LEFT JOIN user_species_preferences usp
+       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
+WHERE c.user_id = $1
+  AND c.stability >= 7
+  AND c.lane = COALESCE($2, c.lane)
+  AND (
+    (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
+    OR
+    (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
+  )
+  AND EXISTS (
+    SELECT 1 FROM deck_species ds
+    JOIN decks d ON d.id = ds.deck_id
+    WHERE ds.species_code = c.species_code AND d.owner_id = c.user_id
+  )
+`
+
+type GetBankedCardsParams struct {
+	UserID int64       `db:"user_id" json:"user_id"`
+	Lane   pgtype.Text `db:"lane" json:"lane"`
+}
+
+type GetBankedCardsRow struct {
+	SpeciesCode    string             `db:"species_code" json:"species_code"`
+	CommonName     string             `db:"common_name" json:"common_name"`
+	ScientificName string             `db:"scientific_name" json:"scientific_name"`
+	Lane           string             `db:"lane" json:"lane"`
+	Stability      float64            `db:"stability" json:"stability"`
+	Due            pgtype.Timestamptz `db:"due" json:"due"`
+	LastReview     pgtype.Timestamptz `db:"last_review" json:"last_review"`
+}
+
+// Stats: "banked" cards (stability >= the banked bar, currently 7 days) with
+// FSRS fields for retrievability math in Go. Banked is the shared "genuinely
+// learned" cut (see api/tiers.go); feeds Fading. Keeps the lane-preference and
+// deck-membership filters so disabled/deckless cards never appear.
+func (q *Queries) GetBankedCards(ctx context.Context, arg GetBankedCardsParams) ([]GetBankedCardsRow, error) {
+	rows, err := q.db.Query(ctx, getBankedCards, arg.UserID, arg.Lane)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetBankedCardsRow
+	for rows.Next() {
+		var i GetBankedCardsRow
+		if err := rows.Scan(
+			&i.SpeciesCode,
+			&i.CommonName,
+			&i.ScientificName,
+			&i.Lane,
+			&i.Stability,
+			&i.Due,
+			&i.LastReview,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getCard = `-- name: GetCard :one
 SELECT id, user_id, species_code, lane, stability, difficulty, due,
        last_review, reps, lapses, state, created_at
@@ -332,81 +401,10 @@ func (q *Queries) GetDueCardsForUser(ctx context.Context, arg GetDueCardsForUser
 	return items, nil
 }
 
-const getKnownCards = `-- name: GetKnownCards :many
-SELECT c.species_code, s.common_name, s.scientific_name, c.lane,
-       c.stability, c.due, c.last_review
-FROM cards c
-JOIN species s ON s.ebird_code = c.species_code
-LEFT JOIN user_species_preferences usp
-       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
-WHERE c.user_id = $1
-  AND c.state = 2
-  AND c.lane = COALESCE($2, c.lane)
-  AND (
-    (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
-    OR
-    (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
-  )
-  AND EXISTS (
-    SELECT 1 FROM deck_species ds
-    JOIN decks d ON d.id = ds.deck_id
-    WHERE ds.species_code = c.species_code AND d.owner_id = c.user_id
-  )
-`
-
-type GetKnownCardsParams struct {
-	UserID int64       `db:"user_id" json:"user_id"`
-	Lane   pgtype.Text `db:"lane" json:"lane"`
-}
-
-type GetKnownCardsRow struct {
-	SpeciesCode    string             `db:"species_code" json:"species_code"`
-	CommonName     string             `db:"common_name" json:"common_name"`
-	ScientificName string             `db:"scientific_name" json:"scientific_name"`
-	Lane           string             `db:"lane" json:"lane"`
-	Stability      float64            `db:"stability" json:"stability"`
-	Due            pgtype.Timestamptz `db:"due" json:"due"`
-	LastReview     pgtype.Timestamptz `db:"last_review" json:"last_review"`
-}
-
-// Stats: known cards with FSRS fields for retrievability math in Go.
-// "Known" here (state = 2) is intentionally equivalent to GetCardStateCounts'
-// known bucket: FSRS cannot produce state 2 with reps = 0, so the two
-// predicates cannot diverge. Keep them in sync if either changes -- including
-// the lane-preference filter below, so a known-then-disabled card doesn't show
-// in Fading/Remember while vanishing from the progress bar.
-func (q *Queries) GetKnownCards(ctx context.Context, arg GetKnownCardsParams) ([]GetKnownCardsRow, error) {
-	rows, err := q.db.Query(ctx, getKnownCards, arg.UserID, arg.Lane)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []GetKnownCardsRow
-	for rows.Next() {
-		var i GetKnownCardsRow
-		if err := rows.Scan(
-			&i.SpeciesCode,
-			&i.CommonName,
-			&i.ScientificName,
-			&i.Lane,
-			&i.Stability,
-			&i.Due,
-			&i.LastReview,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
 const getLaneGaps = `-- name: GetLaneGaps :many
 SELECT a.species_code, s.common_name, s.scientific_name,
-       CASE WHEN a.state = 2 THEN 'audio' ELSE 'image' END AS known_lane,
-       CASE WHEN a.state = 2 THEN 'image' ELSE 'audio' END AS weak_lane,
+       CASE WHEN a.stability >= 7 THEN 'audio' ELSE 'image' END AS known_lane,
+       CASE WHEN a.stability >= 7 THEN 'image' ELSE 'audio' END AS weak_lane,
        ABS(a.stability - i.stability)::float AS stability_gap
 FROM cards a
 JOIN cards i   ON i.user_id = a.user_id AND i.species_code = a.species_code AND i.lane = 'image'
@@ -422,7 +420,7 @@ WHERE a.user_id = $1
     JOIN decks d ON d.id = ds.deck_id
     WHERE ds.species_code = a.species_code AND d.owner_id = a.user_id
   )
-  AND ((a.state = 2 AND i.state <> 2) OR (i.state = 2 AND a.state <> 2))
+  AND ((a.stability >= 7 AND i.stability < 7) OR (i.stability >= 7 AND a.stability < 7))
 ORDER BY stability_gap DESC
 LIMIT 10
 `
@@ -436,9 +434,10 @@ type GetLaneGapsRow struct {
 	StabilityGap   float64 `db:"stability_gap" json:"stability_gap"`
 }
 
-// Stats: species known in exactly one lane, biggest stability gap first.
-// Both lanes must be enabled for a gap to be actionable -- if the weak lane is
-// disabled, the user opted out of practicing it, so it's not a gap to surface.
+// Stats: species banked in exactly one lane (stability >= 7), biggest
+// stability gap first. Both lanes must be enabled for a gap to be actionable
+// -- if the weak lane is disabled, the user opted out of practicing it, so
+// it's not a gap to surface.
 func (q *Queries) GetLaneGaps(ctx context.Context, userID int64) ([]GetLaneGapsRow, error) {
 	rows, err := q.db.Query(ctx, getLaneGaps, userID)
 	if err != nil {
@@ -624,6 +623,73 @@ func (q *Queries) GetRandomMediaForSpecies(ctx context.Context, dollar_1 string)
 		&i.ImageID,
 	)
 	return i, err
+}
+
+const getReviewedCards = `-- name: GetReviewedCards :many
+SELECT c.species_code, s.common_name, s.scientific_name, c.lane,
+       c.stability, c.due, c.last_review
+FROM cards c
+JOIN species s ON s.ebird_code = c.species_code
+LEFT JOIN user_species_preferences usp
+       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
+WHERE c.user_id = $1
+  AND c.reps > 0
+  AND c.lane = COALESCE($2, c.lane)
+  AND (
+    (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
+    OR
+    (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
+  )
+  AND EXISTS (
+    SELECT 1 FROM deck_species ds
+    JOIN decks d ON d.id = ds.deck_id
+    WHERE ds.species_code = c.species_code AND d.owner_id = c.user_id
+  )
+`
+
+type GetReviewedCardsParams struct {
+	UserID int64       `db:"user_id" json:"user_id"`
+	Lane   pgtype.Text `db:"lane" json:"lane"`
+}
+
+type GetReviewedCardsRow struct {
+	SpeciesCode    string             `db:"species_code" json:"species_code"`
+	CommonName     string             `db:"common_name" json:"common_name"`
+	ScientificName string             `db:"scientific_name" json:"scientific_name"`
+	Lane           string             `db:"lane" json:"lane"`
+	Stability      float64            `db:"stability" json:"stability"`
+	Due            pgtype.Timestamptz `db:"due" json:"due"`
+	LastReview     pgtype.Timestamptz `db:"last_review" json:"last_review"`
+}
+
+// Stats: all reviewed cards (reps > 0) with FSRS fields, for the Remember
+// (expected-recall) projection over the whole studied collection.
+func (q *Queries) GetReviewedCards(ctx context.Context, arg GetReviewedCardsParams) ([]GetReviewedCardsRow, error) {
+	rows, err := q.db.Query(ctx, getReviewedCards, arg.UserID, arg.Lane)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetReviewedCardsRow
+	for rows.Next() {
+		var i GetReviewedCardsRow
+		if err := rows.Scan(
+			&i.SpeciesCode,
+			&i.CommonName,
+			&i.ScientificName,
+			&i.Lane,
+			&i.Stability,
+			&i.Due,
+			&i.LastReview,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const seedCardsForUserDecks = `-- name: SeedCardsForUserDecks :execrows

@@ -784,56 +784,79 @@ func TestGetCardTotals(t *testing.T) {
 	assert.GreaterOrEqual(t, totals.Reviews, int64(1), "Should count at least one review")
 }
 
-// GetKnownCards
+// GetBankedCards
 
-func TestGetKnownCards_OnlyReviewState(t *testing.T) {
+func TestGetBankedCards_OnlyBanked(t *testing.T) {
 	pool := connectTestDB(t)
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
-	// Drive audio to Review; image stays not_seen (reps=0, state=0).
-	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+	// audio at stability 10 (>=7 -> banked); image stays reps=0 (not banked).
+	mustScheduleStability(t, q, f.userID, "_tst1", "audio", 10)
 
-	known, err := q.GetKnownCards(context.Background(), store.GetKnownCardsParams{
+	banked, err := q.GetBankedCards(context.Background(), store.GetBankedCardsParams{UserID: f.userID})
+	require.NoError(t, err)
+	require.Len(t, banked, 1, "only the banked audio card")
+	assert.Equal(t, "_tst1", banked[0].SpeciesCode)
+	assert.Equal(t, "audio", banked[0].Lane)
+}
+
+func TestGetBankedCards_BelowBarExcluded(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// stability 3 is reviewed but below the 7-day banked bar.
+	mustScheduleStability(t, q, f.userID, "_tst1", "audio", 3)
+
+	banked, err := q.GetBankedCards(context.Background(), store.GetBankedCardsParams{UserID: f.userID})
+	require.NoError(t, err)
+	assert.Empty(t, banked, "a stability-3 card is not banked")
+}
+
+func TestGetBankedCards_EggExcluded(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// No scheduling — both cards remain reps=0.
+
+	banked, err := q.GetBankedCards(context.Background(), store.GetBankedCardsParams{
 		UserID: f.userID,
 	})
 	require.NoError(t, err)
-
-	require.Len(t, known, 1, "Should return exactly one known card")
-	assert.Equal(t, "_tst1", known[0].SpeciesCode, "Should return the correct species")
-	assert.Equal(t, "audio", known[0].Lane, "Should return the audio lane")
-	assert.Equal(t, float64(10), known[0].Stability, "Should round-trip stability")
+	assert.Empty(t, banked, "Should return no cards when none have been banked")
 }
 
-func TestGetKnownCards_NotSeenCardExcluded(t *testing.T) {
+func TestGetBankedCards_ExcludesDecklessSpecies(t *testing.T) {
 	pool := connectTestDB(t)
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
-	// No scheduling — both cards remain not_seen.
-
-	known, err := q.GetKnownCards(context.Background(), store.GetKnownCardsParams{
-		UserID: f.userID,
-	})
-	require.NoError(t, err)
-	assert.Empty(t, known, "Should return no cards when none have been reviewed to state=2")
-}
-
-func TestGetKnownCards_ExcludesDecklessSpecies(t *testing.T) {
-	pool := connectTestDB(t)
-	tx := withTx(t, pool)
-	f := seedFixtures(t, tx)
-	q := store.New(tx)
-	// An orphaned (deckless) species driven to known must not feed Fading or the
+	// An orphaned (deckless) species driven to banked must not feed Fading or the
 	// Remember projection -- it can never be studied, so it'd never actually fade.
 	seedDecklessSpecies(t, tx, f, "_tst3")
-	mustSchedule(t, q, f.userID, "_tst3", "audio", 2)
+	mustScheduleStability(t, q, f.userID, "_tst3", "audio", 10)
 
-	known, err := q.GetKnownCards(context.Background(), store.GetKnownCardsParams{
+	banked, err := q.GetBankedCards(context.Background(), store.GetBankedCardsParams{
 		UserID: f.userID,
 	})
 	require.NoError(t, err)
-	assert.Empty(t, known, "Should not include a known card for a species in no deck")
+	assert.Empty(t, banked, "Should not include a banked card for a species in no deck")
+}
+
+func TestGetReviewedCards_IncludesAllReps(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	mustScheduleStability(t, q, f.userID, "_tst1", "audio", 3) // reviewed, low stability
+	// image stays reps=0 -> excluded.
+
+	reviewed, err := q.GetReviewedCards(context.Background(), store.GetReviewedCardsParams{UserID: f.userID})
+	require.NoError(t, err)
+	require.Len(t, reviewed, 1, "only the reviewed (reps>0) card, regardless of stability")
+	assert.Equal(t, "_tst1", reviewed[0].SpeciesCode)
 }
 
 // GetLaneGaps
@@ -843,15 +866,15 @@ func TestGetLaneGaps_OneLaneKnown(t *testing.T) {
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
-	// Audio known, image stays not_seen → should produce one gap row.
-	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+	// Audio banked (stability=10 >= 7), image stays reps=0 → should produce one gap row.
+	mustScheduleStability(t, q, f.userID, "_tst1", "audio", 10)
 
 	gaps, err := q.GetLaneGaps(context.Background(), f.userID)
 	require.NoError(t, err)
 
-	require.Len(t, gaps, 1, "Should return one gap row when only audio is known")
+	require.Len(t, gaps, 1, "Should return one gap row when only audio is banked")
 	assert.Equal(t, "_tst1", gaps[0].SpeciesCode)
-	assert.Equal(t, "audio", gaps[0].KnownLane, "Should identify audio as known lane")
+	assert.Equal(t, "audio", gaps[0].KnownLane, "Should identify audio as banked lane")
 	assert.Equal(t, "image", gaps[0].WeakLane, "Should identify image as weak lane")
 }
 
@@ -860,13 +883,13 @@ func TestGetLaneGaps_BothLanesKnown_NoGap(t *testing.T) {
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
-	// Both lanes known → should NOT appear in gaps.
-	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
-	mustSchedule(t, q, f.userID, "_tst1", "image", 2)
+	// Both lanes banked (stability=10 >= 7) → should NOT appear in gaps.
+	mustScheduleStability(t, q, f.userID, "_tst1", "audio", 10)
+	mustScheduleStability(t, q, f.userID, "_tst1", "image", 10)
 
 	gaps, err := q.GetLaneGaps(context.Background(), f.userID)
 	require.NoError(t, err)
-	assert.Empty(t, gaps, "Should return no gaps when both lanes are known")
+	assert.Empty(t, gaps, "Should return no gaps when both lanes are banked")
 }
 
 func TestGetLaneGaps_ImageKnown_AudioWeak(t *testing.T) {
@@ -874,15 +897,15 @@ func TestGetLaneGaps_ImageKnown_AudioWeak(t *testing.T) {
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
-	// Image known, audio stays not_seen → one gap with the reversed lanes.
-	mustSchedule(t, q, f.userID, "_tst1", "image", 2)
+	// Image banked (stability=10 >= 7), audio stays reps=0 → one gap with the reversed lanes.
+	mustScheduleStability(t, q, f.userID, "_tst1", "image", 10)
 
 	gaps, err := q.GetLaneGaps(context.Background(), f.userID)
 	require.NoError(t, err)
 
-	require.Len(t, gaps, 1, "Should return one gap row when only image is known")
+	require.Len(t, gaps, 1, "Should return one gap row when only image is banked")
 	assert.Equal(t, "_tst1", gaps[0].SpeciesCode)
-	assert.Equal(t, "image", gaps[0].KnownLane, "Should identify image as known lane")
+	assert.Equal(t, "image", gaps[0].KnownLane, "Should identify image as banked lane")
 	assert.Equal(t, "audio", gaps[0].WeakLane, "Should identify audio as weak lane")
 }
 
@@ -891,9 +914,9 @@ func TestGetLaneGaps_ExcludesDisabledLane(t *testing.T) {
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
-	// Audio known, image weak -- but image is disabled, so this is not an
-	// actionable gap: the user opted out of image practice for this species.
-	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+	// Audio banked (stability=10 >= 7), image weak -- but image is disabled, so
+	// this is not an actionable gap: the user opted out of image practice for this species.
+	mustScheduleStability(t, q, f.userID, "_tst1", "audio", 10)
 	disableImageLane(t, tx, f.userID)
 
 	gaps, err := q.GetLaneGaps(context.Background(), f.userID)
@@ -906,14 +929,29 @@ func TestGetLaneGaps_ExcludesDecklessSpecies(t *testing.T) {
 	tx := withTx(t, pool)
 	f := seedFixtures(t, tx)
 	q := store.New(tx)
-	// Orphan known in audio, weak in image -- but it's in no deck, so it's not
-	// an actionable gap: the user can't practice a species they can't reach.
+	// Orphan banked (stability=10 >= 7) in audio, weak in image -- but it's in
+	// no deck, so it's not an actionable gap: the user can't practice a species
+	// they can't reach.
 	seedDecklessSpecies(t, tx, f, "_tst3")
-	mustSchedule(t, q, f.userID, "_tst3", "audio", 2)
+	mustScheduleStability(t, q, f.userID, "_tst3", "audio", 10)
 
 	gaps, err := q.GetLaneGaps(context.Background(), f.userID)
 	require.NoError(t, err)
 	assert.Empty(t, gaps, "Should not surface a gap for a species in no deck")
+}
+
+func TestGetLaneGaps_BelowBankedBarIsNotAGap(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// audio reviewed but stability 3 (< 7 banked bar); image reps=0. Neither
+	// lane is banked, so there is no actionable gap.
+	mustScheduleStability(t, q, f.userID, "_tst1", "audio", 3)
+
+	gaps, err := q.GetLaneGaps(context.Background(), f.userID)
+	require.NoError(t, err)
+	assert.Empty(t, gaps, "a sub-banked lane is not a gap")
 }
 
 // GetCardTotals lane filter

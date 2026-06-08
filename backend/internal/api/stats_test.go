@@ -31,7 +31,7 @@ func TestRetrievability_DecaysOverTime(t *testing.T) {
 
 func TestExpectedRecall_SumsRetrievabilities(t *testing.T) {
 	now := time.Now()
-	cards := []store.GetKnownCardsRow{
+	cards := []store.GetReviewedCardsRow{
 		{Stability: 10, LastReview: tstz(t, now.Add(-24*time.Hour))},
 		{Stability: 10, LastReview: tstz(t, now.Add(-24*time.Hour))},
 	}
@@ -66,10 +66,23 @@ func TestGetStats_CombinedShape(t *testing.T) {
 			return store.GetCardTotalsRow{Species: 1, Cards: 2, Reviews: 5, Lapses: 1}, nil
 		},
 		getCardStateCounts: func(_ context.Context, _ store.GetCardStateCountsParams) ([]store.GetCardStateCountsRow, error) {
-			return []store.GetCardStateCountsRow{{Bucket: "known", Count: 1}}, nil
+			return []store.GetCardStateCountsRow{{Bucket: "juvenile", Count: 1}}, nil
 		},
-		getKnownCards: func(_ context.Context, _ store.GetKnownCardsParams) ([]store.GetKnownCardsRow, error) {
-			return []store.GetKnownCardsRow{
+		getBankedCards: func(_ context.Context, _ store.GetBankedCardsParams) ([]store.GetBankedCardsRow, error) {
+			return []store.GetBankedCardsRow{
+				{
+					SpeciesCode:    "spotto",
+					CommonName:     "Spotted Towhee",
+					ScientificName: "Pipilo maculatus",
+					Lane:           "audio",
+					Stability:      10,
+					LastReview:     tstz(t, now.Add(-24*time.Hour)),
+					Due:            tstz(t, now.Add(9*24*time.Hour)),
+				},
+			}, nil
+		},
+		getReviewedCards: func(_ context.Context, _ store.GetReviewedCardsParams) ([]store.GetReviewedCardsRow, error) {
+			return []store.GetReviewedCardsRow{
 				{
 					SpeciesCode:    "spotto",
 					CommonName:     "Spotted Towhee",
@@ -145,16 +158,19 @@ func TestGetStats_LaneTab_OmitsLanesBlock(t *testing.T) {
 			return store.GetCardTotalsRow{Species: 1, Cards: 2, Reviews: 5, Lapses: 1}, nil
 		},
 		getCardStateCounts: func(_ context.Context, _ store.GetCardStateCountsParams) ([]store.GetCardStateCountsRow, error) {
-			return []store.GetCardStateCountsRow{{Bucket: "known", Count: 1}}, nil
+			return []store.GetCardStateCountsRow{{Bucket: "juvenile", Count: 1}}, nil
 		},
-		getKnownCards: func(_ context.Context, _ store.GetKnownCardsParams) ([]store.GetKnownCardsRow, error) {
-			return []store.GetKnownCardsRow{
+		getBankedCards: func(_ context.Context, _ store.GetBankedCardsParams) ([]store.GetBankedCardsRow, error) {
+			return []store.GetBankedCardsRow{
 				{
 					SpeciesCode: "spotto", Lane: "audio", Stability: 10,
 					LastReview: tstz(t, now.Add(-24*time.Hour)),
 					Due:        tstz(t, now.Add(9*24*time.Hour)),
 				},
 			}, nil
+		},
+		getReviewedCards: func(_ context.Context, _ store.GetReviewedCardsParams) ([]store.GetReviewedCardsRow, error) {
+			return []store.GetReviewedCardsRow{}, nil
 		},
 		getConfusionPairs: func(_ context.Context, _ store.GetConfusionPairsParams) ([]store.GetConfusionPairsRow, error) {
 			return []store.GetConfusionPairsRow{}, nil
@@ -195,8 +211,8 @@ func TestGetStats_FadingSortedWorstFirst(t *testing.T) {
 		getCardStateCounts: func(_ context.Context, _ store.GetCardStateCountsParams) ([]store.GetCardStateCountsRow, error) {
 			return []store.GetCardStateCountsRow{}, nil
 		},
-		getKnownCards: func(_ context.Context, _ store.GetKnownCardsParams) ([]store.GetKnownCardsRow, error) {
-			return []store.GetKnownCardsRow{
+		getBankedCards: func(_ context.Context, _ store.GetBankedCardsParams) ([]store.GetBankedCardsRow, error) {
+			return []store.GetBankedCardsRow{
 				{
 					SpeciesCode: "spotto", CommonName: "Spotted Towhee",
 					ScientificName: "Pipilo maculatus", Lane: "audio",
@@ -212,6 +228,9 @@ func TestGetStats_FadingSortedWorstFirst(t *testing.T) {
 					Due:        tstz(t, now.Add(-20*24*time.Hour)),
 				},
 			}, nil
+		},
+		getReviewedCards: func(_ context.Context, _ store.GetReviewedCardsParams) ([]store.GetReviewedCardsRow, error) {
+			return []store.GetReviewedCardsRow{}, nil
 		},
 		getLaneGaps: func(_ context.Context, _ int64) ([]store.GetLaneGapsRow, error) {
 			return []store.GetLaneGapsRow{}, nil
@@ -253,6 +272,77 @@ func TestGetStats_FadingSortedWorstFirst(t *testing.T) {
 	}
 }
 
+// TestGetStats_RememberUsesReviewedNotBanked pins the Remember/Fading wiring so
+// a future swap of the two source queries would be caught immediately.
+// Remember must count reviewed cards (GetReviewedCards); Fading must source from
+// banked cards (GetBankedCards). Here banked is empty and reviewed has one
+// low-stability (stability=3, below the banked bar of 7) card with a valid
+// LastReview. If Remember were wired to banked it would return 0; if Fading
+// were wired to reviewed it would be non-empty.
+func TestGetStats_RememberUsesReviewedNotBanked(t *testing.T) {
+	now := time.Now()
+	q := &stubQuerier{
+		getCardTotals: func(_ context.Context, _ store.GetCardTotalsParams) (store.GetCardTotalsRow, error) {
+			return store.GetCardTotalsRow{}, nil
+		},
+		getCardStateCounts: func(_ context.Context, _ store.GetCardStateCountsParams) ([]store.GetCardStateCountsRow, error) {
+			return []store.GetCardStateCountsRow{}, nil
+		},
+		// Nothing banked: Fading should be empty.
+		getBankedCards: func(_ context.Context, _ store.GetBankedCardsParams) ([]store.GetBankedCardsRow, error) {
+			return []store.GetBankedCardsRow{}, nil
+		},
+		// One reviewed card, low stability (below banked bar): Remember should count it.
+		getReviewedCards: func(_ context.Context, _ store.GetReviewedCardsParams) ([]store.GetReviewedCardsRow, error) {
+			return []store.GetReviewedCardsRow{
+				{
+					SpeciesCode: "foxspa",
+					Lane:        "audio",
+					Stability:   3,
+					LastReview:  tstz(t, now.Add(-1*time.Hour)),
+					Due:         tstz(t, now.Add(2*24*time.Hour)),
+				},
+			}, nil
+		},
+		getLaneGaps: func(_ context.Context, _ int64) ([]store.GetLaneGapsRow, error) {
+			return []store.GetLaneGapsRow{}, nil
+		},
+		getConfusionPairs: func(_ context.Context, _ store.GetConfusionPairsParams) ([]store.GetConfusionPairsRow, error) {
+			return []store.GetConfusionPairsRow{}, nil
+		},
+		getFamilyAccuracy: func(_ context.Context, _ store.GetFamilyAccuracyParams) ([]store.GetFamilyAccuracyRow, error) {
+			return []store.GetFamilyAccuracyRow{}, nil
+		},
+		getHardMedia: func(_ context.Context, _ store.GetHardMediaParams) ([]store.GetHardMediaRow, error) {
+			return []store.GetHardMediaRow{}, nil
+		},
+		getReviewAccuracy: func(_ context.Context, _ store.GetReviewAccuracyParams) (store.GetReviewAccuracyRow, error) {
+			return store.GetReviewAccuracyRow{}, nil
+		},
+		countReviewsSince: func(_ context.Context, _ store.CountReviewsSinceParams) (int64, error) {
+			return 0, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/stats", nil)
+	r = injectUserID(r, 1)
+	w := httptest.NewRecorder()
+
+	h.getStats(w, r)
+
+	require.Equal(t, http.StatusOK, w.Code)
+	var resp statsResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	// The reviewed card was just reviewed (1 hour ago, stability=3): retrievability
+	// is near 1, so expectedRecall rounds to >= 1.
+	assert.GreaterOrEqual(t, resp.Remember.Now, 1,
+		"Remember.Now must count reviewed cards; got 0, which means it was wired to banked instead")
+	// No banked cards → Fading must be empty.
+	assert.Empty(t, resp.Fading,
+		"Fading must source from banked cards; non-empty means it was wired to reviewed instead")
+}
+
 func TestGetStats_WireContract(t *testing.T) {
 	now := time.Now()
 	q := &stubQuerier{
@@ -260,10 +350,23 @@ func TestGetStats_WireContract(t *testing.T) {
 			return store.GetCardTotalsRow{Species: 1, Cards: 2, Reviews: 5, Lapses: 1}, nil
 		},
 		getCardStateCounts: func(_ context.Context, _ store.GetCardStateCountsParams) ([]store.GetCardStateCountsRow, error) {
-			return []store.GetCardStateCountsRow{{Bucket: "known", Count: 1}}, nil
+			return []store.GetCardStateCountsRow{{Bucket: "juvenile", Count: 1}}, nil
 		},
-		getKnownCards: func(_ context.Context, _ store.GetKnownCardsParams) ([]store.GetKnownCardsRow, error) {
-			return []store.GetKnownCardsRow{
+		getBankedCards: func(_ context.Context, _ store.GetBankedCardsParams) ([]store.GetBankedCardsRow, error) {
+			return []store.GetBankedCardsRow{
+				{
+					SpeciesCode:    "spotto",
+					CommonName:     "Spotted Towhee",
+					ScientificName: "Pipilo maculatus",
+					Lane:           "audio",
+					Stability:      10,
+					LastReview:     tstz(t, now.Add(-24*time.Hour)),
+					Due:            tstz(t, now.Add(9*24*time.Hour)),
+				},
+			}, nil
+		},
+		getReviewedCards: func(_ context.Context, _ store.GetReviewedCardsParams) ([]store.GetReviewedCardsRow, error) {
+			return []store.GetReviewedCardsRow{
 				{
 					SpeciesCode:    "spotto",
 					CommonName:     "Spotted Towhee",
@@ -330,15 +433,16 @@ func TestGetStats_WireContract(t *testing.T) {
 		assert.Contains(t, raw, key, "Should expose top-level key %q", key)
 	}
 	totals := raw["totals"].(map[string]any)
-	for _, key := range []string{"species", "cards", "known", "reviews", "lapses", "attempts", "correct", "reviews_last_7d"} {
+	for _, key := range []string{"species", "cards", "reviews", "lapses", "attempts", "correct", "reviews_last_7d"} {
 		assert.Contains(t, totals, key, "Should expose totals key %q", key)
 	}
+	assert.NotContains(t, totals, "known", "totals.known has been removed")
 	remember := raw["remember"].(map[string]any)
 	for _, key := range []string{"now", "in_a_week", "in_a_month"} {
 		assert.Contains(t, remember, key)
 	}
 	progress := raw["progress"].(map[string]any)
-	for _, key := range []string{"not_seen", "learning", "known", "relearning"} {
+	for _, key := range []string{"egg", "nestling", "fledgling", "juvenile", "immature", "adult"} {
 		assert.Contains(t, progress, key)
 	}
 	fading := raw["fading"].([]any)
@@ -353,4 +457,8 @@ func TestGetStats_WireContract(t *testing.T) {
 	for _, key := range []string{"media_id", "media_url", "attempts", "correct"} {
 		assert.Contains(t, h0, key)
 	}
+	lanes := raw["lanes"].(map[string]any)
+	audio := lanes["audio"].(map[string]any)
+	assert.Contains(t, audio, "banked", "audio lane should expose banked field")
+	assert.NotContains(t, audio, "known", "audio lane known has been renamed to banked")
 }

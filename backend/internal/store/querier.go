@@ -28,6 +28,11 @@ type Querier interface {
 	DeleteRecordingsBySpeciesCode(ctx context.Context, speciesCode string) error
 	DeleteSpeciesByCode(ctx context.Context, ebirdCode string) error
 	DeleteSpeciesImagesBySpeciesCode(ctx context.Context, speciesCode string) error
+	// Stats: "banked" cards (stability >= the banked bar, currently 7 days) with
+	// FSRS fields for retrievability math in Go. Banked is the shared "genuinely
+	// learned" cut (see api/tiers.go); feeds Fading. Keeps the lane-preference and
+	// deck-membership filters so disabled/deckless cards never appear.
+	GetBankedCards(ctx context.Context, arg GetBankedCardsParams) ([]GetBankedCardsRow, error)
 	GetCard(ctx context.Context, arg GetCardParams) (Card, error)
 	// Stats: per-card mastery tier counts. Tiers are stability-based bird life-cycle
 	// stages (see api/tiers.go for the matching Go constants). Preference-disabled
@@ -56,16 +61,10 @@ type Querier interface {
 	// opportunistically -- deleted media yields ''.
 	GetHardMedia(ctx context.Context, arg GetHardMediaParams) ([]GetHardMediaRow, error)
 	GetImageByID(ctx context.Context, macaulayID string) (GetImageByIDRow, error)
-	// Stats: known cards with FSRS fields for retrievability math in Go.
-	// "Known" here (state = 2) is intentionally equivalent to GetCardStateCounts'
-	// known bucket: FSRS cannot produce state 2 with reps = 0, so the two
-	// predicates cannot diverge. Keep them in sync if either changes -- including
-	// the lane-preference filter below, so a known-then-disabled card doesn't show
-	// in Fading/Remember while vanishing from the progress bar.
-	GetKnownCards(ctx context.Context, arg GetKnownCardsParams) ([]GetKnownCardsRow, error)
-	// Stats: species known in exactly one lane, biggest stability gap first.
-	// Both lanes must be enabled for a gap to be actionable -- if the weak lane is
-	// disabled, the user opted out of practicing it, so it's not a gap to surface.
+	// Stats: species banked in exactly one lane (stability >= 7), biggest
+	// stability gap first. Both lanes must be enabled for a gap to be actionable
+	// -- if the weak lane is disabled, the user opted out of practicing it, so
+	// it's not a gap to surface.
 	GetLaneGaps(ctx context.Context, userID int64) ([]GetLaneGapsRow, error)
 	GetNextDueAt(ctx context.Context, userID int64) (pgtype.Timestamptz, error)
 	// Bucket due-time by the minute, then shuffle within the bucket. A fresh deck
@@ -81,6 +80,9 @@ type Querier interface {
 	GetRandomMediaForSpecies(ctx context.Context, dollar_1 string) (GetRandomMediaForSpeciesRow, error)
 	GetRecordingByID(ctx context.Context, xenoCantoID string) (GetRecordingByIDRow, error)
 	GetReviewAccuracy(ctx context.Context, arg GetReviewAccuracyParams) (GetReviewAccuracyRow, error)
+	// Stats: all reviewed cards (reps > 0) with FSRS fields, for the Remember
+	// (expected-recall) projection over the whole studied collection.
+	GetReviewedCards(ctx context.Context, arg GetReviewedCardsParams) ([]GetReviewedCardsRow, error)
 	GetSpeciesByCode(ctx context.Context, ebirdCode string) (GetSpeciesByCodeRow, error)
 	GetSpeciesImages(ctx context.Context, speciesCode string) ([]GetSpeciesImagesRow, error)
 	GetSpeciesRecordings(ctx context.Context, speciesCode string) ([]GetSpeciesRecordingsRow, error)

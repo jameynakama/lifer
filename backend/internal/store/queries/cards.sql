@@ -196,13 +196,11 @@ WHERE c.user_id = $1
     WHERE ds.species_code = c.species_code AND d.owner_id = c.user_id
   );
 
--- Stats: known cards with FSRS fields for retrievability math in Go.
--- "Known" here (state = 2) is intentionally equivalent to GetCardStateCounts'
--- known bucket: FSRS cannot produce state 2 with reps = 0, so the two
--- predicates cannot diverge. Keep them in sync if either changes -- including
--- the lane-preference filter below, so a known-then-disabled card doesn't show
--- in Fading/Remember while vanishing from the progress bar.
--- name: GetKnownCards :many
+-- Stats: "banked" cards (stability >= the banked bar, currently 7 days) with
+-- FSRS fields for retrievability math in Go. Banked is the shared "genuinely
+-- learned" cut (see api/tiers.go); feeds Fading. Keeps the lane-preference and
+-- deck-membership filters so disabled/deckless cards never appear.
+-- name: GetBankedCards :many
 SELECT c.species_code, s.common_name, s.scientific_name, c.lane,
        c.stability, c.due, c.last_review
 FROM cards c
@@ -210,7 +208,7 @@ JOIN species s ON s.ebird_code = c.species_code
 LEFT JOIN user_species_preferences usp
        ON usp.user_id = c.user_id AND usp.species_code = c.species_code
 WHERE c.user_id = $1
-  AND c.state = 2
+  AND c.stability >= 7
   AND c.lane = COALESCE(sqlc.narg('lane'), c.lane)
   AND (
     (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
@@ -223,13 +221,37 @@ WHERE c.user_id = $1
     WHERE ds.species_code = c.species_code AND d.owner_id = c.user_id
   );
 
--- Stats: species known in exactly one lane, biggest stability gap first.
--- Both lanes must be enabled for a gap to be actionable -- if the weak lane is
--- disabled, the user opted out of practicing it, so it's not a gap to surface.
+-- Stats: all reviewed cards (reps > 0) with FSRS fields, for the Remember
+-- (expected-recall) projection over the whole studied collection.
+-- name: GetReviewedCards :many
+SELECT c.species_code, s.common_name, s.scientific_name, c.lane,
+       c.stability, c.due, c.last_review
+FROM cards c
+JOIN species s ON s.ebird_code = c.species_code
+LEFT JOIN user_species_preferences usp
+       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
+WHERE c.user_id = $1
+  AND c.reps > 0
+  AND c.lane = COALESCE(sqlc.narg('lane'), c.lane)
+  AND (
+    (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
+    OR
+    (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
+  )
+  AND EXISTS (
+    SELECT 1 FROM deck_species ds
+    JOIN decks d ON d.id = ds.deck_id
+    WHERE ds.species_code = c.species_code AND d.owner_id = c.user_id
+  );
+
+-- Stats: species banked in exactly one lane (stability >= 7), biggest
+-- stability gap first. Both lanes must be enabled for a gap to be actionable
+-- -- if the weak lane is disabled, the user opted out of practicing it, so
+-- it's not a gap to surface.
 -- name: GetLaneGaps :many
 SELECT a.species_code, s.common_name, s.scientific_name,
-       CASE WHEN a.state = 2 THEN 'audio' ELSE 'image' END AS known_lane,
-       CASE WHEN a.state = 2 THEN 'image' ELSE 'audio' END AS weak_lane,
+       CASE WHEN a.stability >= 7 THEN 'audio' ELSE 'image' END AS known_lane,
+       CASE WHEN a.stability >= 7 THEN 'image' ELSE 'audio' END AS weak_lane,
        ABS(a.stability - i.stability)::float AS stability_gap
 FROM cards a
 JOIN cards i   ON i.user_id = a.user_id AND i.species_code = a.species_code AND i.lane = 'image'
@@ -245,7 +267,7 @@ WHERE a.user_id = $1
     JOIN decks d ON d.id = ds.deck_id
     WHERE ds.species_code = a.species_code AND d.owner_id = a.user_id
   )
-  AND ((a.state = 2 AND i.state <> 2) OR (i.state = 2 AND a.state <> 2))
+  AND ((a.stability >= 7 AND i.stability < 7) OR (i.stability >= 7 AND a.stability < 7))
 ORDER BY stability_gap DESC
 LIMIT 10;
 

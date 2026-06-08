@@ -30,7 +30,7 @@ func retrievability(stability float64, lastReview, at time.Time) float64 {
 
 // expectedRecall is the probabilistic number of cards remembered at time at:
 // the rounded sum of each card's retrievability.
-func expectedRecall(cards []store.GetKnownCardsRow, at time.Time) int {
+func expectedRecall(cards []store.GetReviewedCardsRow, at time.Time) int {
 	var sum float64
 	for _, c := range cards {
 		if !c.LastReview.Valid {
@@ -50,7 +50,6 @@ type statsSpecies struct {
 type statsTotals struct {
 	Species       int64 `json:"species"`
 	Cards         int64 `json:"cards"`
-	Known         int64 `json:"known"`
 	Reviews       int64 `json:"reviews"`
 	Lapses        int64 `json:"lapses"`
 	Attempts      int64 `json:"attempts"`
@@ -59,15 +58,17 @@ type statsTotals struct {
 }
 
 type statsProgress struct {
-	NotSeen    int64 `json:"not_seen"`
-	Learning   int64 `json:"learning"`
-	Known      int64 `json:"known"`
-	Relearning int64 `json:"relearning"`
+	Egg       int64 `json:"egg"`
+	Nestling  int64 `json:"nestling"`
+	Fledgling int64 `json:"fledgling"`
+	Juvenile  int64 `json:"juvenile"`
+	Immature  int64 `json:"immature"`
+	Adult     int64 `json:"adult"`
 }
 
 type statsLane struct {
-	Cards int64 `json:"cards"`
-	Known int64 `json:"known"`
+	Cards  int64 `json:"cards"`
+	Banked int64 `json:"banked"`
 }
 
 type statsGap struct {
@@ -134,14 +135,16 @@ func laneArg(lane string) pgtype.Text {
 	return pgtype.Text{String: lane, Valid: true}
 }
 
-// knownOf extracts the known count from a slice of bucket rows.
-func knownOf(rows []store.GetCardStateCountsRow) int64 {
+// bankedOf counts cards at or above the banked bar (Juvenile+) from tier rows.
+func bankedOf(rows []store.GetCardStateCountsRow) int64 {
+	var n int64
 	for _, r := range rows {
-		if r.Bucket == "known" {
-			return r.Count
+		switch r.Bucket {
+		case "juvenile", "immature", "adult":
+			n += r.Count
 		}
 	}
-	return 0
+	return n
 }
 
 func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) {
@@ -172,9 +175,14 @@ func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	known, err := h.queries.GetKnownCards(ctx, store.GetKnownCardsParams{UserID: userID, Lane: la})
+	banked, err := h.queries.GetBankedCards(ctx, store.GetBankedCardsParams{UserID: userID, Lane: la})
 	if err != nil {
-		fail("GetKnownCards", err)
+		fail("GetBankedCards", err)
+		return
+	}
+	reviewed, err := h.queries.GetReviewedCards(ctx, store.GetReviewedCardsParams{UserID: userID, Lane: la})
+	if err != nil {
+		fail("GetReviewedCards", err)
 		return
 	}
 
@@ -221,26 +229,30 @@ func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) {
 	var progress statsProgress
 	for _, b := range buckets {
 		switch b.Bucket {
-		case "not_seen":
-			progress.NotSeen = b.Count
-		case "learning":
-			progress.Learning = b.Count
-		case "known":
-			progress.Known = b.Count
-		case "relearning":
-			progress.Relearning = b.Count
+		case "egg":
+			progress.Egg = b.Count
+		case "nestling":
+			progress.Nestling = b.Count
+		case "fledgling":
+			progress.Fledgling = b.Count
+		case "juvenile":
+			progress.Juvenile = b.Count
+		case "immature":
+			progress.Immature = b.Count
+		case "adult":
+			progress.Adult = b.Count
 		}
 	}
 
 	now := time.Now()
 
-	// Build Fading: known cards sorted by retrievability ascending (worst first).
+	// Build Fading: banked cards sorted by retrievability ascending (worst first).
 	type fadingEntry struct {
-		row  store.GetKnownCardsRow
+		row  store.GetBankedCardsRow
 		retr float64
 	}
-	fadingAll := make([]fadingEntry, 0, len(known))
-	for _, c := range known {
+	fadingAll := make([]fadingEntry, 0, len(banked))
+	for _, c := range banked {
 		if !c.LastReview.Valid {
 			continue
 		}
@@ -327,7 +339,6 @@ func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) {
 		Totals: statsTotals{
 			Species:       totalsRow.Species,
 			Cards:         totalsRow.Cards,
-			Known:         progress.Known,
 			Reviews:       totalsRow.Reviews,
 			Lapses:        totalsRow.Lapses,
 			Attempts:      accuracy.Attempts,
@@ -339,9 +350,9 @@ func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) {
 		Families:   families,
 		Fading:     fading,
 		Remember: statsRemember{
-			Now:      expectedRecall(known, now),
-			InAWeek:  expectedRecall(known, now.Add(7*24*time.Hour)),
-			InAMonth: expectedRecall(known, now.Add(30*24*time.Hour)),
+			Now:      expectedRecall(reviewed, now),
+			InAWeek:  expectedRecall(reviewed, now.Add(7*24*time.Hour)),
+			InAMonth: expectedRecall(reviewed, now.Add(30*24*time.Hour)),
 		},
 		HardMedia: hardMedia,
 	}
@@ -394,8 +405,8 @@ func (h *Handler) getStats(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 		resp.Lanes = &statsLanes{
-			Audio: statsLane{Cards: audioTotals.Cards, Known: knownOf(audioBuckets)},
-			Image: statsLane{Cards: imageTotals.Cards, Known: knownOf(imageBuckets)},
+			Audio: statsLane{Cards: audioTotals.Cards, Banked: bankedOf(audioBuckets)},
+			Image: statsLane{Cards: imageTotals.Cards, Banked: bankedOf(imageBuckets)},
 			Gaps:  gaps,
 		}
 	}

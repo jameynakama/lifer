@@ -34,7 +34,8 @@ type stubQuerier struct {
 	// stats stubs
 	getCardTotals      func(ctx context.Context, arg store.GetCardTotalsParams) (store.GetCardTotalsRow, error)
 	getCardStateCounts func(ctx context.Context, arg store.GetCardStateCountsParams) ([]store.GetCardStateCountsRow, error)
-	getKnownCards      func(ctx context.Context, arg store.GetKnownCardsParams) ([]store.GetKnownCardsRow, error)
+	getBankedCards     func(ctx context.Context, arg store.GetBankedCardsParams) ([]store.GetBankedCardsRow, error)
+	getReviewedCards   func(ctx context.Context, arg store.GetReviewedCardsParams) ([]store.GetReviewedCardsRow, error)
 	getLaneGaps        func(ctx context.Context, userID int64) ([]store.GetLaneGapsRow, error)
 	getConfusionPairs  func(ctx context.Context, arg store.GetConfusionPairsParams) ([]store.GetConfusionPairsRow, error)
 	getFamilyAccuracy  func(ctx context.Context, arg store.GetFamilyAccuracyParams) ([]store.GetFamilyAccuracyRow, error)
@@ -80,8 +81,11 @@ func (s *stubQuerier) GetCardTotals(ctx context.Context, arg store.GetCardTotals
 func (s *stubQuerier) GetCardStateCounts(ctx context.Context, arg store.GetCardStateCountsParams) ([]store.GetCardStateCountsRow, error) {
 	return s.getCardStateCounts(ctx, arg)
 }
-func (s *stubQuerier) GetKnownCards(ctx context.Context, arg store.GetKnownCardsParams) ([]store.GetKnownCardsRow, error) {
-	return s.getKnownCards(ctx, arg)
+func (s *stubQuerier) GetBankedCards(ctx context.Context, arg store.GetBankedCardsParams) ([]store.GetBankedCardsRow, error) {
+	return s.getBankedCards(ctx, arg)
+}
+func (s *stubQuerier) GetReviewedCards(ctx context.Context, arg store.GetReviewedCardsParams) ([]store.GetReviewedCardsRow, error) {
+	return s.getReviewedCards(ctx, arg)
 }
 func (s *stubQuerier) GetLaneGaps(ctx context.Context, userID int64) ([]store.GetLaneGapsRow, error) {
 	return s.getLaneGaps(ctx, userID)
