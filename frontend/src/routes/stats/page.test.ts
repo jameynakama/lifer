@@ -10,17 +10,16 @@ const combined: StatsResponse = {
   totals: {
     species: 112,
     cards: 224,
-    known: 38,
     reviews: 412,
     lapses: 91,
     attempts: 73,
     correct: 57,
     reviews_last_7d: 23,
   },
-  progress: { not_seen: 141, learning: 28, known: 38, relearning: 17 },
+  progress: { egg: 141, nestling: 28, fledgling: 17, juvenile: 2, immature: 0, adult: 0 },
   lanes: {
-    audio: { cards: 112, known: 14 },
-    image: { cards: 112, known: 24 },
+    audio: { cards: 112, banked: 14 },
+    image: { cards: 112, banked: 24 },
     gaps: [
       {
         ebird_code: 'varthr',
@@ -86,7 +85,7 @@ describe('Stats page', () => {
   it('renders panels from the combined response', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(combined) }),
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(combined), { status: 200, headers: { 'Content-Type': 'application/json' } })),
     )
     renderWithClient(StatsPage)
     await vi.waitFor(() => {
@@ -97,7 +96,7 @@ describe('Stats page', () => {
   })
 
   it('fetches the combined endpoint by default and shows ear vs eye', async () => {
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(combined) })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(combined), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
     renderWithClient(StatsPage)
     await vi.waitFor(() => {
@@ -110,7 +109,7 @@ describe('Stats page', () => {
   it('lane tab links to ?lane=audio', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(combined) }),
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(combined), { status: 200, headers: { 'Content-Type': 'application/json' } })),
     )
     renderWithClient(StatsPage)
     await vi.waitFor(() => screen.getByRole('link', { name: /audio/i }))
@@ -123,7 +122,7 @@ describe('Stats page', () => {
   it('omits ear vs eye on a lane tab and fetches with the lane param', async () => {
     page.url = new URL('http://localhost/stats?lane=audio') as typeof page.url
     const { lanes: _lanes, ...laneResp } = combined
-    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(laneResp) })
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(laneResp), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
     renderWithClient(StatsPage)
     await vi.waitFor(() => screen.getByText(/fox sparrow/i))
@@ -142,7 +141,7 @@ describe('Stats page', () => {
     }
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(empty) }),
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(empty), { status: 200, headers: { 'Content-Type': 'application/json' } })),
     )
     renderWithClient(StatsPage)
     await vi.waitFor(() => {

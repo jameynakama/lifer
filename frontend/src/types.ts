@@ -143,7 +143,6 @@ export interface StatsSpecies {
 export interface StatsTotals {
   species: number
   cards: number
-  known: number
   reviews: number
   lapses: number
   attempts: number
@@ -152,16 +151,23 @@ export interface StatsTotals {
 }
 
 export interface StatsProgress {
-  not_seen: number
-  learning: number
-  known: number
-  relearning: number
+  egg: number
+  nestling: number
+  fledgling: number
+  juvenile: number
+  immature: number
+  adult: number
 }
 
 export interface StatsLanes {
-  audio: { cards: number; known: number }
-  image: { cards: number; known: number }
+  audio: { cards: number; banked: number }
+  image: { cards: number; banked: number }
   gaps: (StatsSpecies & { known_lane: 'audio' | 'image'; weak_lane: 'audio' | 'image' })[]
+}
+
+export type StatsTierBird = StatsSpecies & {
+  lane: 'audio' | 'image'
+  stability: number
 }
 
 export interface StatsConfusion {

@@ -19,6 +19,17 @@
   --danger: #ef4444;
   --error: #f87171;
   --success: #4ade80;
+  /* Green for chart TEXT values (e.g. family-accuracy %). Theme-aware: the mint
+     in dark, a readable deeper mint in light (light mint text is unreadable on a
+     light bg). Chart FILLS that must match a tier use the tier token directly. */
+  --chart-green: #8be59d;
+  /* Mastery tier ramp (Egg -> Adult); used by ProgressBreakdown.svelte. */
+  --tier-egg: #ec8a83;
+  --tier-nestling: #ffad85;
+  --tier-fledgling: #f9f176;
+  --tier-juvenile: #8be59d;
+  --tier-immature: #6ab4f1;
+  --tier-adult: #a983d8;
   /* No-op shadow, NOT the keyword none: --shadow composes into
      --shadow-stacked's list, and a shadow list containing none is invalid
      CSS (the browser drops the whole declaration). */
@@ -47,6 +58,7 @@
   --danger: #dc2626;
   --error: #b91c1c;
   --success: #15803d;
+  --chart-green: #2e8b57;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
@@ -64,6 +76,7 @@
     --danger: #dc2626;
     --error: #b91c1c;
     --success: #15803d;
+    --chart-green: #2e8b57;
     --shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
   }
 }

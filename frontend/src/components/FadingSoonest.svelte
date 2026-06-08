@@ -14,7 +14,7 @@
 <section class="card panel">
   <h3 class="panel-title">
     Fading soonest<InfoTip
-      text="Known birds whose memory the model predicts is decaying fastest. The next ones you'd likely miss without a refresher."
+      text="Banked birds (stability of at least a week) whose memory the model predicts is decaying fastest. The next ones you'd likely miss without a refresher."
     />
   </h3>
   <p class="remember muted">
@@ -22,7 +22,7 @@
     month
   </p>
   {#if fading.length === 0}
-    <p class="muted">Nothing is fading — no graduated cards yet.</p>
+    <p class="muted">Nothing is fading — no banked cards yet.</p>
   {:else}
     <ul class="list-reset">
       {#each fading as f (`${f.ebird_code}:${f.lane}`)}

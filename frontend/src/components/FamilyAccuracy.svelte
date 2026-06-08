@@ -38,7 +38,7 @@
   }
   .pct {
     font-weight: 700;
-    color: var(--success);
+    color: var(--chart-green);
   }
   .pct.low {
     color: var(--error);

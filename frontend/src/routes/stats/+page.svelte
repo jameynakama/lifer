@@ -37,12 +37,6 @@
             tip: 'Distinct species with at least one card.',
           },
           {
-            label: 'Known',
-            value: `${stats.totals.known}/${stats.totals.cards}`,
-            highlight: true,
-            tip: 'Cards graduated to long-term review, out of all your cards. A scheduler state, not a score.',
-          },
-          {
             label: 'Accuracy',
             value: accuracy === null ? '—' : `${accuracy}%`,
             tip: 'Correct answers across your whole logged review history.',
@@ -82,7 +76,7 @@
     <p class="status">Couldn't load stats. Try again in a bit.</p>
   {:else}
     <StatsBar variant="grid" stats={totalsRow} />
-    <ProgressBreakdown progress={stats.progress} />
+    <ProgressBreakdown progress={stats.progress} {lane} />
     {#if stats.lanes}
       <EarVsEye lanes={stats.lanes} />
     {/if}
