@@ -61,6 +61,18 @@ describe('Layout', () => {
     })
   })
 
+  it('shows About link when authenticated', async () => {
+    const user = { id: 1, email: 'test@example.com', name: 'Test User' }
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve(user) }),
+    )
+    render(Layout)
+    await vi.waitFor(() => {
+      expect(screen.getByRole('link', { name: /about/i })).toBeInTheDocument()
+    })
+  })
+
   it('shows Admin link when user is admin', async () => {
     const user = { id: 1, email: 'test@example.com', name: 'Test User', is_admin: true }
     vi.stubGlobal(
