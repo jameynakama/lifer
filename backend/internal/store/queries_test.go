@@ -124,6 +124,33 @@ func seedNoMediaSpecies(t *testing.T, tx pgx.Tx, f fixtures) {
 	require.NoError(t, err)
 }
 
+// seedDecklessSpecies adds a species with media and both-lane cards but NO
+// deck_species row -- an orphan left behind after the species was removed from
+// every deck. GetNextDueCard joins deck_species, so the quiz can never serve
+// it; stats must not count it either.
+func seedDecklessSpecies(t *testing.T, tx pgx.Tx, f fixtures, code string) {
+	t.Helper()
+	ctx := context.Background()
+	_, err := tx.Exec(ctx,
+		`INSERT INTO species (ebird_code, common_name, scientific_name)
+		 VALUES ($1, 'Orphan Species', 'Testus orphanus')`, code)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx,
+		`INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type, credit)
+		 VALUES ($1, $2, 'https://r2.example.com/orphan.mp3', 'A', 'song', 'tester')`,
+		"_xc_"+code, code)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx,
+		`INSERT INTO species_images (macaulay_id, species_code, file_path, credit)
+		 VALUES ($1, $2, 'https://r2.example.com/orphan.jpg', 'tester')`,
+		"_ml_"+code, code)
+	require.NoError(t, err)
+	_, err = tx.Exec(ctx,
+		`INSERT INTO cards (user_id, species_code, lane)
+		 VALUES ($1, $2, 'audio'), ($1, $2, 'image')`, f.userID, code)
+	require.NoError(t, err)
+}
+
 func disableImageLane(t *testing.T, tx pgx.Tx, userID int64) {
 	t.Helper()
 	_, err := tx.Exec(context.Background(),
@@ -614,6 +641,30 @@ func TestGetCardStateCounts_ExcludesDisabledLane(t *testing.T) {
 	assert.Equal(t, int64(0), buckets["not_seen"], "Should not count the disabled image card as not_seen")
 }
 
+func TestGetCardStateCounts_ExcludesDecklessSpecies(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// _tst1 (in a deck) fully known; an orphaned species with reps=0 cards must
+	// not be counted -- removing a species from a deck leaves its cards behind,
+	// and the quiz can never serve a species that's in no deck.
+	mustSchedule(t, q, f.userID, "_tst1", "audio", 2)
+	mustSchedule(t, q, f.userID, "_tst1", "image", 2)
+	seedDecklessSpecies(t, tx, f, "_tst3")
+
+	rows, err := q.GetCardStateCounts(context.Background(), store.GetCardStateCountsParams{
+		UserID: f.userID,
+	})
+	require.NoError(t, err)
+	buckets := make(map[string]int64)
+	for _, r := range rows {
+		buckets[r.Bucket] = r.Count
+	}
+	assert.Equal(t, int64(2), buckets["known"], "Should count both in-deck lanes as known")
+	assert.Equal(t, int64(0), buckets["not_seen"], "Should not count the deckless orphan as not_seen")
+}
+
 // GetCardTotals
 
 func TestGetCardTotals(t *testing.T) {
@@ -666,6 +717,23 @@ func TestGetKnownCards_NotSeenCardExcluded(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Empty(t, known, "Should return no cards when none have been reviewed to state=2")
+}
+
+func TestGetKnownCards_ExcludesDecklessSpecies(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// An orphaned (deckless) species driven to known must not feed Fading or the
+	// Remember projection -- it can never be studied, so it'd never actually fade.
+	seedDecklessSpecies(t, tx, f, "_tst3")
+	mustSchedule(t, q, f.userID, "_tst3", "audio", 2)
+
+	known, err := q.GetKnownCards(context.Background(), store.GetKnownCardsParams{
+		UserID: f.userID,
+	})
+	require.NoError(t, err)
+	assert.Empty(t, known, "Should not include a known card for a species in no deck")
 }
 
 // GetLaneGaps
@@ -733,6 +801,21 @@ func TestGetLaneGaps_ExcludesDisabledLane(t *testing.T) {
 	assert.Empty(t, gaps, "Should not surface a gap for a lane the user disabled")
 }
 
+func TestGetLaneGaps_ExcludesDecklessSpecies(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// Orphan known in audio, weak in image -- but it's in no deck, so it's not
+	// an actionable gap: the user can't practice a species they can't reach.
+	seedDecklessSpecies(t, tx, f, "_tst3")
+	mustSchedule(t, q, f.userID, "_tst3", "audio", 2)
+
+	gaps, err := q.GetLaneGaps(context.Background(), f.userID)
+	require.NoError(t, err)
+	assert.Empty(t, gaps, "Should not surface a gap for a species in no deck")
+}
+
 // GetCardTotals lane filter
 
 func TestGetCardTotals_LaneFilter(t *testing.T) {
@@ -773,6 +856,21 @@ func TestGetCardTotals_ExcludesDisabledLane(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), totals.Cards, "Should count only the enabled audio card, not the disabled image card")
 	assert.Equal(t, int64(1), totals.Species, "Should still count the species via its enabled lane")
+}
+
+func TestGetCardTotals_ExcludesDecklessSpecies(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	seedDecklessSpecies(t, tx, f, "_tst3")
+
+	totals, err := q.GetCardTotals(context.Background(), store.GetCardTotalsParams{
+		UserID: f.userID,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, int64(1), totals.Species, "Should count only the in-deck species")
+	assert.Equal(t, int64(2), totals.Cards, "Should count only the in-deck species' two lanes")
 }
 
 // logReview is a test helper that inserts a review_log row with optional

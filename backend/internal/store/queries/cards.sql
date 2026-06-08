@@ -161,6 +161,14 @@ WHERE c.user_id = $1
     OR
     (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
   )
+  -- Only count species still in one of the user's decks. Removing a species
+  -- from a deck leaves its card behind; that orphan is unservable (GetNextDueCard
+  -- joins deck_species) and would otherwise linger as a permanent not_seen.
+  AND EXISTS (
+    SELECT 1 FROM deck_species ds
+    JOIN decks d ON d.id = ds.deck_id
+    WHERE ds.species_code = c.species_code AND d.owner_id = c.user_id
+  )
 GROUP BY bucket;
 
 -- Totals mirror GetCardStateCounts' lane-preference filter so disabled lanes
@@ -179,6 +187,11 @@ WHERE c.user_id = $1
     (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
     OR
     (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
+  )
+  AND EXISTS (
+    SELECT 1 FROM deck_species ds
+    JOIN decks d ON d.id = ds.deck_id
+    WHERE ds.species_code = c.species_code AND d.owner_id = c.user_id
   );
 
 -- Stats: known cards with FSRS fields for retrievability math in Go.
@@ -201,6 +214,11 @@ WHERE c.user_id = $1
     (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
     OR
     (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
+  )
+  AND EXISTS (
+    SELECT 1 FROM deck_species ds
+    JOIN decks d ON d.id = ds.deck_id
+    WHERE ds.species_code = c.species_code AND d.owner_id = c.user_id
   );
 
 -- Stats: species known in exactly one lane, biggest stability gap first.
@@ -220,6 +238,11 @@ WHERE a.user_id = $1
   AND a.lane = 'audio'
   AND COALESCE(usp.audio_enabled, true)
   AND COALESCE(usp.image_enabled, true)
+  AND EXISTS (
+    SELECT 1 FROM deck_species ds
+    JOIN decks d ON d.id = ds.deck_id
+    WHERE ds.species_code = a.species_code AND d.owner_id = a.user_id
+  )
   AND ((a.state = 2 AND i.state <> 2) OR (i.state = 2 AND a.state <> 2))
 ORDER BY stability_gap DESC
 LIMIT 10;
