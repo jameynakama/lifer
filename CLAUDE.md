@@ -39,6 +39,7 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - **Flow:** email → short-lived token → link to `/api/v1/auth/magic?token=...` → verify, upsert user, issue existing HttpOnly JWT cookie
 - **Schema:** `magic_link_tokens (email, token, expires_at, used)`
 - Coexists with Google OAuth, matched on email in `users` -- no passwords ever
+- **`/about` feedback form (follow-up):** the `/about` page currently uses a plain `mailto:` to a plus-alias (`nakamajamey+flockdeck@gmail.com`) -- filterable/disposable since the repo is public. Once Resend is wired up here, replace it with a feedback form that POSTs to the backend and emails via Resend, keeping the address out of the client entirely
 
 ### 2. Recording normalization
 - Some recordings (e.g. American Barn Owl) are startlingly loud compared to others
@@ -52,12 +53,7 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Must proxy through backend to keep the eBird API key server-side
 - `regionType`: `country`, `subnational1` (states), `subnational2` (counties)
 
-### 4. About page (`/about`)
-- What FlockDeck is and how it works
-- Credit/attribution for eBird, Xeno-canto (CC-licensed recordings), Macaulay Library photos
-- Link to source repos / contact
-
-### 5. Real audio waveforms (precomputed peaks)
+### 4. Real audio waveforms (precomputed peaks)
 - Today `WavePlayer.svelte` draws *fake* peaks (`generatePeaks()`) -- cosmetic only. Real waveforms would make the player a navigation tool: scrub to a distinct phrase, or skip past the 3 background birds most XC recordings carry
 - Approach: precompute peaks at ingest (BBC `audiowaveform` or ffmpeg downsample) → store a small float array per recording (DB column or `.json` sidecar in R2) → serve with the card → hand to WaveSurfer's `peaks`. Keeps the instant draw AND native `<audio>` playback (no CORS needed)
 - Rejected alternative: enable CORS on R2 and let WaveSurfer fetch+decode client-side. Easier, zero BE work, but forces a full-file download + decode before drawing on *every* quiz card -- regresses the snappy card-to-card flip for accuracy nobody reads on a 4s clip. Precompute is the only option strictly better than today
