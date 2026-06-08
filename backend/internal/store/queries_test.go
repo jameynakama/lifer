@@ -1268,6 +1268,42 @@ func seedManyAudioSpecies(t *testing.T, tx pgx.Tx, f fixtures, n int) {
 	}
 }
 
+// GetCardsInTier
+
+func TestGetCardsInTier_Window(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	mustScheduleStability(t, q, f.userID, "_tst1", "audio", 10) // juvenile [7,30)
+
+	// Juvenile window: min=7, max=30, not egg, not unbounded.
+	rows, err := q.GetCardsInTier(context.Background(), store.GetCardsInTierParams{
+		UserID:       f.userID,
+		Egg:          false,
+		MinStability: 7,
+		Unbounded:    false,
+		MaxStability: 30,
+	})
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	assert.Equal(t, "_tst1", rows[0].SpeciesCode)
+	assert.Equal(t, "audio", rows[0].Lane)
+}
+
+func TestGetCardsInTier_Egg(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	f := seedFixtures(t, tx)
+	q := store.New(tx)
+	// Both _tst1 lanes are reps=0 -> egg.
+	rows, err := q.GetCardsInTier(context.Background(), store.GetCardsInTierParams{
+		UserID: f.userID, Egg: true,
+	})
+	require.NoError(t, err)
+	assert.Len(t, rows, 2, "both never-quizzed lanes are eggs")
+}
+
 // GetNextDueCard must not present tied-due cards in a fixed order: a fresh deck
 // seeds every card with the same `due`, and a deterministic tiebreak made the
 // quiz replay the identical species sequence every session. We bucket due by

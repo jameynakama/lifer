@@ -271,6 +271,39 @@ WHERE a.user_id = $1
 ORDER BY stability_gap DESC
 LIMIT 10;
 
+-- Stats: the birds in one mastery tier. Egg = reps=0; other tiers select a
+-- half-open stability window [min, max) (max ignored when unbounded). Same
+-- lane-preference + deck-membership filters as the tier counts.
+-- Returns: ebird_code, common_name, scientific_name, lane, stability.
+-- name: GetCardsInTier :many
+SELECT c.species_code, s.common_name, s.scientific_name, c.lane, c.stability
+FROM cards c
+JOIN species s ON s.ebird_code = c.species_code
+LEFT JOIN user_species_preferences usp
+       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
+WHERE c.user_id = $1
+  AND c.lane = COALESCE(sqlc.narg('lane'), c.lane)
+  AND (
+    (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
+    OR
+    (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
+  )
+  AND EXISTS (
+    SELECT 1 FROM deck_species ds
+    JOIN decks d ON d.id = ds.deck_id
+    WHERE ds.species_code = c.species_code AND d.owner_id = c.user_id
+  )
+  AND (
+    (sqlc.arg('egg')::bool AND c.reps = 0)
+    OR (
+      NOT sqlc.arg('egg')::bool
+      AND c.reps > 0
+      AND c.stability >= sqlc.arg('min_stability')::float
+      AND (sqlc.arg('unbounded')::bool OR c.stability < sqlc.arg('max_stability')::float)
+    )
+  )
+ORDER BY c.stability ASC, s.common_name ASC;
+
 -- name: DeleteAllCardsForUser :execrows
 DELETE FROM cards
 WHERE user_id = $1;

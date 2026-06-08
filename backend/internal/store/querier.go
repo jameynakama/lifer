@@ -43,6 +43,11 @@ type Querier interface {
 	// Totals mirror GetCardStateCounts' lane-preference filter so disabled lanes
 	// don't inflate card/species/review counts.
 	GetCardTotals(ctx context.Context, arg GetCardTotalsParams) (GetCardTotalsRow, error)
+	// Stats: the birds in one mastery tier. Egg = reps=0; other tiers select a
+	// half-open stability window [min, max) (max ignored when unbounded). Same
+	// lane-preference + deck-membership filters as the tier counts.
+	// Returns: ebird_code, common_name, scientific_name, lane, stability.
+	GetCardsInTier(ctx context.Context, arg GetCardsInTierParams) ([]GetCardsInTierRow, error)
 	// Stats: actual misidentifications only (skips have NULL guesses).
 	GetConfusionPairs(ctx context.Context, arg GetConfusionPairsParams) ([]GetConfusionPairsRow, error)
 	GetDeck(ctx context.Context, id int64) (Deck, error)

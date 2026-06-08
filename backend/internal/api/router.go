@@ -66,6 +66,7 @@ func NewRouter(cfg RouterConfig) http.Handler {
 			r.Use(auth.RequireAuth(cfg.JWTSecret))
 			r.Get("/me", h.getMe)
 			r.Get("/stats", h.getStats)
+			r.Get("/stats/tier/{stage}", h.getStatsTier)
 			r.Post("/reset", h.resetUserData)
 
 			r.Get("/decks", h.listDecks)

@@ -42,6 +42,8 @@ type stubQuerier struct {
 	getHardMedia       func(ctx context.Context, arg store.GetHardMediaParams) ([]store.GetHardMediaRow, error)
 	getReviewAccuracy  func(ctx context.Context, arg store.GetReviewAccuracyParams) (store.GetReviewAccuracyRow, error)
 	countReviewsSince  func(ctx context.Context, arg store.CountReviewsSinceParams) (int64, error)
+	// tier stubs
+	getCardsInTier func(ctx context.Context, arg store.GetCardsInTierParams) ([]store.GetCardsInTierRow, error)
 	// reset stubs
 	deleteAllCardsForUser   func(ctx context.Context, userID int64) (int64, error)
 	deleteAllReviewsForUser func(ctx context.Context, userID int64) (int64, error)
@@ -104,6 +106,9 @@ func (s *stubQuerier) GetReviewAccuracy(ctx context.Context, arg store.GetReview
 }
 func (s *stubQuerier) CountReviewsSince(ctx context.Context, arg store.CountReviewsSinceParams) (int64, error) {
 	return s.countReviewsSince(ctx, arg)
+}
+func (s *stubQuerier) GetCardsInTier(ctx context.Context, arg store.GetCardsInTierParams) ([]store.GetCardsInTierRow, error) {
+	return s.getCardsInTier(ctx, arg)
 }
 func (s *stubQuerier) DeleteAllCardsForUser(ctx context.Context, userID int64) (int64, error) {
 	return s.deleteAllCardsForUser(ctx, userID)

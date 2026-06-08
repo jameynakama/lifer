@@ -276,6 +276,90 @@ func (q *Queries) GetCardTotals(ctx context.Context, arg GetCardTotalsParams) (G
 	return i, err
 }
 
+const getCardsInTier = `-- name: GetCardsInTier :many
+SELECT c.species_code, s.common_name, s.scientific_name, c.lane, c.stability
+FROM cards c
+JOIN species s ON s.ebird_code = c.species_code
+LEFT JOIN user_species_preferences usp
+       ON usp.user_id = c.user_id AND usp.species_code = c.species_code
+WHERE c.user_id = $1
+  AND c.lane = COALESCE($2, c.lane)
+  AND (
+    (c.lane = 'audio' AND COALESCE(usp.audio_enabled, true))
+    OR
+    (c.lane = 'image' AND COALESCE(usp.image_enabled, true))
+  )
+  AND EXISTS (
+    SELECT 1 FROM deck_species ds
+    JOIN decks d ON d.id = ds.deck_id
+    WHERE ds.species_code = c.species_code AND d.owner_id = c.user_id
+  )
+  AND (
+    ($3::bool AND c.reps = 0)
+    OR (
+      NOT $3::bool
+      AND c.reps > 0
+      AND c.stability >= $4::float
+      AND ($5::bool OR c.stability < $6::float)
+    )
+  )
+ORDER BY c.stability ASC, s.common_name ASC
+`
+
+type GetCardsInTierParams struct {
+	UserID       int64       `db:"user_id" json:"user_id"`
+	Lane         pgtype.Text `db:"lane" json:"lane"`
+	Egg          bool        `db:"egg" json:"egg"`
+	MinStability float64     `db:"min_stability" json:"min_stability"`
+	Unbounded    bool        `db:"unbounded" json:"unbounded"`
+	MaxStability float64     `db:"max_stability" json:"max_stability"`
+}
+
+type GetCardsInTierRow struct {
+	SpeciesCode    string  `db:"species_code" json:"species_code"`
+	CommonName     string  `db:"common_name" json:"common_name"`
+	ScientificName string  `db:"scientific_name" json:"scientific_name"`
+	Lane           string  `db:"lane" json:"lane"`
+	Stability      float64 `db:"stability" json:"stability"`
+}
+
+// Stats: the birds in one mastery tier. Egg = reps=0; other tiers select a
+// half-open stability window [min, max) (max ignored when unbounded). Same
+// lane-preference + deck-membership filters as the tier counts.
+// Returns: ebird_code, common_name, scientific_name, lane, stability.
+func (q *Queries) GetCardsInTier(ctx context.Context, arg GetCardsInTierParams) ([]GetCardsInTierRow, error) {
+	rows, err := q.db.Query(ctx, getCardsInTier,
+		arg.UserID,
+		arg.Lane,
+		arg.Egg,
+		arg.MinStability,
+		arg.Unbounded,
+		arg.MaxStability,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GetCardsInTierRow
+	for rows.Next() {
+		var i GetCardsInTierRow
+		if err := rows.Scan(
+			&i.SpeciesCode,
+			&i.CommonName,
+			&i.ScientificName,
+			&i.Lane,
+			&i.Stability,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getDeckPracticeCards = `-- name: GetDeckPracticeCards :many
 SELECT s.ebird_code, s.common_name, s.scientific_name,
        COALESCE(rec.file_path, '')     AS audio_url,
