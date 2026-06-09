@@ -159,22 +159,46 @@
   }
 
   @keyframes popIn {
-    0%   { transform: scale(0.88); }
-    60%  { transform: scale(1.05); }
-    100% { transform: scale(1.0); }
+    0% {
+      transform: scale(0.88);
+    }
+    60% {
+      transform: scale(1.05);
+    }
+    100% {
+      transform: scale(1);
+    }
   }
 
   @keyframes shake {
-    0%   { transform: translateX(0); }
-    20%  { transform: translateX(-8px); }
-    40%  { transform: translateX(7px); }
-    60%  { transform: translateX(-5px); }
-    80%  { transform: translateX(4px); }
-    100% { transform: translateX(0); }
+    0% {
+      transform: translateX(0);
+    }
+    20% {
+      transform: translateX(-8px);
+    }
+    40% {
+      transform: translateX(7px);
+    }
+    60% {
+      transform: translateX(-5px);
+    }
+    80% {
+      transform: translateX(4px);
+    }
+    100% {
+      transform: translateX(0);
+    }
   }
 
   @keyframes photoReveal {
-    from { transform: scale(1.07); opacity: 0.6; }
-    to   { transform: scale(1.0);  opacity: 1; }
+    from {
+      transform: scale(1.07);
+      opacity: 0.6;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
 </style>

@@ -33,7 +33,10 @@ describe('ProgressBreakdown', () => {
   })
 
   it('shows error message when the tier fetch fails', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('Internal Server Error', { status: 500 })))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('Internal Server Error', { status: 500 })),
+    )
     renderWithClient(ProgressBreakdown, { progress })
     const fledglingBtn = screen.getByText(/Fledgling/).closest('button')!
     await fireEvent.click(fledglingBtn)

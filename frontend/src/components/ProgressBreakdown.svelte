@@ -14,9 +14,7 @@
     { key: 'adult', label: 'Adult', color: 'var(--tier-adult)' },
   ] as const
 
-  const segments = $derived(
-    TIERS.map((t) => ({ ...t, count: progress[t.key] })),
-  )
+  const segments = $derived(TIERS.map((t) => ({ ...t, count: progress[t.key] })))
   let expanded: string | null = $state(null)
   function toggle(key: string) {
     expanded = expanded === key ? null : key
@@ -74,20 +72,65 @@
 </section>
 
 <style>
-  .bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; gap: 1px; }
-  .tiers { display: flex; flex-direction: column; gap: 0.25rem; margin-top: 0.75rem; }
-  .tier {
-    display: flex; align-items: center; gap: 0.5rem; width: 100%;
-    background: transparent; border: none; cursor: pointer; padding: 0.25rem;
-    font-family: inherit; color: var(--text); text-align: left;
+  .bar {
+    display: flex;
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    gap: 1px;
   }
-  .tier.empty { opacity: 0.45; }
-  .swatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
-  .label { flex: 1; font-size: 0.875rem; }
-  .count { font-variant-numeric: tabular-nums; font-weight: 600; }
-  .birds { padding: 0.25rem 0 0.5rem 1.5rem; font-size: 0.8125rem; }
-  .birds li { padding: 0.1rem 0; }
-  .bird { color: var(--text); text-decoration: none; }
-  .bird:hover { text-decoration: underline; color: var(--accent); }
-  .muted { color: var(--text-muted); }
+  .tiers {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    margin-top: 0.75rem;
+  }
+  .tier {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0.25rem;
+    font-family: inherit;
+    color: var(--text);
+    text-align: left;
+  }
+  .tier.empty {
+    opacity: 0.45;
+  }
+  .swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .label {
+    flex: 1;
+    font-size: 0.875rem;
+  }
+  .count {
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
+  .birds {
+    padding: 0.25rem 0 0.5rem 1.5rem;
+    font-size: 0.8125rem;
+  }
+  .birds li {
+    padding: 0.1rem 0;
+  }
+  .bird {
+    color: var(--text);
+    text-decoration: none;
+  }
+  .bird:hover {
+    text-decoration: underline;
+    color: var(--accent);
+  }
+  .muted {
+    color: var(--text-muted);
+  }
 </style>

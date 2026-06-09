@@ -4,7 +4,8 @@
 
   let { lanes }: { lanes: StatsLanes } = $props()
 
-  const pct = (banked: number, cards: number) => (cards > 0 ? Math.round((banked / cards) * 100) : 0)
+  const pct = (banked: number, cards: number) =>
+    cards > 0 ? Math.round((banked / cards) * 100) : 0
   const audioPct = $derived(pct(lanes.audio.banked, lanes.audio.cards))
   const imagePct = $derived(pct(lanes.image.banked, lanes.image.cards))
 </script>

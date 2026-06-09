@@ -85,7 +85,12 @@ describe('Stats page', () => {
   it('renders panels from the combined response', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(combined), { status: 200, headers: { 'Content-Type': 'application/json' } })),
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(combined), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
     )
     renderWithClient(StatsPage)
     await vi.waitFor(() => {
@@ -96,7 +101,12 @@ describe('Stats page', () => {
   })
 
   it('fetches the combined endpoint by default and shows ear vs eye', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(combined), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(combined), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
     vi.stubGlobal('fetch', fetchMock)
     renderWithClient(StatsPage)
     await vi.waitFor(() => {
@@ -109,7 +119,12 @@ describe('Stats page', () => {
   it('lane tab links to ?lane=audio', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(combined), { status: 200, headers: { 'Content-Type': 'application/json' } })),
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(combined), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
     )
     renderWithClient(StatsPage)
     await vi.waitFor(() => screen.getByRole('link', { name: /audio/i }))
@@ -122,7 +137,12 @@ describe('Stats page', () => {
   it('omits ear vs eye on a lane tab and fetches with the lane param', async () => {
     page.url = new URL('http://localhost/stats?lane=audio') as typeof page.url
     const { lanes: _lanes, ...laneResp } = combined
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(laneResp), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(laneResp), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
     vi.stubGlobal('fetch', fetchMock)
     renderWithClient(StatsPage)
     await vi.waitFor(() => screen.getByText(/fox sparrow/i))
@@ -141,7 +161,12 @@ describe('Stats page', () => {
     }
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(new Response(JSON.stringify(empty), { status: 200, headers: { 'Content-Type': 'application/json' } })),
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify(empty), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
     )
     renderWithClient(StatsPage)
     await vi.waitFor(() => {
