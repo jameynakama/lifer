@@ -39,8 +39,8 @@
     margin-left: 0.375rem;
   }
   .infotip-btn {
-    width: 0.875rem;
-    height: 0.875rem;
+    width: 0.8rem;
+    height: 0.8rem;
     padding: 0;
     font-family: inherit;
     font-size: 0.625rem;
@@ -52,7 +52,7 @@
     border: 1px solid var(--text-muted);
     border-radius: 50%;
     cursor: pointer;
-    vertical-align: text-top;
+    vertical-align: baseline;
   }
   .infotip-btn:hover,
   .infotip-btn[aria-expanded='true'] {
