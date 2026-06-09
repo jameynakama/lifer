@@ -18,9 +18,13 @@
       {#each confusions as pair (`${pair.actual.ebird_code}:${pair.guessed.ebird_code}`)}
         <li class="row">
           <span class="names">
-            <b>{pair.actual.common_name}</b>
+            <a class="bird-link" href="/explore/{pair.actual.ebird_code}"
+              ><b>{pair.actual.common_name}</b></a
+            >
             <span class="muted"> — you said </span>
-            {pair.guessed.common_name}
+            <a class="bird-link" href="/explore/{pair.guessed.ebird_code}"
+              >{pair.guessed.common_name}</a
+            >
           </span>
           <span class="count">{pair.count}×</span>
         </li>

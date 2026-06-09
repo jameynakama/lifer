@@ -38,7 +38,9 @@
     <p class="gaps">
       Biggest gaps:
       {#each lanes.gaps.slice(0, 5) as gap, i (gap.ebird_code)}
-        {i > 0 ? ' · ' : ''}{gap.common_name}
+        {i > 0 ? ' · ' : ''}<a class="bird-link" href="/explore/{gap.ebird_code}"
+          >{gap.common_name}</a
+        >
         ({gap.known_lane === 'audio' ? '🔊' : '👁'} ✓ / {gap.weak_lane === 'audio' ? '🔊' : '👁'} ✗)
       {/each}
     </p>

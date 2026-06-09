@@ -19,7 +19,7 @@
         <li class="row">
           <span>
             {m.lane === 'audio' ? '🔊' : '👁'}
-            {m.common_name}
+            <a class="bird-link" href="/explore/{m.ebird_code}">{m.common_name}</a>
             {#if m.media_url}
               <a
                 href={m.media_url}

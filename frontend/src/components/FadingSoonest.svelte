@@ -27,7 +27,10 @@
     <ul class="list-reset">
       {#each fading as f (`${f.ebird_code}:${f.lane}`)}
         <li class="row">
-          <span>{f.lane === 'audio' ? '🔊' : '👁'} {f.common_name}</span>
+          <span
+            >{f.lane === 'audio' ? '🔊' : '👁'}
+            <a class="bird-link" href="/explore/{f.ebird_code}">{f.common_name}</a></span
+          >
           <span class="muted"
             >{Math.min(100, Math.round(f.retrievability * 100))}% · due {f.due_in_days === 0
               ? 'now'
