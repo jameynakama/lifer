@@ -7,12 +7,12 @@ alias tfe := test-fe
 
 # Run all tests and checks (backend + frontend)
 test args='':
-    cd backend && go vet ./... && gotestsum ./... -- {{ args }}
-    cd frontend && npm run check && npm test
+    just test-be
+    just test-fe
 
 # Run backend tests and checks
 test-be args='':
-    cd backend && go vet ./... && gotestsum ./... -- {{ args }}
+    cd backend && go vet ./... && golangci-lint run && gotestsum ./... -- {{ args }}
 
 # Run frontend tests and checks (npm run check syncs svelte-kit first)
 test-fe:
@@ -20,7 +20,7 @@ test-fe:
 
 # Lint backend (golangci-lint) and frontend (eslint + prettier --check)
 lint:
-    cd backend && golangci-lint run
+    cd backend && go vet ./... && golangci-lint run
     cd frontend && npm run lint
 
 # Auto-fix lint findings and formatting
