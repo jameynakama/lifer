@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createQuery } from '@tanstack/svelte-query'
   import { apiGet } from '$lib/api'
+  import InfoTip from './InfoTip.svelte'
   import type { StatsProgress, StatsTierBird } from '../types'
 
   let { progress, lane = '' }: { progress: StatsProgress; lane?: string } = $props()
@@ -29,7 +30,11 @@
 </script>
 
 <section class="card panel">
-  <h3 class="panel-title">Life cycle</h3>
+  <h3 class="panel-title">
+    Life cycle<InfoTip
+      text="A bird's-eye view of where each card sits in its learning journey: new, in progress, or deeply embedded."
+    />
+  </h3>
   <div class="bar" aria-hidden="true">
     {#each segments as s (s.key)}
       {#if s.count > 0}
