@@ -2,18 +2,15 @@ package api
 
 // Mastery tier thresholds, in FSRS stability (days). The bucketing CASE in
 // GetCardStateCounts (store/queries/cards.sql) MUST mirror these literals.
-// "banked" (stability >= bankedStability) is the shared "genuinely learned"
-// cut used by Fading, lane gaps, and Ear-vs-Eye.
+// "banked" (stability >= stabJuvenile, i.e. Juvenile+) is the shared "genuinely
+// learned" cut used by Fading, lane gaps, and Ear-vs-Eye (as the literal 7 in
+// those SQL queries).
 const (
-	stabFledgling   = 1.0  // >= this -> Fledgling
-	stabJuvenile    = 7.0  // >= this -> Juvenile
-	stabImmature    = 30.0 // >= this -> Immature
-	stabAdult       = 90.0 // >= this -> Adult
-	bankedStability = stabJuvenile
+	stabFledgling = 1.0  // >= this -> Fledgling
+	stabJuvenile  = 7.0  // >= this -> Juvenile
+	stabImmature  = 30.0 // >= this -> Immature
+	stabAdult     = 90.0 // >= this -> Adult
 )
-
-// tierStages is the ordered ladder, Egg (never quizzed) first.
-var tierStages = []string{"egg", "nestling", "fledgling", "juvenile", "immature", "adult"}
 
 // tierWindow describes how to select the cards in one stage.
 type tierWindow struct {
