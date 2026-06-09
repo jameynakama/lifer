@@ -7,7 +7,7 @@ alias tfe := test-fe
 
 # Run all tests and checks (backend + frontend)
 test args='':
-    just test-be
+    just test-be {{ args }}
     just test-fe
 
 # Run backend tests and checks
@@ -18,15 +18,18 @@ test-be args='':
 test-fe:
     cd frontend && npm run check && npm test
 
-# Lint backend (golangci-lint) and frontend (eslint + prettier --check)
-lint:
-    cd backend && go vet ./... && golangci-lint run
-    cd frontend && npm run lint
+# Lint backend + frontend. Pass `fix` to auto-fix instead of check: `just lint fix`
+lint mode='':
+    #!/usr/bin/env bash
+    if [ "{{ mode }}" = "fix" ]; then
+      (cd backend && golangci-lint run --fix) && (cd frontend && npm run lint:fix && npm run format)
+    else
+      (cd backend && go vet ./... && golangci-lint run) && (cd frontend && npm run lint)
+    fi
 
-# Auto-fix lint findings and formatting
+# Alias for `just lint fix`
 lint-fix:
-    cd backend && golangci-lint run --fix
-    cd frontend && npm run lint:fix && npm run format
+    just lint fix
 
 # Run regular tests with certain args that gotestsum seems to ignore
 gotest args='':
