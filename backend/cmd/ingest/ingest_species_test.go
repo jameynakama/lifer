@@ -43,7 +43,7 @@ func macServer(t *testing.T, status int) *macaulay.Client {
 			w.WriteHeader(status)
 			return
 		}
-		fmt.Fprint(w, `{"results":{"content":[{"assetId":"ML1","userDisplayName":"Photographer"}]}}`)
+		fmt.Fprint(w, `[{"assetId":123456789,"userDisplayName":"Photographer"}]`)
 	}))
 	t.Cleanup(srv.Close)
 	return macaulay.NewWithBaseURL("key", srv.URL)
@@ -86,8 +86,8 @@ func TestIngestSpecies_DampRun_UpsertsPlaceholderMedia(t *testing.T) {
 	if len(*recs) != 1 || (*recs)[0].XenoCantoID != "XC1" || (*recs)[0].FilePath != "placeholder://recordings/sonspa/XC1.mp3" {
 		t.Errorf("Should upsert placeholder recording for XC1, got %+v", *recs)
 	}
-	if len(*imgs) != 1 || (*imgs)[0].MacaulayID != "ML1" || (*imgs)[0].FilePath != "placeholder://images/sonspa/ML1.jpg" {
-		t.Errorf("Should upsert placeholder image for ML1, got %+v", *imgs)
+	if len(*imgs) != 1 || (*imgs)[0].MacaulayID != "123456789" || (*imgs)[0].FilePath != "placeholder://images/sonspa/123456789.jpg" {
+		t.Errorf("Should upsert placeholder image for 123456789, got %+v", *imgs)
 	}
 }
 
@@ -129,14 +129,14 @@ func TestIngestSpecies_XCSearchError_RecordedAndImagesContinue(t *testing.T) {
 
 func TestIngestSpecies_BannedImagesAreSkipped(t *testing.T) {
 	q, _, imgs := happyStore(t)
-	banned := map[string]struct{}{"ML1": {}}
+	banned := map[string]struct{}{"123456789": {}}
 	stats, err := ingestSpecies(context.Background(), q, xcServer(t), macServer(t, 0),
 		testEntry, 4, 3, 0, nil, nil, banned, 0, discard)
 	if err != nil {
 		t.Fatalf("Should ingest without error, got %v", err)
 	}
 	if stats.images != 0 || len(*imgs) != 0 {
-		t.Errorf("Should skip banned image ML1, got %d upserts", len(*imgs))
+		t.Errorf("Should skip banned image 123456789, got %d upserts", len(*imgs))
 	}
 }
 

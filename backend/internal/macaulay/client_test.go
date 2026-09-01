@@ -13,17 +13,17 @@ import (
 
 func TestPhotos(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/api/v1/search", r.URL.Path)
+		assert.Equal(t, "/api/v2/search", r.URL.Path)
 		assert.Equal(t, "soospa", r.URL.Query().Get("taxonCode"))
 		assert.Equal(t, "photo", r.URL.Query().Get("mediaType"))
 		assert.Equal(t, "rating_rank_desc", r.URL.Query().Get("sort"))
 		assert.Equal(t, "testkey", r.Header.Get("X-eBirdApiToken"))
-		json.NewEncoder(w).Encode(apiResponse{Results: apiResults{Content: []Photo{
-			{AssetID: "111111111", UserDisplayName: "Jane Birder"},
-			{AssetID: "222222222", UserDisplayName: "John Watcher"},
-			{AssetID: "333333333", UserDisplayName: "Alice Finch"},
-			{AssetID: "444444444", UserDisplayName: "Bob Sparrow"},
-		}}})
+		json.NewEncoder(w).Encode([]apiPhoto{
+			{AssetID: 111111111, UserDisplayName: "Jane Birder"},
+			{AssetID: 222222222, UserDisplayName: "John Watcher"},
+			{AssetID: 333333333, UserDisplayName: "Alice Finch"},
+			{AssetID: 444444444, UserDisplayName: "Bob Sparrow"},
+		})
 	}))
 	defer srv.Close()
 

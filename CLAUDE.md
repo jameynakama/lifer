@@ -86,4 +86,4 @@ All three are **ingestion-only** -- never hit at runtime.
 
 - **eBird:** regional checklists → preset decks
 - **Xeno-canto (v3, not v2):** query `gen:Genus sp:species` -- **do NOT use `en:`** (XC English names differ from eBird → silent empty results); **do NOT use `q:A`** (filter quality client-side); use `url.PathEscape` not `url.Values.Encode` (XC needs `%20` not `+`)
-- **Macaulay Library:** same eBird key, `X-eBirdApiToken` header; host is **search.macaulaylibrary.org**, not api.ebird.org
+- **Macaulay Library:** same eBird key, `X-eBirdApiToken` header; host is **search.macaulaylibrary.org**, not api.ebird.org. Use **`/api/v2/search`** -- v1 is gone (404). v2 returns a **bare JSON array** (no `results.content` wrapper) and `assetId` as a **number**, formatted to string for `macaulay_id`
