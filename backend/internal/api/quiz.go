@@ -27,6 +27,10 @@ type nextCardResponse struct {
 	RecordingCredit string `json:"recording_credit"`
 	PhotoCredit     string `json:"photo_credit"`
 	DueRemaining    int64  `json:"due_remaining"`
+	// Precomputed waveform envelope, 0..255 per bucket. Absent until the
+	// recording has been through the transcode backfill; the player draws
+	// generated bars in the meantime.
+	Peaks []int16 `json:"peaks,omitempty"`
 }
 
 func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
@@ -82,6 +86,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var mediaURL, mediaID, recordingType, recordingCredit, photoURL, photoCredit string
+	var peaks []int16
 	if lane == "audio" {
 		if media.AudioPath == "" {
 			// Defensive: GetNextDueCard's media filter should prevent this.
@@ -95,6 +100,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		recordingCredit = media.AudioCredit
 		photoURL = media.ImagePath
 		photoCredit = media.ImageCredit
+		peaks = media.AudioPeaks
 	} else {
 		if media.ImagePath == "" {
 			log.Printf("no media for species %s lane %s", card.SpeciesCode, lane)
@@ -119,6 +125,7 @@ func (h *Handler) getNextCard(w http.ResponseWriter, r *http.Request) {
 		RecordingCredit: recordingCredit,
 		PhotoCredit:     photoCredit,
 		DueRemaining:    card.DueRemaining,
+		Peaks:           peaks,
 	})
 }
 
@@ -160,9 +167,11 @@ func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
 			photoURL = row.ImageUrl
 		}
 		var recordingCredit, photoCredit string
+		var peaks []int16
 		if lane == "audio" {
 			recordingCredit = row.AudioCredit
 			photoCredit = row.ImageCredit
+			peaks = row.AudioPeaks
 		} else {
 			photoCredit = row.ImageCredit
 		}
@@ -176,6 +185,7 @@ func (h *Handler) getPracticeCards(w http.ResponseWriter, r *http.Request) {
 			Lane:            lane,
 			RecordingCredit: recordingCredit,
 			PhotoCredit:     photoCredit,
+			Peaks:           peaks,
 		})
 	}
 

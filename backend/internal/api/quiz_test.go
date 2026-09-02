@@ -446,6 +446,200 @@ func TestGetNextCard_NoMedia_Returns404(t *testing.T) {
 	assert.Equal(t, http.StatusNotFound, w.Code)
 }
 
+func TestGetNextCard_IncludesPeaksForAudioLane(t *testing.T) {
+	due := pgtype.Timestamptz{}
+	require.NoError(t, due.Scan(time.Now().Add(-time.Hour)))
+
+	peaks := make([]int16, 1000)
+	peaks[0] = 200
+
+	q := &stubQuerier{
+		getDeck: deckOwnedBy(1),
+		getNextDueCard: func(_ context.Context, _ store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
+			return store.GetNextDueCardRow{SpeciesCode: "spotto", Lane: "audio", Due: due}, nil
+		},
+		getRandomMedia: func(_ context.Context, _ string) (store.GetRandomMediaForSpeciesRow, error) {
+			return store.GetRandomMediaForSpeciesRow{
+				AudioPath:  "https://r2.example.com/recordings/spotto/123.mp3",
+				AudioID:    "XC1",
+				AudioPeaks: peaks,
+				ImagePath:  "https://r2.example.com/images/spotto/456.jpg",
+				ImageID:    "ML1",
+			}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/next?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getNextCard(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body nextCardResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	require.Len(t, body.Peaks, 1000)
+	assert.Equal(t, int16(200), body.Peaks[0])
+}
+
+func TestGetNextCard_OmitsPeaksWhenNotBackfilled(t *testing.T) {
+	due := pgtype.Timestamptz{}
+	require.NoError(t, due.Scan(time.Now().Add(-time.Hour)))
+
+	q := &stubQuerier{
+		getDeck: deckOwnedBy(1),
+		getNextDueCard: func(_ context.Context, _ store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
+			return store.GetNextDueCardRow{SpeciesCode: "spotto", Lane: "audio", Due: due}, nil
+		},
+		getRandomMedia: func(_ context.Context, _ string) (store.GetRandomMediaForSpeciesRow, error) {
+			return store.GetRandomMediaForSpeciesRow{
+				AudioPath:  "https://r2.example.com/recordings/spotto/123.mp3",
+				AudioID:    "XC1",
+				AudioPeaks: nil,
+			}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/next?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getNextCard(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NotContains(t, w.Body.String(), `"peaks"`, "a NULL peaks column must not appear in the payload")
+}
+
+func TestGetNextCard_OmitsPeaksForImageLane(t *testing.T) {
+	due := pgtype.Timestamptz{}
+	require.NoError(t, due.Scan(time.Now().Add(-time.Hour)))
+
+	peaks := make([]int16, 1000)
+
+	q := &stubQuerier{
+		getDeck: deckOwnedBy(1),
+		getNextDueCard: func(_ context.Context, _ store.GetNextDueCardParams) (store.GetNextDueCardRow, error) {
+			return store.GetNextDueCardRow{SpeciesCode: "spotto", Lane: "image", Due: due}, nil
+		},
+		getRandomMedia: func(_ context.Context, _ string) (store.GetRandomMediaForSpeciesRow, error) {
+			return store.GetRandomMediaForSpeciesRow{
+				AudioPath:  "https://r2.example.com/recordings/spotto/123.mp3",
+				AudioPeaks: peaks,
+				ImagePath:  "https://r2.example.com/images/spotto/456.jpg",
+				ImageID:    "ML1",
+			}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/next?lane=image", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getNextCard(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NotContains(t, w.Body.String(), `"peaks"`, "the image lane has no waveform")
+}
+
+func TestGetPracticeCards_IncludesPeaksForAudioLane(t *testing.T) {
+	peaks := make([]int16, 1000)
+	peaks[0] = 200
+
+	q := &stubQuerier{
+		getDeck: deckOwnedBy(1),
+		getDeckPracticeCards: func(_ context.Context, _ int64) ([]store.GetDeckPracticeCardsRow, error) {
+			return []store.GetDeckPracticeCardsRow{
+				{
+					EbirdCode:  "spotto",
+					AudioUrl:   "https://r2.example.com/rec.mp3",
+					AudioID:    "XC1",
+					AudioPeaks: peaks,
+					ImageUrl:   "https://r2.example.com/img.jpg",
+					ImageID:    "ML1",
+				},
+			}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/practice?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	var body []nextCardResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&body))
+	require.Len(t, body, 1)
+	require.Len(t, body[0].Peaks, 1000)
+	assert.Equal(t, int16(200), body[0].Peaks[0])
+}
+
+func TestGetPracticeCards_OmitsPeaksWhenNotBackfilled(t *testing.T) {
+	q := &stubQuerier{
+		getDeck: deckOwnedBy(1),
+		getDeckPracticeCards: func(_ context.Context, _ int64) ([]store.GetDeckPracticeCardsRow, error) {
+			return []store.GetDeckPracticeCardsRow{
+				{
+					EbirdCode:  "spotto",
+					AudioUrl:   "https://r2.example.com/rec.mp3",
+					AudioID:    "XC1",
+					AudioPeaks: nil,
+				},
+			}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/practice?lane=audio", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NotContains(t, w.Body.String(), `"peaks"`, "a NULL peaks column must not appear in the payload")
+}
+
+func TestGetPracticeCards_OmitsPeaksForImageLane(t *testing.T) {
+	peaks := make([]int16, 1000)
+
+	q := &stubQuerier{
+		getDeck: deckOwnedBy(1),
+		getDeckPracticeCards: func(_ context.Context, _ int64) ([]store.GetDeckPracticeCardsRow, error) {
+			return []store.GetDeckPracticeCardsRow{
+				{
+					EbirdCode:  "spotto",
+					AudioUrl:   "https://r2.example.com/rec.mp3",
+					AudioPeaks: peaks,
+					ImageUrl:   "https://r2.example.com/img.jpg",
+					ImageID:    "ML1",
+				},
+			}, nil
+		},
+	}
+
+	h := makeHandler(q)
+	r := httptest.NewRequest(http.MethodGet, "/api/v1/decks/42/practice?lane=image", nil)
+	r = injectUserID(r, 1)
+	r = withChiParam(r, "id", "42")
+	w := httptest.NewRecorder()
+
+	h.getPracticeCards(w, r)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.NotContains(t, w.Body.String(), `"peaks"`, "the image lane has no waveform")
+}
+
 func TestGetPracticeCards_Audio_ReturnsAllSpecies(t *testing.T) {
 	q := &stubQuerier{
 		getDeck: func(_ context.Context, id int64) (store.Deck, error) {
