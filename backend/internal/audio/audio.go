@@ -4,11 +4,13 @@
 package audio
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -83,6 +85,47 @@ func normalizeFormat(name string) string {
 		return ""
 	}
 	return strings.Split(name, ",")[0]
+}
+
+const (
+	// TargetPeakDBFS is where the loudest sample lands after normalization.
+	// Peak normalization is a linear gain, so signal-to-noise is preserved
+	// exactly -- unlike loudnorm, which targets integrated loudness and would
+	// apply far more gain to the mostly-quiet recordings xeno-canto carries,
+	// lifting hiss and insects to audible levels.
+	TargetPeakDBFS = -1.0
+
+	// MaxBoostDB caps upward gain. A file needing more than this is effectively
+	// silent; boosting it would raise noise to full scale for no benefit.
+	MaxBoostDB = 20.0
+)
+
+var maxVolumeRe = regexp.MustCompile(`max_volume:\s*(-?[0-9.]+) dB`)
+
+// gainFor measures the file's peak and returns the dB adjustment that puts it
+// at TargetPeakDBFS, clamped to MaxBoostDB.
+func gainFor(ctx context.Context, path string) (float64, error) {
+	cmd := exec.CommandContext(ctx, "ffmpeg", "-i", path, "-af", "volumedetect", "-f", "null", "-")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		var execErr *exec.Error
+		if errors.As(err, &execErr) && errors.Is(execErr.Err, exec.ErrNotFound) {
+			return 0, ErrFFmpegMissing
+		}
+		return 0, fmt.Errorf("volumedetect %s: %w: %s", path, err, stderr.String())
+	}
+
+	m := maxVolumeRe.FindSubmatch(stderr.Bytes())
+	if m == nil {
+		return 0, fmt.Errorf("volumedetect %s: no max_volume in output", path)
+	}
+	maxVolume, err := strconv.ParseFloat(string(m[1]), 64)
+	if err != nil {
+		return 0, fmt.Errorf("volumedetect %s: parse max_volume %q: %w", path, m[1], err)
+	}
+
+	return min(TargetPeakDBFS-maxVolume, MaxBoostDB), nil
 }
 
 // run executes an ffmpeg-family command and returns its stdout. Stderr is
