@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jameynakama/flockdeck/internal/audio"
 	"github.com/jameynakama/flockdeck/internal/ebird"
 	"github.com/jameynakama/flockdeck/internal/macaulay"
 	"github.com/jameynakama/flockdeck/internal/r2"
@@ -223,12 +225,14 @@ type mediaUpserter interface {
 	UpsertSpeciesImage(ctx context.Context, arg store.UpsertSpeciesImageParams) (store.SpeciesImage, error)
 }
 
-// uploadRecording ensures the recording's file is in R2 (or a placeholder when
-// r2c is nil) and upserts its DB row. Any failure, including the DB write, is
-// returned so the caller can record it.
+// uploadRecording transcodes the recording to mono 96 kbps mp3 (peak-normalized,
+// with waveform peaks extracted from the same decode), ensures it is in R2, and
+// upserts its DB row. Any failure, including the DB write, is returned so the
+// caller can record it.
 func uploadRecording(ctx context.Context, q mediaUpserter, r2c *r2.Client, rec xenocanto.Recording, speciesCode string, workerID int, send func(any)) error {
 	key := "recordings/" + speciesCode + "/" + rec.ID + ".mp3"
-	filePath, err := ensureUploaded(ctx, r2c, rec.FileURL, key, "audio/mpeg", workerID, send)
+
+	filePath, peaks, err := ensureRecordingUploaded(ctx, r2c, rec.FileURL, key, workerID, send)
 	if err != nil {
 		return err
 	}
@@ -239,6 +243,7 @@ func uploadRecording(ctx context.Context, q mediaUpserter, r2c *r2.Client, rec x
 		Quality:     rec.Quality,
 		Type:        rec.Type,
 		Credit:      rec.Rec,
+		Peaks:       peaks,
 	}); err != nil {
 		return fmt.Errorf("db upsert: %w", err)
 	}
@@ -284,6 +289,43 @@ func ensureUploaded(ctx context.Context, r2c *r2.Client, sourceURL, key, content
 	return fetchAndUpload(ctx, r2c, sourceURL, key, contentType, workerID, send)
 }
 
+// ensureRecordingUploaded is ensureUploaded's audio counterpart: it transcodes
+// before uploading and returns the waveform peaks alongside the URL. Peaks come
+// back nil when the object already exists (no decode happened) -- UpsertRecording
+// COALESCEs, so nil never clobbers peaks the backfill wrote.
+func ensureRecordingUploaded(ctx context.Context, r2c *r2.Client, sourceURL, key string, workerID int, send func(any)) (string, []int16, error) {
+	if r2c == nil {
+		return "placeholder://" + key, nil, nil
+	}
+	exists, err := r2c.Exists(ctx, key)
+	if err != nil {
+		return "", nil, err
+	}
+	if exists {
+		return r2c.URL(key), nil, nil
+	}
+
+	path, cleanup, err := fetchToTemp(ctx, sourceURL, key, workerID, send)
+	if err != nil {
+		return "", nil, err
+	}
+	defer cleanup()
+
+	res, err := audio.Transcode(ctx, path)
+	if err != nil {
+		send(uploadDoneMsg{workerID: workerID, key: key, err: err})
+		return "", nil, fmt.Errorf("transcode %s: %w", key, err)
+	}
+
+	send(uploadStartedMsg{workerID: workerID, key: key})
+	url, err := r2c.Upload(ctx, key, "audio/mpeg", bytes.NewReader(res.Data))
+	send(uploadDoneMsg{workerID: workerID, key: key, err: err})
+	if err != nil {
+		return "", nil, err
+	}
+	return url, res.Peaks, nil
+}
+
 // xcGenSp returns the genus and species to use for a xeno-canto query.
 func xcGenSp(ebirdCode, sciName string, xcOverrides map[string][2]string) (genus, species string) {
 	if override, ok := xcOverrides[ebirdCode]; ok {
@@ -316,11 +358,14 @@ func parseXCOverrides(s string) (map[string][2]string, error) {
 	return out, nil
 }
 
-// fetchAndUpload GETs from sourceURL and uploads the body to R2 at key.
-// Sends fetchStartedMsg, uploadStartedMsg, and uploadDoneMsg via send.
-// Retries on 429 and 503 from the source. Returns the full public R2 URL.
-func fetchAndUpload(ctx context.Context, r2c *r2.Client, sourceURL, key, contentType string, workerID int, send func(any)) (string, error) {
+// fetchToTemp GETs sourceURL into a temp file and returns its path plus a
+// cleanup func the caller must always invoke. Retries on 429 and 503 from the
+// source. Buffering to disk (rather than streaming straight through) is what
+// lets the audio path measure the file before encoding it: a pipe cannot rewind.
+func fetchToTemp(ctx context.Context, sourceURL, key string, workerID int, send func(any)) (string, func(), error) {
 	send(fetchStartedMsg{workerID: workerID, key: key})
+	noop := func() {}
+
 	var lastErr error
 	for attempt := range len(retryDelays) + 1 {
 		if attempt > 0 {
@@ -329,18 +374,18 @@ func fetchAndUpload(ctx context.Context, r2c *r2.Client, sourceURL, key, content
 			case <-ctx.Done():
 				err := ctx.Err()
 				send(uploadDoneMsg{workerID: workerID, key: key, err: err})
-				return "", err
+				return "", noop, err
 			}
 		}
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, sourceURL, nil)
 		if err != nil {
 			send(uploadDoneMsg{workerID: workerID, key: key, err: err})
-			return "", err
+			return "", noop, err
 		}
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			send(uploadDoneMsg{workerID: workerID, key: key, err: err})
-			return "", err
+			return "", noop, err
 		}
 		if resp.StatusCode == http.StatusTooManyRequests || resp.StatusCode == http.StatusServiceUnavailable {
 			resp.Body.Close()
@@ -351,20 +396,54 @@ func fetchAndUpload(ctx context.Context, r2c *r2.Client, sourceURL, key, content
 			resp.Body.Close()
 			err := fmt.Errorf("fetch %s: status %d", sourceURL, resp.StatusCode)
 			send(uploadDoneMsg{workerID: workerID, key: key, err: err})
-			return "", err
+			return "", noop, err
 		}
-		send(uploadStartedMsg{workerID: workerID, key: key})
-		url, err := r2c.Upload(ctx, key, contentType, resp.Body)
-		resp.Body.Close()
+
+		f, err := os.CreateTemp("", "flockdeck-fetch-")
 		if err != nil {
+			resp.Body.Close()
 			send(uploadDoneMsg{workerID: workerID, key: key, err: err})
-			return "", err
+			return "", noop, err
 		}
-		send(uploadDoneMsg{workerID: workerID, key: key, err: nil})
-		return url, nil
+		_, copyErr := io.Copy(f, resp.Body)
+		resp.Body.Close()
+		f.Close()
+		cleanup := func() { os.Remove(f.Name()) } //nolint:errcheck
+		if copyErr != nil {
+			cleanup()
+			send(uploadDoneMsg{workerID: workerID, key: key, err: copyErr})
+			return "", noop, copyErr
+		}
+		return f.Name(), cleanup, nil
 	}
 	send(uploadDoneMsg{workerID: workerID, key: key, err: lastErr})
-	return "", lastErr
+	return "", noop, lastErr
+}
+
+// fetchAndUpload GETs from sourceURL and uploads the body to R2 at key.
+// Returns the full public R2 URL. Used by the image lane, which stores bytes
+// verbatim; the recording lane transcodes instead (see uploadRecording).
+func fetchAndUpload(ctx context.Context, r2c *r2.Client, sourceURL, key, contentType string, workerID int, send func(any)) (string, error) {
+	path, cleanup, err := fetchToTemp(ctx, sourceURL, key, workerID, send)
+	if err != nil {
+		return "", err
+	}
+	defer cleanup()
+
+	f, err := os.Open(path)
+	if err != nil {
+		send(uploadDoneMsg{workerID: workerID, key: key, err: err})
+		return "", err
+	}
+	defer f.Close()
+
+	send(uploadStartedMsg{workerID: workerID, key: key})
+	url, err := r2c.Upload(ctx, key, contentType, f)
+	send(uploadDoneMsg{workerID: workerID, key: key, err: err})
+	if err != nil {
+		return "", err
+	}
+	return url, nil
 }
 
 func filterBySpecies(codes []string, taxMap map[string]ebird.TaxonomyEntry, want []string) []string {

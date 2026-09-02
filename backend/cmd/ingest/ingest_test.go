@@ -3,9 +3,15 @@ package main
 import (
 	"context"
 	"errors"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"os"
 	"testing"
 
+	"github.com/jameynakama/flockdeck/internal/audio"
 	"github.com/jameynakama/flockdeck/internal/macaulay"
+	"github.com/jameynakama/flockdeck/internal/r2"
 	"github.com/jameynakama/flockdeck/internal/store"
 	"github.com/jameynakama/flockdeck/internal/xenocanto"
 	"github.com/stretchr/testify/assert"
@@ -98,6 +104,81 @@ func TestUploadImage_Success_UpsertsWithImageFields(t *testing.T) {
 	assert.Equal(t, "spotto", got.SpeciesCode)
 	assert.Equal(t, "Photographer", got.Credit)
 	assert.Equal(t, "placeholder://images/spotto/456.jpg", got.FilePath)
+}
+
+func TestUploadRecording_TranscodesAndStoresPeaks(t *testing.T) {
+	wav, err := os.ReadFile("../../internal/audio/testdata/stereo.wav")
+	require.NoError(t, err)
+
+	src := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write(wav)
+	}))
+	defer src.Close()
+
+	var uploaded []byte
+	var uploadedType string
+	r2srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPut:
+			uploaded, _ = io.ReadAll(r.Body)
+			uploadedType = r.Header.Get("Content-Type")
+			w.Header().Set("ETag", `"abc"`)
+			w.WriteHeader(http.StatusOK)
+		case http.MethodHead:
+			// The object doesn't exist yet, so uploadRecording must transcode and upload it.
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer r2srv.Close()
+
+	r2c, err := r2.NewWithEndpoint(r2srv.URL, "k", "s", "flockdeck", "https://pub.example.com")
+	require.NoError(t, err)
+
+	var got store.UpsertRecordingParams
+	q := &stubUpserter{t: t, upsertRecording: func(arg store.UpsertRecordingParams) (store.SpeciesRecording, error) {
+		got = arg
+		return store.SpeciesRecording{}, nil
+	}}
+	rec := xenocanto.Recording{ID: "12345", FileURL: src.URL, Quality: "A", Type: "song", Rec: "Someone"}
+
+	err = uploadRecording(context.Background(), q, r2c, rec, "sonspa", 0, discard)
+	require.NoError(t, err)
+
+	// The source was a 1.4 Mbps WAV; what landed must be a much smaller mp3.
+	assert.Equal(t, "audio/mpeg", uploadedType)
+	assert.Less(t, len(uploaded), len(wav)/4, "transcoded audio must be far smaller than the WAV source")
+	assert.Equal(t, []byte("ID3"), uploaded[:3], "output must be an mp3")
+
+	assert.Len(t, got.Peaks, audio.PeakCount)
+}
+
+func TestEnsureUploaded_StillShortCircuitsOnExists(t *testing.T) {
+	var puts int
+	r2srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut {
+			puts++
+		}
+		// HEAD returns 200: the object already exists.
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer r2srv.Close()
+
+	r2c, err := r2.NewWithEndpoint(r2srv.URL, "k", "s", "flockdeck", "https://pub.example.com")
+	require.NoError(t, err)
+
+	var got store.UpsertRecordingParams
+	q := &stubUpserter{t: t, upsertRecording: func(arg store.UpsertRecordingParams) (store.SpeciesRecording, error) {
+		got = arg
+		return store.SpeciesRecording{}, nil
+	}}
+	rec := xenocanto.Recording{ID: "12345", FileURL: "http://unused.invalid", Quality: "A", Type: "song"}
+
+	require.NoError(t, uploadRecording(context.Background(), q, r2c, rec, "sonspa", 0, discard))
+
+	assert.Zero(t, puts, "an existing object must not be re-uploaded")
+	assert.Nil(t, got.Peaks, "no peaks to offer when the upload was skipped")
 }
 
 func TestPartitionProtected(t *testing.T) {
