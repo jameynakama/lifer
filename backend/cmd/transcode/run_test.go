@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/jameynakama/flockdeck/internal/audio"
 	"github.com/jameynakama/flockdeck/internal/store"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -204,4 +205,24 @@ func TestSweep_VerificationFailureSkipsUpload(t *testing.T) {
 	assert.Empty(t, obj.uploads, "a failed row must leave its original object alone")
 	assert.Empty(t, q.peakParams)
 	assert.Len(t, rep.Failures, 1)
+}
+
+func TestVerify_RejectsNonMP3Output(t *testing.T) {
+	data, err := os.ReadFile("../../internal/audio/testdata/stereo.wav")
+	require.NoError(t, err)
+
+	err = verify(context.Background(), data, 2.0)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "not mp3", "must identify the format check as the failing one")
+}
+
+func TestVerify_RejectsDurationDrift(t *testing.T) {
+	res, err := audio.Transcode(context.Background(), "../../internal/audio/testdata/stereo.wav")
+	require.NoError(t, err)
+
+	// The real output is ~2s; claiming a wildly different source duration must
+	// trip the drift check even though the mp3 itself is valid.
+	err = verify(context.Background(), res.Data, 100.0)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duration drifted", "must identify the duration check as the failing one")
 }
