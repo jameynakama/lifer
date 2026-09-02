@@ -1304,6 +1304,27 @@ func TestGetCardsInTier_Egg(t *testing.T) {
 	assert.Len(t, rows, 2, "both never-quizzed lanes are eggs")
 }
 
+// ListRecordingsForTranscode
+
+func TestListRecordingsForTranscode_ExcludesRowsWithPeaks(t *testing.T) {
+	pool := connectTestDB(t)
+	tx := withTx(t, pool)
+	seedFixtures(t, tx)
+	q := store.New(tx)
+	ctx := context.Background()
+
+	_, err := tx.Exec(ctx,
+		`UPDATE species_recordings SET peaks = '{1,2,3}' WHERE xeno_canto_id = '_xc_tst1'`)
+	require.NoError(t, err)
+
+	rows, err := q.ListRecordingsForTranscode(ctx)
+	require.NoError(t, err)
+	for _, r := range rows {
+		assert.NotEqual(t, "_xc_tst1", r.XenoCantoID,
+			"a row with peaks already set must not be returned, so --limit only ever samples real work")
+	}
+}
+
 // GetNextDueCard must not present tied-due cards in a fixed order: a fresh deck
 // seeds every card with the same `due`, and a deterministic tiebreak made the
 // quiz replay the identical species sequence every session. We bucket due by

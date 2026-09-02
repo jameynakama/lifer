@@ -112,6 +112,8 @@ type Querier interface {
 	// Queries for cmd/transcode. Deliberately narrow: the job reads recordings and
 	// writes peaks, nothing else. It must never reach ingest's cleanup queries,
 	// which delete species rows DB-wide and cascade to cards and review_log.
+	// Only rows still needing work, so --limit samples real remaining work
+	// instead of rows the caller would immediately skip.
 	ListRecordingsForTranscode(ctx context.Context) ([]ListRecordingsForTranscodeRow, error)
 	ListSpecies(ctx context.Context, arg ListSpeciesParams) ([]ListSpeciesRow, error)
 	ListSpeciesCodes(ctx context.Context) ([]string, error)
