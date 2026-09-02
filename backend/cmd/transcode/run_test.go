@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/jameynakama/flockdeck/internal/audio"
@@ -15,8 +16,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// fakeStore is driven concurrently by sweep's worker pool, so its mutable
+// state needs its own lock -- separate from run.go's, which only protects
+// sweep's own report aggregation.
 type fakeStore struct {
-	rows       []store.ListRecordingsForTranscodeRow
+	rows []store.ListRecordingsForTranscodeRow
+
+	mu         sync.Mutex
 	peakParams []store.SetRecordingPeaksParams
 }
 
@@ -25,11 +31,15 @@ func (f *fakeStore) ListRecordingsForTranscode(context.Context) ([]store.ListRec
 }
 
 func (f *fakeStore) SetRecordingPeaks(_ context.Context, arg store.SetRecordingPeaksParams) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.peakParams = append(f.peakParams, arg)
 	return nil
 }
 
+// fakeObjects is likewise driven concurrently by sweep's worker pool.
 type fakeObjects struct {
+	mu      sync.Mutex
 	uploads map[string][]byte
 	types   map[string]string
 }
@@ -47,8 +57,10 @@ func (f *fakeObjects) Upload(_ context.Context, key, contentType string, body io
 	if err != nil {
 		return "", err
 	}
+	f.mu.Lock()
 	f.uploads[key] = b
 	f.types[key] = contentType
+	f.mu.Unlock()
 	return "https://media.flockdeck.com/" + key, nil
 }
 
