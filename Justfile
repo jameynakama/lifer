@@ -67,6 +67,12 @@ migration name:
 ingest *args:
     cd backend && go run ./cmd/ingest {{ args }}
 
+# Re-encode stored recordings to mono 96k mp3 + waveform peaks.
+# DRY RUN by default -- pass --apply to actually write. `just transcode --file x.wav`
+# checks the encode locally with no DB or R2.
+transcode *args:
+    cd backend && go run ./cmd/transcode {{ args }}
+
 # Seed a local user with simulated study history (usage: just seed you@example.com --days 30)
 seed email *args:
     cd backend && go run ./cmd/seed {{ args }} {{ email }}
