@@ -104,6 +104,30 @@ func TestSweep_ApplyUploadsAtTheSameKeyAndWritesPeaks(t *testing.T) {
 	assert.Len(t, q.peakParams[0].Peaks, 1000)
 }
 
+// A row that is already conformant (mono, under the bit rate ceiling) but too
+// quiet must still be re-uploaded: the transcode that measures its peaks
+// applies real gain, so leaving the stored object alone would leave peaks on
+// file that describe louder audio than what actually plays.
+func TestSweep_ConformantButQuietRowIsStillUploaded(t *testing.T) {
+	q := &fakeStore{rows: []store.ListRecordingsForTranscodeRow{wavRow()}}
+	obj := newFakeObjects()
+
+	rep, err := sweep(context.Background(), io.Discard, q, obj,
+		fixtureFetcher(t, "../../internal/audio/testdata/quiet96.mp3"),
+		options{apply: true, workers: 1})
+	require.NoError(t, err)
+
+	assert.Equal(t, 1, rep.Counts[actionPeaksOnly], "quiet96.mp3 is mono and under the bit rate ceiling")
+	require.Len(t, obj.uploads, 1, "a peaks-only row must still be uploaded")
+	body, ok := obj.uploads["recordings/sonspa/111.mp3"]
+	require.True(t, ok, "must upload at the original key")
+	assert.Equal(t, []byte("ID3"), body[:3])
+	assert.Equal(t, int64(len(body)), rep.BytesAfter, "reported after-bytes must match the uploaded encode")
+
+	require.Len(t, q.peakParams, 1)
+	assert.Equal(t, "111", q.peakParams[0].XenoCantoID)
+}
+
 // A row whose peaks are already populated must be skipped before ever being
 // fetched: peaks are only ever written by the transcoding ingest path or by
 // this job, so a non-NULL peaks column already implies a conformant object.

@@ -148,21 +148,19 @@ func processRow(ctx context.Context, q recordingStore, obj objectStore, fetch fe
 		return actionNone, 0, 0, err
 	}
 
-	after := size
-	if act == actionTranscode {
-		after = int64(len(res.Data))
-	}
+	// Both remaining actions re-upload: the transcode above already applied
+	// peak-normalization gain, so leaving actionPeaksOnly's original object in
+	// place would store peaks that describe audio the bucket doesn't hold.
+	after := int64(len(res.Data))
 	if !apply {
 		return act, size, after, nil
 	}
 
-	if act == actionTranscode {
-		// Same key, same content type: every file_path row stays valid and the
-		// declared type finally matches the bytes.
-		key := obj.KeyFor(row.FilePath)
-		if _, err := obj.Upload(ctx, key, "audio/mpeg", bytes.NewReader(res.Data)); err != nil {
-			return actionNone, 0, 0, fmt.Errorf("upload: %w", err)
-		}
+	// Same key, same content type: every file_path row stays valid and the
+	// declared type finally matches the bytes.
+	key := obj.KeyFor(row.FilePath)
+	if _, err := obj.Upload(ctx, key, "audio/mpeg", bytes.NewReader(res.Data)); err != nil {
+		return actionNone, 0, 0, fmt.Errorf("upload: %w", err)
 	}
 	if err := q.SetRecordingPeaks(ctx, store.SetRecordingPeaksParams{
 		XenoCantoID: row.XenoCantoID,

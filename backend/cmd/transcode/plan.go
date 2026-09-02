@@ -28,9 +28,14 @@ func (a action) String() string {
 	}
 }
 
-// decide answers whether a probed recording needs re-encoding or only a decode
-// for peaks. Callers skip rows that already have peaks before ever downloading
-// them, so this is only reached for a recording whose peaks are missing.
+// decide classifies a probed recording as needing a real re-encode or as
+// already conformant. Callers skip rows that already have peaks before ever
+// downloading them, so this is only reached for a recording whose peaks are
+// missing -- and every such row is re-uploaded regardless of the answer here,
+// since the transcode that measures the peaks is the same transcode that
+// would produce the replacement object. decide only separates the report's
+// counts: how much of the catalog needed a real re-encode versus was already
+// conformant and only needed its object refreshed to match its new peaks.
 //
 // Keeping this pure is what makes the job idempotent and resumable: a run that
 // uploads but fails its DB write comes back as actionPeaksOnly on the next pass

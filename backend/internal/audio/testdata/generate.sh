@@ -27,3 +27,10 @@ ffmpeg -y -f lavfi -i "sine=frequency=1000:duration=2:sample_rate=44100" \
 # (measures around -90 dBFS, deep in 16-bit quantization noise).
 ffmpeg -y -f lavfi -i "sine=frequency=1000:duration=2:sample_rate=44100" \
        -ac 1 -af "volume=-70dB" -c:a pcm_s16le quiet.wav
+
+# 2 s mono 96 kbps MP3, quiet (peaks around -58 dBFS) -- already conformant
+# (mono, under the bit rate ceiling) but too quiet, so gainFor still wants
+# real boost. Stands in for a stored row that must be re-uploaded even though
+# it only needs the peaks-only path.
+ffmpeg -y -f lavfi -i "sine=frequency=1500:duration=2:sample_rate=44100" \
+       -ac 1 -af "volume=-40dB" -c:a libmp3lame -b:a 96k quiet96.mp3
