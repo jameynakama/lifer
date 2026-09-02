@@ -365,13 +365,14 @@ SELECT s.ebird_code, s.common_name, s.scientific_name,
        COALESCE(rec.file_path, '')     AS audio_url,
        COALESCE(rec.credit, '')        AS audio_credit,
        COALESCE(rec.xeno_canto_id, '') AS audio_id,
+       rec.peaks                       AS audio_peaks,
        COALESCE(img.file_path, '')     AS image_url,
        COALESCE(img.credit, '')        AS image_credit,
        COALESCE(img.macaulay_id, '')   AS image_id
 FROM species s
 JOIN deck_species ds ON ds.species_code = s.ebird_code
 LEFT JOIN LATERAL (
-    SELECT file_path, credit, xeno_canto_id FROM species_recordings
+    SELECT file_path, credit, xeno_canto_id, peaks FROM species_recordings
     WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
     ORDER BY random() LIMIT 1
 ) rec ON true
@@ -385,15 +386,16 @@ ORDER BY s.common_name
 `
 
 type GetDeckPracticeCardsRow struct {
-	EbirdCode      string `db:"ebird_code" json:"ebird_code"`
-	CommonName     string `db:"common_name" json:"common_name"`
-	ScientificName string `db:"scientific_name" json:"scientific_name"`
-	AudioUrl       string `db:"audio_url" json:"audio_url"`
-	AudioCredit    string `db:"audio_credit" json:"audio_credit"`
-	AudioID        string `db:"audio_id" json:"audio_id"`
-	ImageUrl       string `db:"image_url" json:"image_url"`
-	ImageCredit    string `db:"image_credit" json:"image_credit"`
-	ImageID        string `db:"image_id" json:"image_id"`
+	EbirdCode      string  `db:"ebird_code" json:"ebird_code"`
+	CommonName     string  `db:"common_name" json:"common_name"`
+	ScientificName string  `db:"scientific_name" json:"scientific_name"`
+	AudioUrl       string  `db:"audio_url" json:"audio_url"`
+	AudioCredit    string  `db:"audio_credit" json:"audio_credit"`
+	AudioID        string  `db:"audio_id" json:"audio_id"`
+	AudioPeaks     []int16 `db:"audio_peaks" json:"audio_peaks"`
+	ImageUrl       string  `db:"image_url" json:"image_url"`
+	ImageCredit    string  `db:"image_credit" json:"image_credit"`
+	ImageID        string  `db:"image_id" json:"image_id"`
 }
 
 func (q *Queries) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]GetDeckPracticeCardsRow, error) {
@@ -412,6 +414,7 @@ func (q *Queries) GetDeckPracticeCards(ctx context.Context, deckID int64) ([]Get
 			&i.AudioUrl,
 			&i.AudioCredit,
 			&i.AudioID,
+			&i.AudioPeaks,
 			&i.ImageUrl,
 			&i.ImageCredit,
 			&i.ImageID,
@@ -665,12 +668,13 @@ SELECT COALESCE(rec.file_path, '')      AS audio_path,
        COALESCE(rec.type, '')           AS audio_type,
        COALESCE(rec.credit, '')         AS audio_credit,
        COALESCE(rec.xeno_canto_id, '')  AS audio_id,
+       rec.peaks                        AS audio_peaks,
        COALESCE(img.file_path, '')      AS image_path,
        COALESCE(img.credit, '')         AS image_credit,
        COALESCE(img.macaulay_id, '')    AS image_id
 FROM (SELECT $1::text AS code) sp
 LEFT JOIN LATERAL (
-    SELECT file_path, type, credit, xeno_canto_id FROM species_recordings
+    SELECT file_path, type, credit, xeno_canto_id, peaks FROM species_recordings
     WHERE species_code = sp.code AND quality IN ('A', 'B')
     ORDER BY random() LIMIT 1
 ) rec ON true
@@ -682,13 +686,14 @@ LEFT JOIN LATERAL (
 `
 
 type GetRandomMediaForSpeciesRow struct {
-	AudioPath   string `db:"audio_path" json:"audio_path"`
-	AudioType   string `db:"audio_type" json:"audio_type"`
-	AudioCredit string `db:"audio_credit" json:"audio_credit"`
-	AudioID     string `db:"audio_id" json:"audio_id"`
-	ImagePath   string `db:"image_path" json:"image_path"`
-	ImageCredit string `db:"image_credit" json:"image_credit"`
-	ImageID     string `db:"image_id" json:"image_id"`
+	AudioPath   string  `db:"audio_path" json:"audio_path"`
+	AudioType   string  `db:"audio_type" json:"audio_type"`
+	AudioCredit string  `db:"audio_credit" json:"audio_credit"`
+	AudioID     string  `db:"audio_id" json:"audio_id"`
+	AudioPeaks  []int16 `db:"audio_peaks" json:"audio_peaks"`
+	ImagePath   string  `db:"image_path" json:"image_path"`
+	ImageCredit string  `db:"image_credit" json:"image_credit"`
+	ImageID     string  `db:"image_id" json:"image_id"`
 }
 
 // GetRandomMediaForSpecies picks a random quiz-quality recording and a random
@@ -702,6 +707,7 @@ func (q *Queries) GetRandomMediaForSpecies(ctx context.Context, dollar_1 string)
 		&i.AudioType,
 		&i.AudioCredit,
 		&i.AudioID,
+		&i.AudioPeaks,
 		&i.ImagePath,
 		&i.ImageCredit,
 		&i.ImageID,

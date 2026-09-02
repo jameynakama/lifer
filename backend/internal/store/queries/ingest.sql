@@ -11,13 +11,16 @@ RETURNING *;
 -- NOT locked delete guards below); ingest may still add new media to a locked
 -- bird and refresh same-source fields on existing rows.
 -- name: UpsertRecording :one
-INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type, credit)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type, credit, peaks)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (xeno_canto_id) DO UPDATE
     SET file_path = EXCLUDED.file_path,
         quality   = EXCLUDED.quality,
         type      = EXCLUDED.type,
-        credit    = EXCLUDED.credit
+        credit    = EXCLUDED.credit,
+        -- A re-ingest that short-circuits on r2c.Exists has no peaks to offer.
+        -- COALESCE keeps whatever the backfill already wrote.
+        peaks     = COALESCE(EXCLUDED.peaks, species_recordings.peaks)
 RETURNING *;
 
 -- name: UpsertSpeciesImage :one

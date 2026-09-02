@@ -109,6 +109,10 @@ type Querier interface {
 	ListDeckSpeciesWithPrefs(ctx context.Context, arg ListDeckSpeciesWithPrefsParams) ([]ListDeckSpeciesWithPrefsRow, error)
 	ListIncompleteSpecies(ctx context.Context) ([]string, error)
 	ListPresetDecks(ctx context.Context) ([]ListPresetDecksRow, error)
+	// Queries for cmd/transcode. Deliberately narrow: the job reads recordings and
+	// writes peaks, nothing else. It must never reach ingest's cleanup queries,
+	// which delete species rows DB-wide and cascade to cards and review_log.
+	ListRecordingsForTranscode(ctx context.Context) ([]ListRecordingsForTranscodeRow, error)
 	ListSpecies(ctx context.Context, arg ListSpeciesParams) ([]ListSpeciesRow, error)
 	ListSpeciesCodes(ctx context.Context) ([]string, error)
 	// Species with any locked media are protected from ingest cleanup: deleting
@@ -124,6 +128,7 @@ type Querier interface {
 	SeedCardsForUserDecks(ctx context.Context, userID int64) (int64, error)
 	SetImageLocked(ctx context.Context, arg SetImageLockedParams) error
 	SetRecordingLocked(ctx context.Context, arg SetRecordingLockedParams) error
+	SetRecordingPeaks(ctx context.Context, arg SetRecordingPeaksParams) error
 	SetUserIsAdmin(ctx context.Context, arg SetUserIsAdminParams) error
 	UpdateCardSchedule(ctx context.Context, arg UpdateCardScheduleParams) (Card, error)
 	UpdateDeck(ctx context.Context, arg UpdateDeckParams) (Deck, error)

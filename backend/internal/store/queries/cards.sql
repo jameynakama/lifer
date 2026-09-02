@@ -47,12 +47,13 @@ SELECT COALESCE(rec.file_path, '')      AS audio_path,
        COALESCE(rec.type, '')           AS audio_type,
        COALESCE(rec.credit, '')         AS audio_credit,
        COALESCE(rec.xeno_canto_id, '')  AS audio_id,
+       rec.peaks                        AS audio_peaks,
        COALESCE(img.file_path, '')      AS image_path,
        COALESCE(img.credit, '')         AS image_credit,
        COALESCE(img.macaulay_id, '')    AS image_id
 FROM (SELECT $1::text AS code) sp
 LEFT JOIN LATERAL (
-    SELECT file_path, type, credit, xeno_canto_id FROM species_recordings
+    SELECT file_path, type, credit, xeno_canto_id, peaks FROM species_recordings
     WHERE species_code = sp.code AND quality IN ('A', 'B')
     ORDER BY random() LIMIT 1
 ) rec ON true
@@ -103,13 +104,14 @@ SELECT s.ebird_code, s.common_name, s.scientific_name,
        COALESCE(rec.file_path, '')     AS audio_url,
        COALESCE(rec.credit, '')        AS audio_credit,
        COALESCE(rec.xeno_canto_id, '') AS audio_id,
+       rec.peaks                       AS audio_peaks,
        COALESCE(img.file_path, '')     AS image_url,
        COALESCE(img.credit, '')        AS image_credit,
        COALESCE(img.macaulay_id, '')   AS image_id
 FROM species s
 JOIN deck_species ds ON ds.species_code = s.ebird_code
 LEFT JOIN LATERAL (
-    SELECT file_path, credit, xeno_canto_id FROM species_recordings
+    SELECT file_path, credit, xeno_canto_id, peaks FROM species_recordings
     WHERE species_code = s.ebird_code AND quality IN ('A', 'B')
     ORDER BY random() LIMIT 1
 ) rec ON true

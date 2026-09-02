@@ -144,23 +144,27 @@ func (q *Queries) ListSpeciesCodesWithLockedMedia(ctx context.Context) ([]string
 }
 
 const upsertRecording = `-- name: UpsertRecording :one
-INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type, credit)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO species_recordings (xeno_canto_id, species_code, file_path, quality, type, credit, peaks)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (xeno_canto_id) DO UPDATE
     SET file_path = EXCLUDED.file_path,
         quality   = EXCLUDED.quality,
         type      = EXCLUDED.type,
-        credit    = EXCLUDED.credit
-RETURNING xeno_canto_id, species_code, file_path, quality, type, created_at, credit, locked
+        credit    = EXCLUDED.credit,
+        -- A re-ingest that short-circuits on r2c.Exists has no peaks to offer.
+        -- COALESCE keeps whatever the backfill already wrote.
+        peaks     = COALESCE(EXCLUDED.peaks, species_recordings.peaks)
+RETURNING xeno_canto_id, species_code, file_path, quality, type, created_at, credit, locked, peaks
 `
 
 type UpsertRecordingParams struct {
-	XenoCantoID string `db:"xeno_canto_id" json:"xeno_canto_id"`
-	SpeciesCode string `db:"species_code" json:"species_code"`
-	FilePath    string `db:"file_path" json:"file_path"`
-	Quality     string `db:"quality" json:"quality"`
-	Type        string `db:"type" json:"type"`
-	Credit      string `db:"credit" json:"credit"`
+	XenoCantoID string  `db:"xeno_canto_id" json:"xeno_canto_id"`
+	SpeciesCode string  `db:"species_code" json:"species_code"`
+	FilePath    string  `db:"file_path" json:"file_path"`
+	Quality     string  `db:"quality" json:"quality"`
+	Type        string  `db:"type" json:"type"`
+	Credit      string  `db:"credit" json:"credit"`
+	Peaks       []int16 `db:"peaks" json:"peaks"`
 }
 
 // "locked" protects media from REMOVAL only (see the cleanup path and the
@@ -174,6 +178,7 @@ func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams
 		arg.Quality,
 		arg.Type,
 		arg.Credit,
+		arg.Peaks,
 	)
 	var i SpeciesRecording
 	err := row.Scan(
@@ -185,6 +190,7 @@ func (q *Queries) UpsertRecording(ctx context.Context, arg UpsertRecordingParams
 		&i.CreatedAt,
 		&i.Credit,
 		&i.Locked,
+		&i.Peaks,
 	)
 	return i, err
 }

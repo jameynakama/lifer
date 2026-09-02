@@ -73,6 +73,7 @@ type SpeciesRecording struct {
 	CreatedAt   pgtype.Timestamptz `db:"created_at" json:"created_at"`
 	Credit      string             `db:"credit" json:"credit"`
 	Locked      bool               `db:"locked" json:"locked"`
+	Peaks       []int16            `db:"peaks" json:"peaks"`
 }
 
 type User struct {
