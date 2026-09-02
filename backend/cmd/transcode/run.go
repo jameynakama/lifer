@@ -79,34 +79,53 @@ func sweep(ctx context.Context, w io.Writer, q recordingStore, obj objectStore, 
 	workers := max(opts.workers, 1)
 	rep := report{Counts: map[action]int{}}
 	var mu sync.Mutex
-	sem := make(chan struct{}, workers)
+
+	rowCh := make(chan store.ListRecordingsForTranscodeRow)
 	var wg sync.WaitGroup
-
-	for _, row := range rows {
-		if ctx.Err() != nil {
-			break
-		}
-		wg.Add(1)
-		go func(row store.ListRecordingsForTranscodeRow) {
+	wg.Add(workers)
+	for range workers {
+		go func() {
 			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
+			for row := range rowCh {
+				if ctx.Err() != nil {
+					continue
+				}
 
-			act, before, after, err := processRow(ctx, q, obj, fetch, row, opts.apply)
+				act, before, after, err := processRow(ctx, q, obj, fetch, row, opts.apply)
+				if err != nil {
+					if ctx.Err() != nil {
+						// The context was canceled mid-flight, which is what made
+						// processRow fail. That is an interrupt, not a row worth
+						// reporting: the row's peaks are still NULL, so a rerun
+						// picks it up again.
+						continue
+					}
+					mu.Lock()
+					rep.Failures = append(rep.Failures, fmt.Sprintf("%s (%s): %v", row.XenoCantoID, row.SpeciesCode, err))
+					mu.Unlock()
+					fmt.Fprintf(w, "  FAIL %s %s: %v\n", row.SpeciesCode, row.XenoCantoID, err)
+					continue
+				}
 
-			mu.Lock()
-			defer mu.Unlock()
-			if err != nil {
-				rep.Failures = append(rep.Failures, fmt.Sprintf("%s (%s): %v", row.XenoCantoID, row.SpeciesCode, err))
-				fmt.Fprintf(w, "  FAIL %s %s: %v\n", row.SpeciesCode, row.XenoCantoID, err)
-				return
+				mu.Lock()
+				rep.Counts[act]++
+				rep.BytesBefore += before
+				rep.BytesAfter += after
+				mu.Unlock()
+				fmt.Fprintf(w, "  %-9s %s %s  %s -> %s\n", act, row.SpeciesCode, row.XenoCantoID, humanBytes(before), humanBytes(after))
 			}
-			rep.Counts[act]++
-			rep.BytesBefore += before
-			rep.BytesAfter += after
-			fmt.Fprintf(w, "  %-9s %s %s  %s -> %s\n", act, row.SpeciesCode, row.XenoCantoID, humanBytes(before), humanBytes(after))
-		}(row)
+		}()
 	}
+
+feed:
+	for _, row := range rows {
+		select {
+		case rowCh <- row:
+		case <-ctx.Done():
+			break feed
+		}
+	}
+	close(rowCh)
 	wg.Wait()
 
 	writeSummary(w, rep, opts.apply)

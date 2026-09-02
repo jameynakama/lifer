@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/jameynakama/flockdeck/internal/audio"
@@ -225,4 +227,74 @@ func TestVerify_RejectsDurationDrift(t *testing.T) {
 	err = verify(context.Background(), res.Data, 100.0)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "duration drifted", "must identify the duration check as the failing one")
+}
+
+// With workers > 1, rows are dispatched to a fixed pool rather than one
+// goroutine per row. The report must still land on the correct totals no
+// matter how the pool interleaves them.
+func TestSweep_WorkersGreaterThanOneProcessesAllRowsCorrectly(t *testing.T) {
+	fixtureFor := map[string]string{
+		"t1": "../../internal/audio/testdata/stereo.wav",
+		"t2": "../../internal/audio/testdata/stereo.wav",
+		"t3": "../../internal/audio/testdata/stereo.wav",
+		"p1": "../../internal/audio/testdata/quiet96.mp3",
+	}
+	var rows []store.ListRecordingsForTranscodeRow
+	for id := range fixtureFor {
+		row := wavRow()
+		row.XenoCantoID = id
+		row.FilePath = "https://media.flockdeck.com/recordings/sonspa/" + id + ".mp3"
+		rows = append(rows, row)
+	}
+	for _, id := range []string{"s1", "s2"} {
+		row := wavRow()
+		row.XenoCantoID = id
+		row.Peaks = make([]int16, 1000)
+		rows = append(rows, row)
+	}
+
+	q := &fakeStore{rows: rows}
+	obj := newFakeObjects()
+	fetch := func(ctx context.Context, url string) (string, int64, func(), error) {
+		id := strings.TrimSuffix(strings.TrimPrefix(url, "https://media.flockdeck.com/recordings/sonspa/"), ".mp3")
+		fixture, ok := fixtureFor[id]
+		require.True(t, ok, "unexpected fetch for %s", url)
+		return fixtureFetcher(t, fixture)(ctx, url)
+	}
+
+	rep, err := sweep(context.Background(), io.Discard, q, obj, fetch, options{apply: true, workers: 3})
+	require.NoError(t, err)
+
+	assert.Equal(t, 3, rep.Counts[actionTranscode])
+	assert.Equal(t, 1, rep.Counts[actionPeaksOnly])
+	assert.Equal(t, 2, rep.Counts[actionSkip])
+	assert.Empty(t, rep.Failures)
+	assert.Len(t, obj.uploads, 4, "every non-skip row must be uploaded")
+}
+
+// Interrupting a sweep cancels the context; the in-flight row's fetch fails
+// with context.Canceled as a direct result, and that must not be recorded as
+// a row failure (it would flood the terminal with FAIL lines and force a
+// non-zero exit on nothing but an interrupt).
+func TestSweep_ContextCancellationDuringFetchIsNotRecordedAsFailure(t *testing.T) {
+	rows := make([]store.ListRecordingsForTranscodeRow, 5)
+	for i := range rows {
+		rows[i] = wavRow()
+		rows[i].XenoCantoID = fmt.Sprintf("row%d", i)
+	}
+	q := &fakeStore{rows: rows}
+	obj := newFakeObjects()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	fetch := func(ctx context.Context, url string) (string, int64, func(), error) {
+		cancel()
+		return "", 0, func() {}, ctx.Err()
+	}
+
+	rep, err := sweep(ctx, io.Discard, q, obj, fetch, options{apply: true, workers: 1})
+	require.NoError(t, err)
+
+	assert.Empty(t, rep.Failures, "a row that only failed because the context was canceled must not be recorded")
+	assert.Empty(t, obj.uploads)
+	assert.Empty(t, q.peakParams)
 }
