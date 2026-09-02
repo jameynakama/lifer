@@ -47,6 +47,8 @@ SELECT COALESCE(rec.file_path, '')      AS audio_path,
        COALESCE(rec.type, '')           AS audio_type,
        COALESCE(rec.credit, '')         AS audio_credit,
        COALESCE(rec.xeno_canto_id, '')  AS audio_id,
+       -- No COALESCE: NULL here means "not backfilled" and must reach the
+       -- client, or the player loses its fallback to generated bars.
        rec.peaks                        AS audio_peaks,
        COALESCE(img.file_path, '')      AS image_path,
        COALESCE(img.credit, '')         AS image_credit,
@@ -104,6 +106,8 @@ SELECT s.ebird_code, s.common_name, s.scientific_name,
        COALESCE(rec.file_path, '')     AS audio_url,
        COALESCE(rec.credit, '')        AS audio_credit,
        COALESCE(rec.xeno_canto_id, '') AS audio_id,
+       -- No COALESCE: NULL here means "not backfilled" and must reach the
+       -- client, or the player loses its fallback to generated bars.
        rec.peaks                       AS audio_peaks,
        COALESCE(img.file_path, '')     AS image_url,
        COALESCE(img.credit, '')        AS image_credit,
