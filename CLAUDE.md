@@ -51,7 +51,7 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Ingest transcodes and peak-normalizes every new recording, and extracts waveform peaks, but stored recordings from before that shipped are untouched: most are still the original uncompressed audio with a NULL `peaks` column, and the player falls back to generated bars for them
 - `just transcode --limit 50` first to size the sweep against production (dry run, nothing written), then `just transcode --apply` for the full backfill. `ListRecordingsForTranscode` only returns rows with `peaks IS NULL`, so `--limit` always samples real remaining work; the backfill is complete once a sweep returns zero rows
 - The `just transcode` recipe `cd`s into `backend/` first, same as `ingest` -- a `--file` path for local single-file transcoding needs to be absolute or given relative to `backend/`, not the repo root
-- Once every row reports `skip` on a dry run, `generatePeaks` in `frontend/src/components/WavePlayer.svelte` is dead code and should come out
+- `generatePeaks` in `frontend/src/components/WavePlayer.svelte` stays permanently: `RecordingsList.svelte`'s admin view renders `<WavePlayer>` with no `peaks` prop (`GetSpeciesRecordings` doesn't select the column), so it always needs the generated fallback
 
 ## Key non-obvious choices
 - OAuth state stored as short-lived cookie (5min) to prevent CSRF -- verified on callback
