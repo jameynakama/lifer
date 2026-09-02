@@ -11,12 +11,13 @@ backend/flockdeck
 backend/server
 backend/ingest
 backend/seed
+backend/transcode
 
 # Superpowers brainstorm sessions + in-flight plans/specs (durable plans live in CLAUDE.md)
 .superpowers/
 docs/superpowers/
 
-# jj workspaces
+# Worktrees
 .worktrees/
 
 # Frontend
