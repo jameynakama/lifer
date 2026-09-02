@@ -41,30 +41,24 @@ Natural text keys on species/recordings/images are stable across DB resets -- re
 - Coexists with Google OAuth, matched on email in `users` -- no passwords ever
 - **`/about` feedback form (follow-up):** the `/about` page currently uses a plain `mailto:` to a plus-alias (`nakamajamey+flockdeck@gmail.com`) -- filterable/disposable since the repo is public. Once Resend is wired up here, replace it with a feedback form that POSTs to the backend and emails via Resend, keeping the address out of the client entirely
 
-### 2. Recording normalization
-- Some recordings (e.g. American Barn Owl) are startlingly loud compared to others
-- Goal: normalize audio levels to a consistent dB ceiling before storing in R2
-- Options: process at ingest time (ffmpeg loudnorm filter) or run a one-off normalization job after the fact
-- Needs: ffmpeg available in ingest environment, R2 re-upload of normalized files, decision on target loudness (e.g. -16 LUFS)
-
-### 3. Explore -- region filter
+### 2. Explore -- region filter
 - Region codes are NOT stored in the DB; intersect on demand instead
 - Flow: user picks state → backend proxy → eBird `GET /v2/ref/region/list/subnational2/{stateCode}` → user picks county → `GET /v2/product/spplist/{countyCode}` → intersect species codes with our catalog
 - Must proxy through backend to keep the eBird API key server-side
 - `regionType`: `country`, `subnational1` (states), `subnational2` (counties)
 
-### 4. Real audio waveforms (precomputed peaks)
-- Today `WavePlayer.svelte` draws *fake* peaks (`generatePeaks()`) -- cosmetic only. Real waveforms would make the player a navigation tool: scrub to a distinct phrase, or skip past the 3 background birds most XC recordings carry
-- Approach: precompute peaks at ingest (BBC `audiowaveform` or ffmpeg downsample) → store a small float array per recording (DB column or `.json` sidecar in R2) → serve with the card → hand to WaveSurfer's `peaks`. Keeps the instant draw AND native `<audio>` playback (no CORS needed)
-- Rejected alternative: enable CORS on R2 and let WaveSurfer fetch+decode client-side. Easier, zero BE work, but forces a full-file download + decode before drawing on *every* quiz card -- regresses the snappy card-to-card flip for accuracy nobody reads on a 4s clip. Precompute is the only option strictly better than today
-- Note: media is R2-owned (`media.flockdeck.com`), so CORS is fully ours to configure -- the WaveSurfer comment blaming "xeno-canto CDN" is stale
-- Backfill: existing recordings need a one-off peaks-extraction pass
+### 3. Run the transcode backfill
+- Ingest transcodes and peak-normalizes every new recording, and extracts waveform peaks, but stored recordings from before that shipped are untouched: most are still the original uncompressed audio with a NULL `peaks` column, and the player falls back to generated bars for them
+- `just transcode --limit 50` first to size the sweep against production (dry run, nothing written), then `just transcode --apply` for the full backfill
+- The `just transcode` recipe `cd`s into `backend/` first, same as `ingest` -- a `--file` path for local single-file transcoding needs to be absolute or given relative to `backend/`, not the repo root
+- Once every row reports `skip` on a dry run, `generatePeaks` in `frontend/src/components/WavePlayer.svelte` is dead code and should come out
 
 ## Key non-obvious choices
 - OAuth state stored as short-lived cookie (5min) to prevent CSRF -- verified on callback
 - `UpsertUser` updates name/picture on every login so Google profile changes sync
 - SvelteKit mounts into `<div style="display: contents">` -- `#app` CSS is dead; use `.app-container` in `+layout.svelte`
-- WaveSurfer: CDN URLs may lack CORS headers. Pass `media: audio` (native `<audio>`, no XHR) + fake `peaks` so bars draw immediately
+- WavePlayer never decodes audio client-side: it hands WaveSurfer a native `<audio>` element (`media: audio` -- no XHR, so no CORS dependency) plus precomputed peaks from the card payload; recordings that predate the peaks backfill fall back to generated bars
+- Recordings are stored mono at 96 kbps mp3, peak-normalized to -1 dBFS, transcoded at ingest by `internal/audio`. `just transcode` re-runs that pass over already-stored objects, overwriting in place at the existing key so `file_path` never changes; it's a dry run unless `--apply` is passed
 - Quiz auto-rating: no self-reporting; `correct ? 3 : 1` posted to `/rate` along with `guessed_species_code` (null = skip) and `media_id` -- both optional so old clients keep working
 - `/stats` is computed live per request (every query `WHERE user_id`); lane tabs are `?lane=` on the same endpoint, ear-vs-eye exists only on the combined view. FSRS retrievability via go-fsrs `GetRetrievability` (package-level `statsFSRS`), so stats use the exact scheduler curve
 - R2 ingest workflow: ingest runs from the laptop against whichever DB `DATABASE_URL` points at (these days usually prod directly); media goes to the one shared R2 bucket either way. No per-environment media copies
