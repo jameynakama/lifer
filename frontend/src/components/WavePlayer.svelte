@@ -2,7 +2,7 @@
   import WaveSurfer from 'wavesurfer.js'
   import { onMount } from 'svelte'
 
-  let { url }: { url: string } = $props()
+  let { url, peaks }: { url: string; peaks?: number[] } = $props()
 
   let container: HTMLDivElement
   let ws: WaveSurfer
@@ -10,12 +10,14 @@
   let playing = $state(false)
   let ready = $state(false)
 
-  // WaveSurfer's default mode fetches the audio via XHR to decode waveform peaks,
-  // which requires CORS headers our R2 bucket (media.flockdeck.com) doesn't
-  // currently send. So we skip the decode entirely: hand WaveSurfer a native
-  // <audio> element (loaded by the browser without CORS restrictions) and supply
-  // pre-generated peaks. These bars are cosmetic, not the real waveform -- see
-  // "Real audio waveforms" in CLAUDE.md for the precomputed-peaks plan.
+  // WaveSurfer's default mode fetches the audio via XHR to decode waveform
+  // peaks. We skip that decode entirely: hand WaveSurfer a native <audio>
+  // element and supply peaks ourselves, so the bars draw instantly and playback
+  // never waits on a full download.
+  //
+  // Real peaks are precomputed at ingest and stored per recording. Recordings
+  // the transcode backfill has not reached yet have none, and fall back to these
+  // cosmetic bars.
   function generatePeaks(count: number): number[][] {
     return [
       Array.from({ length: count }, (_, i) => {
@@ -24,6 +26,12 @@
         return Math.random() * envelope + 0.05
       }),
     ]
+  }
+
+  // Stored peaks are 0..255 per bucket; WaveSurfer wants one array per channel
+  // of amplitudes in 0..1.
+  function toWaveSurferPeaks(stored: number[]): number[][] {
+    return [stored.map((p) => p / 255)]
   }
 
   onMount(() => {
@@ -38,7 +46,7 @@
     ws = WaveSurfer.create({
       container,
       media: audio,
-      peaks: generatePeaks(200),
+      peaks: peaks && peaks.length > 0 ? toWaveSurferPeaks(peaks) : generatePeaks(200),
       waveColor,
       progressColor,
       cursorColor: 'transparent',

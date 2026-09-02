@@ -25,7 +25,7 @@
 <div class="quiz-card">
   {#if card.lane === 'audio'}
     <div class="audio-card card">
-      <WavePlayer url={card.media_url} bind:this={player} />
+      <WavePlayer url={card.media_url} peaks={card.peaks} bind:this={player} />
     </div>
   {:else}
     <div class="photo-card card">

@@ -37,7 +37,7 @@
       {#if card.recording_type}
         <span class="recording-type">{card.recording_type}</span>
       {/if}
-      <WavePlayer url={card.media_url} />
+      <WavePlayer url={card.media_url} peaks={card.peaks} />
       {#if card.recording_credit}
         <p class="credit">{card.recording_credit}</p>
       {/if}

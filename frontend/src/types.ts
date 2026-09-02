@@ -19,6 +19,9 @@ export interface BirdCard {
   photo_credit: string
   due_remaining: number
   media_id: string
+  /** Waveform envelope, 0..255 per bucket. Absent until the recording has been
+   *  through the transcode backfill. */
+  peaks?: number[]
 }
 
 export interface Deck {
