@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strconv"
+	"strings"
 )
 
 // ErrFFmpegMissing is returned when ffmpeg or ffprobe is not on PATH. Ingest and
@@ -72,7 +73,7 @@ func Probe(ctx context.Context, path string) (Info, error) {
 // normalizeFormat collapses ffprobe's comma-separated format lists ("mov,mp4,
 // m4a,3gp,3g2,mj2") and its WAV alias to a single stable token.
 func normalizeFormat(name string) string {
-	for _, part := range splitComma(name) {
+	for _, part := range strings.Split(name, ",") {
 		switch part {
 		case "wav", "mp3", "flac", "ogg", "mp4":
 			return part
@@ -81,19 +82,7 @@ func normalizeFormat(name string) string {
 	if name == "" {
 		return ""
 	}
-	return splitComma(name)[0]
-}
-
-func splitComma(s string) []string {
-	var out []string
-	start := 0
-	for i := range len(s) {
-		if s[i] == ',' {
-			out = append(out, s[start:i])
-			start = i + 1
-		}
-	}
-	return append(out, s[start:])
+	return strings.Split(name, ",")[0]
 }
 
 // run executes an ffmpeg-family command and returns its stdout. Stderr is
