@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math"
 	"os"
 	"slices"
 	"sync"
@@ -48,10 +47,19 @@ type report struct {
 	BytesAfter  int64
 }
 
-// durationTolerance is how far the transcoded output may drift from the source
-// before it is rejected. Encoder padding accounts for a few milliseconds; a
-// real truncation is far larger.
-const durationTolerance = 0.01
+// paddingAllowanceSecs is how much LONGER than its source the output may run.
+// MP3 encoders add decoder delay and pad the final frame to a 1152-sample
+// boundary, so the output always runs slightly long -- by a fixed amount, not a
+// proportional one, which on a short recording is a large percentage. How much
+// of it reaches the probed duration depends on whether the encoder wrote
+// gapless metadata, so it varies between ffmpeg builds. A generous absolute
+// allowance costs nothing: truncation, the failure this guards against, is
+// measured in seconds.
+const paddingAllowanceSecs = 0.25
+
+// shortfallTolerance is how much SHORTER than its source the output may run.
+// Nothing legitimate truncates audio, so this stays tight.
+const shortfallTolerance = 0.01
 
 // actionNone is returned alongside an error to make clear that no decision was
 // reached, rather than reusing actionSkip's zero value to mean "no answer."
@@ -217,9 +225,11 @@ func verify(ctx context.Context, data []byte, srcDuration float64) error {
 		return fmt.Errorf("verify: output probed as %q, not mp3", info.Format)
 	}
 	if srcDuration > 0 {
-		drift := math.Abs(info.Duration-srcDuration) / srcDuration
-		if drift > durationTolerance {
-			return fmt.Errorf("verify: duration drifted %.1f%% (%.2fs -> %.2fs)", drift*100, srcDuration, info.Duration)
+		if info.Duration < srcDuration*(1-shortfallTolerance) {
+			return fmt.Errorf("verify: output lost audio (%.2fs -> %.2fs)", srcDuration, info.Duration)
+		}
+		if info.Duration > srcDuration+paddingAllowanceSecs {
+			return fmt.Errorf("verify: output ran long (%.2fs -> %.2fs)", srcDuration, info.Duration)
 		}
 	}
 	return nil

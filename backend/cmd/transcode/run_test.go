@@ -234,11 +234,24 @@ func TestVerify_RejectsDurationDrift(t *testing.T) {
 	res, err := audio.Transcode(context.Background(), "../../internal/audio/testdata/stereo.wav")
 	require.NoError(t, err)
 
-	// The real output is ~2s; claiming a wildly different source duration must
-	// trip the drift check even though the mp3 itself is valid.
+	// The real output is ~2s; claiming a wildly longer source means the encode
+	// lost almost all of it, which must be rejected even though the mp3 itself
+	// is valid.
 	err = verify(context.Background(), res.Data, 100.0)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "duration drifted", "must identify the duration check as the failing one")
+	assert.Contains(t, err.Error(), "lost audio", "must identify the duration check as the failing one")
+}
+
+func TestVerify_AcceptsEncoderPadding(t *testing.T) {
+	res, err := audio.Transcode(context.Background(), "../../internal/audio/testdata/stereo.wav")
+	require.NoError(t, err)
+
+	// MP3 encoders pad the final frame, so the output runs long by a fixed
+	// amount that is a large percentage of a short recording. Some ffmpeg
+	// builds surface that padding in the probed duration and some do not, so
+	// this must be accepted rather than read as a corrupt encode.
+	err = verify(context.Background(), res.Data, 1.96)
+	require.NoError(t, err, "padding within the allowance must not be rejected")
 }
 
 // With workers > 1, rows are dispatched to a fixed pool rather than one
