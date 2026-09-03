@@ -55,14 +55,42 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > /tmp/deploy_key
           chmod 600 /tmp/deploy_key
-          ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} '
-            cd /app/flockdeck &&
-            git fetch origin main &&
-            git reset --hard FETCH_HEAD &&
-            cd frontend && npm ci && npm run build && cd .. &&
-            cd backend && /usr/local/go/bin/go build -o bin/flockdeck ./cmd/server && cd .. &&
-            set -a && source .env && set +a &&
-            migrate -path backend/migrations -database "$DATABASE_URL" up &&
-            sudo systemctl restart flockdeck
-          '
+          # `timeout` bounds the whole thing: ssh waits for EOF on the remote
+          # command's output, which a process holding those descriptors open can
+          # withhold long after the work is done. `tee` keeps the log on the
+          # droplet, where it survives whatever ssh does with the stream -- and
+          # the phase markers are what make a slow deploy diagnosable at all.
+          # `|| status=$?` so the step runs its cleanup and its diagnosis
+          # instead of aborting here under the shell errexit default.
+          status=0
+          timeout 600 ssh -i /tmp/deploy_key -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} '
+            set -o pipefail
+            {
+              phase() { echo "== $(date -u +%H:%M:%S) $* =="; }
+              set -e
+              cd /app/flockdeck
+              phase "fetch"
+              git fetch origin main
+              git reset --hard FETCH_HEAD
+              phase "npm ci"
+              (cd frontend && npm ci)
+              phase "frontend build"
+              (cd frontend && npm run build)
+              phase "go build"
+              (cd backend && /usr/local/go/bin/go build -o bin/flockdeck ./cmd/server)
+              phase "migrate"
+              set -a && . ./.env && set +a
+              migrate -path backend/migrations -database "$DATABASE_URL" up
+              phase "restart"
+              # Detached: a restarted service that inherits these descriptors
+              # holds the ssh connection open long after the deploy finishes.
+              sudo systemctl restart flockdeck < /dev/null > /dev/null 2>&1
+              phase "done"
+            } 2>&1 | tee -a "$HOME/flockdeck-deploy.log"
+          ' || status=$?
           rm /tmp/deploy_key
+          if [ $status -eq 124 ]; then
+            echo "Deploy timed out after 600s. The work may have completed anyway:"
+            echo "check /var/log/flockdeck-deploy.log on the droplet for the last phase reached."
+          fi
+          exit $status
